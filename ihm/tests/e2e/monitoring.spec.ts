@@ -212,7 +212,7 @@ starvis_http_request_duration_seconds_count{route="/api/v1/ships"} 5
 
     // 11. Switch to API Logs tab
     await page.getByRole('button', { name: 'Logs API Externe' }).click();
-    await expect(page.getByText('External API logs only')).toBeVisible();
+    await expect(page.getByText('External API logs')).toBeVisible();
 
     // Verify actor label formatting for API Externe
     // External API: should show token name with user who generated it
@@ -220,7 +220,7 @@ starvis_http_request_duration_seconds_count{route="/api/v1/ships"} 5
 
     // 12. Switch to IHM Logs tab
     await page.getByRole('button', { name: 'Logs IHM' }).click();
-    await expect(page.getByText('Starvis IHM logs only')).toBeVisible();
+    await expect(page.getByText('Starvis IHM logs')).toBeVisible();
 
     // Verify actor label formatting for IHM
     // Starvis IHM: should show username & role, or anonymous. NEVER "ihm-public-proxy"!
