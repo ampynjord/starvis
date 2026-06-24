@@ -305,7 +305,7 @@ test.describe('@mobile responsive shell', () => {
       } else {
         await expect(page.getByText(target.text).first()).toBeVisible({ timeout: 15_000 });
       }
-      await expect(page.getByRole('banner').getByPlaceholder(/search ships/i)).toBeVisible();
+      await expect(page.getByRole('button', { name: /search ships/i })).toBeVisible();
       await expect(page.getByLabel('Open menu')).toBeVisible();
       await expectNoShellHorizontalOverflow(page);
     });
