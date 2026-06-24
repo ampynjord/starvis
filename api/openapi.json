@@ -8708,6 +8708,47 @@
         }
       }
     },
+    "/admin/maintenance/prune-old-env": {
+      "post": {
+        "tags": ["Admin"],
+        "summary": "Prune old environments",
+        "description": "Deletes all rows in the game database schema where env is not 'live' or 'ptu'. Cascade deletes related records.",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "cookieAuth": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "integer"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/admin/stats": {
       "get": {
         "tags": ["Admin"],
