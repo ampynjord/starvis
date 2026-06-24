@@ -19,17 +19,14 @@ import {
   Ship,
   User,
   X,
-  Search,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState, useEffect } from 'react';
 import { useEnv } from '@/contexts/EnvContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { NAV_GROUPS, type NavItemDef } from '@/components/layout/navigation';
 import { ADMIN_ROLE, hasDeveloperAccess, PUBLIC_RSI_URL } from '@/lib/app-constants';
 import { useAdvancedMode } from '@/contexts/AdvancedModeContext';
-import { SearchOmnibar } from '@/components/ui/SearchOmnibar';
 
 function NavItem({ to, icon: Icon, label, earlyAccess, auth: requiresAuth, exact, onNavigate }: NavItemDef & { onNavigate?: () => void }) {
   const pathname = usePathname();
@@ -93,22 +90,10 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
   const { env, setEnv } = useEnv();
   const { user } = useAuth();
   const { isAdvancedMode, toggleAdvancedMode } = useAdvancedMode();
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-        e.preventDefault();
-        setIsSearchOpen((prev) => !prev);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
 
   return (
     <>
-      <SearchOmnibar open={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
       <aside
         className={[
         // Desktop: static sidebar
@@ -130,14 +115,6 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
-          {/* Search Trigger */}
-          <button
-            onClick={() => setIsSearchOpen(true)}
-            title="Search (Ctrl+K)"
-            className="p-1 rounded-sm text-slate-500 hover:text-cyan-400 hover:bg-slate-900 transition-colors"
-          >
-            <Search size={14} />
-          </button>
 
           {/* Advanced Mode Toggle */}
           <button
