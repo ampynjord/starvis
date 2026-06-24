@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { EnvProvider } from '@/contexts/EnvContext';
+import { AdvancedModeProvider } from '@/contexts/AdvancedModeContext';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -23,9 +24,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <ErrorBoundary>
       <EnvProvider>
-        <QueryClientProvider client={queryClient}>
-          <AuthProvider>{children}</AuthProvider>
-        </QueryClientProvider>
+        <AdvancedModeProvider>
+          <QueryClientProvider client={queryClient}>
+            <AuthProvider>{children}</AuthProvider>
+          </QueryClientProvider>
+        </AdvancedModeProvider>
       </EnvProvider>
     </ErrorBoundary>
   );

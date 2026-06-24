@@ -397,7 +397,11 @@ async function start() {
   // 5. Mount routes
   app.use('/', createRoutes({ prisma, getGamePrisma: () => prisma, shipMatrixService, gameDataService, rsiWebsiteService }));
 
-  // 6. Start listening
+  // 6. Global Error Handler
+  const { rfc7807ErrorHandler } = await import('./src/middleware/errorHandler.js');
+  app.use(rfc7807ErrorHandler);
+
+  // 7. Start listening
   httpServer = app.listen(PORT, () => logger.info(`✅ Starvis v2.0 listening on :${PORT}`, { module: 'Server' }));
 }
 

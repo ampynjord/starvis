@@ -4,6 +4,7 @@
  */
 
 import type { LoadoutNode, Ship } from '@/types/api';
+import { useAdvancedMode } from '@/contexts/AdvancedModeContext';
 
 // ── Helpers ──────────────────────────────────────────────
 function n(v: unknown): number { return Number(v ?? 0) || 0; }
@@ -102,10 +103,10 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 }
 
 // ── Component ────────────────────────────────────────────
-interface Props { ship: Ship; loadout: LoadoutNode[]; category?: string }
 
-export function ShipStatsBanner({ ship, loadout, category = 'ship' }: Props) {
-  const isGround = category === 'ground';
+export function ShipStatsBanner({ ship, loadout, category }: { ship: Ship, loadout: LoadoutNode[], category?: string }) {
+  const { isAdvancedMode } = useAdvancedMode();
+  const isGround = category?.toLowerCase().includes('ground') || false;
   const isGroundOrGravlev = category === 'ground' || category === 'gravlev';
   const ls = computeStats(loadout);
   const shieldHp = ls.shieldHp > 0 ? ls.shieldHp : n(ship.shield_hp);
@@ -466,7 +467,7 @@ export function ShipStatsBanner({ ship, loadout, category = 'ship' }: Props) {
         )}
 
         {/* Armor resistance — 3 blocks side by side */}
-        {armBars.length > 0 && (
+        {isAdvancedMode && armBars.length > 0 && (
           <div className="grid grid-cols-3 gap-1.5">
             {armBars.map(({ k, v, color, text }) => {
               const pct = Math.round((1 - n(v)) * 100);
@@ -492,7 +493,7 @@ export function ShipStatsBanner({ ship, loadout, category = 'ship' }: Props) {
         )}
 
         {/* Damage penetration */}
-        {(ship.fuse_penetration != null || ship.component_penetration != null) && (
+        {isAdvancedMode && (ship.fuse_penetration != null || ship.component_penetration != null) && (
           <div className="flex items-center justify-between mt-2 rounded-md border border-orange-900/30 bg-orange-950/10 px-3 py-1.5">
             <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-widest">Penetration</span>
             <div className="flex gap-3 items-baseline">
@@ -525,7 +526,7 @@ export function ShipStatsBanner({ ship, loadout, category = 'ship' }: Props) {
       {/* ════════════════════════════════════════
           SIGNATURES
       ════════════════════════════════════════ */}
-      {(ship.armor_signal_ir != null || ship.armor_signal_em != null || ship.armor_signal_cs != null) && (() => {
+      {isAdvancedMode && (ship.armor_signal_ir != null || ship.armor_signal_em != null || ship.armor_signal_cs != null) && (() => {
         const sigs = [
           { key: 'IR',    label: 'Thermal',  val: ship.armor_signal_ir, color: '#f97316', dimColor: 'text-orange-400', trackColor: 'rgba(234,88,12,0.15)' },
           { key: 'EM',    label: 'Electro',  val: ship.armor_signal_em, color: '#a855f7', dimColor: 'text-violet-400', trackColor: 'rgba(168,85,247,0.15)' },
