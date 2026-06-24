@@ -4,7 +4,6 @@
  */
 
 import type { LoadoutNode, Ship } from '@/types/api';
-import { useAdvancedMode } from '@/contexts/AdvancedModeContext';
 
 // ── Helpers ──────────────────────────────────────────────
 function n(v: unknown): number { return Number(v ?? 0) || 0; }
@@ -105,7 +104,6 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 // ── Component ────────────────────────────────────────────
 
 export function ShipStatsBanner({ ship, loadout, category }: { ship: Ship, loadout: LoadoutNode[], category?: string }) {
-  const { isAdvancedMode } = useAdvancedMode();
   const isGround = category?.toLowerCase().includes('ground') || false;
   const isGroundOrGravlev = category === 'ground' || category === 'gravlev';
   const ls = computeStats(loadout);
@@ -280,7 +278,7 @@ export function ShipStatsBanner({ ship, loadout, category }: { ship: Ship, loado
         )}
 
         {/* G-force + boost — ships uniquement */}
-        {isAdvancedMode && !isGroundOrGravlev && gForce != null && (
+        {!isGroundOrGravlev && gForce != null && (
           <div className="flex items-center justify-between mt-2 rounded-md border border-slate-800 bg-slate-900/40 px-3 py-1.5">
             <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-widest">Accel (fwd)</span>
             <div className="flex items-baseline gap-2">
@@ -293,7 +291,7 @@ export function ShipStatsBanner({ ship, loadout, category }: { ship: Ship, loado
         )}
 
         {/* Boost ramp — ships only */}
-        {isAdvancedMode && !isGroundOrGravlev && rampUp != null && (
+        {!isGroundOrGravlev && rampUp != null && (
           <div className="mt-2">
             <div className="flex flex-col items-center rounded-md border border-amber-900/30 bg-amber-950/10 py-1.5 px-1">
               <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-widest mb-0.5">Boost Ramp</span>
@@ -467,7 +465,7 @@ export function ShipStatsBanner({ ship, loadout, category }: { ship: Ship, loado
         )}
 
         {/* Armor resistance — 3 blocks side by side */}
-        {isAdvancedMode && armBars.length > 0 && (
+        {armBars.length > 0 && (
           <div className="grid grid-cols-3 gap-1.5">
             {armBars.map(({ k, v, color, text }) => {
               const pct = Math.round((1 - n(v)) * 100);
@@ -493,7 +491,7 @@ export function ShipStatsBanner({ ship, loadout, category }: { ship: Ship, loado
         )}
 
         {/* Damage penetration */}
-        {isAdvancedMode && (ship.fuse_penetration != null || ship.component_penetration != null) && (
+        {(ship.fuse_penetration != null || ship.component_penetration != null) && (
           <div className="flex items-center justify-between mt-2 rounded-md border border-orange-900/30 bg-orange-950/10 px-3 py-1.5">
             <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-widest">Penetration</span>
             <div className="flex gap-3 items-baseline">
@@ -526,7 +524,7 @@ export function ShipStatsBanner({ ship, loadout, category }: { ship: Ship, loado
       {/* ════════════════════════════════════════
           SIGNATURES
       ════════════════════════════════════════ */}
-      {isAdvancedMode && (ship.armor_signal_ir != null || ship.armor_signal_em != null || ship.armor_signal_cs != null) && (() => {
+      {(ship.armor_signal_ir != null || ship.armor_signal_em != null || ship.armor_signal_cs != null) && (() => {
         const sigs = [
           { key: 'IR',    label: 'Thermal',  val: ship.armor_signal_ir, color: '#f97316', dimColor: 'text-orange-400', trackColor: 'rgba(234,88,12,0.15)' },
           { key: 'EM',    label: 'Electro',  val: ship.armor_signal_em, color: '#a855f7', dimColor: 'text-violet-400', trackColor: 'rgba(168,85,247,0.15)' },
@@ -594,7 +592,7 @@ export function ShipStatsBanner({ ship, loadout, category }: { ship: Ship, loado
       {/* ════════════════════════════════════════
           SYSTEMS — Output + Consumption
       ════════════════════════════════════════ */}
-      {isAdvancedMode && hasPower && (
+      {hasPower && (
         <div>
           <SectionLabel>Systems</SectionLabel>
           {(() => {
@@ -639,7 +637,7 @@ export function ShipStatsBanner({ ship, loadout, category }: { ship: Ship, loado
       {/* ════════════════════════════════════════
           RADAR
       ════════════════════════════════════════ */}
-      {isAdvancedMode && !isGroundOrGravlev && radarNode && (
+      {!isGroundOrGravlev && radarNode && (
         <div>
           <SectionLabel>Radar</SectionLabel>
           <div className="grid grid-cols-3 gap-1.5">
