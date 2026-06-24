@@ -45,6 +45,7 @@ export const ShipQuery = z
     page: qInt(1),
     limit: qInt(50, 200),
     format: qStr,
+    view: qStr,
     /** Comma-separated optional relations: manufacturer,paints,matrix,variants */
     include: qStr,
   })
@@ -147,6 +148,7 @@ export const ItemQuery = z
     page: qInt(1),
     limit: qInt(50, 200),
     format: qStr,
+    view: qStr,
     /** Comma-separated optional relations: manufacturer */
     include: qStr,
   })

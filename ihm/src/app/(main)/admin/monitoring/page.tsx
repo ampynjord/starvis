@@ -282,7 +282,7 @@ function statusStyle(statusCode: number) {
 
 function externalActorLabel(log: RequestLogEntry) {
   if (log.apiTokenName) {
-    return `${log.apiTokenName}${log.username ? ` (by ${log.username})` : ''}`;
+    return log.apiTokenName;
   }
   if (log.username) {
     return `${log.username} (API Token)`;
@@ -294,7 +294,11 @@ function externalActorLabel(log: RequestLogEntry) {
 }
 
 function ihmActorLabel(log: RequestLogEntry) {
-  if (log.username) {
+  if (log.internalClient) {
+    if (log.internalClient === 'anonymous') return 'anonymous';
+    return log.internalClient;
+  }
+  if (log.username && log.username !== 'ihm-public-proxy') {
     return `${log.username}${log.role ? ` · ${log.role}` : ''}`;
   }
   return 'anonymous';
@@ -358,7 +362,7 @@ const REFRESH_INTERVAL_MS = 10_000;
 
 export default function AdminMonitoringPage() {
   const { user: me } = useAuth();
-  const [activeTab, setActiveTab] = useState<'overview' | 'api' | 'system' | 'logs'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'api' | 'system' | 'api-logs' | 'ihm-logs'>('overview');
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [externalRequestLogs, setExternalRequestLogs] = useState<RequestLogEntry[]>([]);
   const [webRequestLogs, setWebRequestLogs] = useState<RequestLogEntry[]>([]);
@@ -500,7 +504,8 @@ export default function AdminMonitoringPage() {
               { id: 'overview', label: 'Vue d\'ensemble' },
               { id: 'api', label: 'Accès & Jetons API' },
               { id: 'system', label: 'Performance & Système' },
-              { id: 'logs', label: 'Journaux d\'activité' },
+              { id: 'api-logs', label: 'Logs API Externe' },
+              { id: 'ihm-logs', label: 'Logs IHM' },
             ] as const
           ).map((tab) => (
             <button
@@ -770,14 +775,14 @@ export default function AdminMonitoringPage() {
         </div>
       )}
 
-      {activeTab === 'logs' && (
+      {activeTab === 'api-logs' && (
         <div className="space-y-4 animate-in fade-in duration-200">
           <div className="sci-panel border border-slate-800/60 p-3">
             <div className="grid gap-3 md:grid-cols-[1fr_180px_160px] md:items-end">
               <div>
-                <p className="font-orbitron text-sm font-bold uppercase tracking-widest text-slate-200">User request history</p>
+                <p className="font-orbitron text-sm font-bold uppercase tracking-widest text-slate-200">External API History</p>
                 <p className="mt-1 font-mono-sc text-xs text-slate-600">
-                  Persistent API and IHM activity, restricted to admins.
+                  Persistent API activity from external developers and apps.
                 </p>
               </div>
               <label className="block">
@@ -801,122 +806,159 @@ export default function AdminMonitoringPage() {
             </div>
           </div>
 
-          <div className="grid gap-4 xl:grid-cols-2">
-            {/* External API request logs */}
-            <div className="sci-panel border border-slate-800/60">
-              <div className="flex flex-col gap-1 border-b border-slate-800/60 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
-                <p className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
-                  External API logs only
-                </p>
-                <span className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-700">
-                  Last {externalRequestLogs.length.toLocaleString()} external requests
-                </span>
-              </div>
-              {loading && externalRequestLogs.length === 0 ? (
-                <div className="flex items-center justify-center py-10 text-slate-600"><Loader2 size={18} className="animate-spin" /></div>
-              ) : externalRequestLogs.length === 0 ? (
-                <p className="px-3 py-8 text-center font-mono-sc text-xs text-slate-700">No external API logs yet.</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left">
-                    <thead>
-                      <tr className="border-b border-slate-800/60 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
-                        <th className="px-3 py-2 font-normal">Time</th>
-                        <th className="px-3 py-2 font-normal">Request</th>
-                        <th className="px-3 py-2 text-right font-normal">Status</th>
-                        <th className="px-3 py-2 text-right font-normal">Duration</th>
-                        <th className="px-3 py-2 font-normal">Project / Actor</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {externalRequestLogs.map((log) => (
-                        <tr key={log.id} className="border-b border-slate-800/40 last:border-0 hover:bg-cyan-950/10">
-                          <td className="whitespace-nowrap px-3 py-2 font-mono-sc text-xs text-slate-500">{fmtTime(log.timestamp)}</td>
-                          <td className="px-3 py-2">
-                            <div className="flex min-w-0 items-center gap-2">
-                              <span className="rounded-sm border border-cyan-900/60 bg-cyan-950/20 px-1.5 py-0.5 font-mono-sc text-[10px] font-bold text-cyan-400">
-                                {log.method}
-                              </span>
-                              <span className="max-w-[12rem] truncate font-mono-sc text-xs text-slate-300" title={log.path}>{log.path}</span>
-                            </div>
-                          </td>
-                          <td className="px-3 py-2 text-right">
-                            <span className={`inline-flex rounded-sm border px-1.5 py-0.5 font-mono-sc text-[10px] font-bold ${statusStyle(log.statusCode)}`}>
-                              {log.statusCode}
-                            </span>
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-2 text-right font-mono-sc text-xs text-slate-400">{fmtMs(log.durationMs)}</td>
-                          <td className="px-3 py-2">
-                            <div className="flex items-center gap-1.5 font-mono-sc text-xs text-slate-500" title={clientLabel(log)}>
-                              <KeyRound size={11} className="text-slate-600" />
-                              <span className="max-w-[10rem] truncate">{externalActorLabel(log)}</span>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+          <div className="sci-panel border border-slate-800/60">
+            <div className="flex flex-col gap-1 border-b border-slate-800/60 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+              <p className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
+                External API logs
+              </p>
+              <span className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-700">
+                Last {externalRequestLogs.length.toLocaleString()} requests
+              </span>
             </div>
+            {loading && externalRequestLogs.length === 0 ? (
+              <div className="flex items-center justify-center py-10 text-slate-600"><Loader2 size={18} className="animate-spin" /></div>
+            ) : externalRequestLogs.length === 0 ? (
+              <p className="px-3 py-8 text-center font-mono-sc text-xs text-slate-700">No external API logs yet.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="border-b border-slate-800/60 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
+                      <th className="px-3 py-2 font-normal">Time</th>
+                      <th className="px-3 py-2 font-normal">Request</th>
+                      <th className="px-3 py-2 text-right font-normal">Status</th>
+                      <th className="px-3 py-2 text-right font-normal">Duration</th>
+                      <th className="px-3 py-2 font-normal">IP Address</th>
+                      <th className="px-3 py-2 font-normal">Project / Actor</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {externalRequestLogs.map((log) => (
+                      <tr key={log.id} className="border-b border-slate-800/40 last:border-0 hover:bg-cyan-950/10 transition-colors">
+                        <td className="whitespace-nowrap px-3 py-2 font-mono-sc text-xs text-slate-500">{fmtTime(log.timestamp)}</td>
+                        <td className="px-3 py-2">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <span className="rounded-sm border border-cyan-900/60 bg-cyan-950/20 px-1.5 py-0.5 font-mono-sc text-[10px] font-bold text-cyan-400">
+                              {log.method}
+                            </span>
+                            <span className="max-w-md truncate font-mono-sc text-xs text-slate-300" title={log.path}>{log.path}</span>
+                          </div>
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <span className={`inline-flex rounded-sm border px-1.5 py-0.5 font-mono-sc text-[10px] font-bold ${statusStyle(log.statusCode)}`}>
+                            {log.statusCode}
+                          </span>
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2 text-right font-mono-sc text-xs text-slate-400">{fmtMs(log.durationMs)}</td>
+                        <td className="px-3 py-2 font-mono-sc text-xs text-slate-500">
+                          {log.ip ?? 'unknown'}
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="flex items-center gap-1.5 font-mono-sc text-xs text-slate-500" title={clientLabel(log)}>
+                            <KeyRound size={11} className="text-slate-600" />
+                            <span className="max-w-[12rem] truncate">{externalActorLabel(log)}</span>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
-            {/* Starvis IHM request logs */}
-            <div className="sci-panel border border-slate-800/60">
-              <div className="flex flex-col gap-1 border-b border-slate-800/60 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
-                <p className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
-                  Starvis IHM logs only
+      {activeTab === 'ihm-logs' && (
+        <div className="space-y-4 animate-in fade-in duration-200">
+          <div className="sci-panel border border-slate-800/60 p-3">
+            <div className="grid gap-3 md:grid-cols-[1fr_180px_160px] md:items-end">
+              <div>
+                <p className="font-orbitron text-sm font-bold uppercase tracking-widest text-slate-200">Starvis IHM History</p>
+                <p className="mt-1 font-mono-sc text-xs text-slate-600">
+                  User requests performed from the frontend application.
                 </p>
-                <span className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-700">
-                  Last {webRequestLogs.length.toLocaleString()} web requests
-                </span>
               </div>
-              {loading && webRequestLogs.length === 0 ? (
-                <div className="flex items-center justify-center py-10 text-slate-600"><Loader2 size={18} className="animate-spin" /></div>
-              ) : webRequestLogs.length === 0 ? (
-                <p className="px-3 py-8 text-center font-mono-sc text-xs text-slate-700">No Starvis IHM request logs yet.</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left">
-                    <thead>
-                      <tr className="border-b border-slate-800/60 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
-                        <th className="px-3 py-2 font-normal">Time</th>
-                        <th className="px-3 py-2 font-normal">Request</th>
-                        <th className="px-3 py-2 text-right font-normal">Status</th>
-                        <th className="px-3 py-2 text-right font-normal">Duration</th>
-                        <th className="px-3 py-2 font-normal">Actor</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {webRequestLogs.map((log) => (
-                        <tr key={log.id} className="border-b border-slate-800/40 last:border-0 hover:bg-cyan-950/10">
-                          <td className="whitespace-nowrap px-3 py-2 font-mono-sc text-xs text-slate-500">{fmtTime(log.timestamp)}</td>
-                          <td className="px-3 py-2">
-                            <div className="flex min-w-0 items-center gap-2">
-                              <span className="rounded-sm border border-cyan-900/60 bg-cyan-950/20 px-1.5 py-0.5 font-mono-sc text-[10px] font-bold text-cyan-400">
-                                {log.method}
-                              </span>
-                              <span className="max-w-[12rem] truncate font-mono-sc text-xs text-slate-300" title={log.path}>{log.path}</span>
-                            </div>
-                          </td>
-                          <td className="px-3 py-2 text-right">
-                            <span className={`inline-flex rounded-sm border px-1.5 py-0.5 font-mono-sc text-[10px] font-bold ${statusStyle(log.statusCode)}`}>
-                              {log.statusCode}
-                            </span>
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-2 text-right font-mono-sc text-xs text-slate-400">{fmtMs(log.durationMs)}</td>
-                          <td className="px-3 py-2">
-                            <div className="flex items-center gap-1.5 font-mono-sc text-xs text-slate-500" title={clientLabel(log)}>
-                              <User size={11} className="text-slate-600" />
-                              <span className="max-w-[10rem] truncate">{ihmActorLabel(log)}</span>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+              <label className="block">
+                <span className="mb-1 block font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">Role</span>
+                <select value={historyRole} onChange={(event) => setHistoryRole(event.target.value)} className="sci-input h-9 w-full text-xs">
+                  <option value="">All roles</option>
+                  <option value="user">User</option>
+                  <option value="developer">Developer</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-1 block font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">User ID</span>
+                <input
+                  value={historyUserId}
+                  onChange={(event) => setHistoryUserId(event.target.value.replace(/\D/g, ''))}
+                  placeholder="Any"
+                  className="sci-input h-9 w-full text-xs"
+                />
+              </label>
             </div>
+          </div>
+
+          <div className="sci-panel border border-slate-800/60">
+            <div className="flex flex-col gap-1 border-b border-slate-800/60 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+              <p className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
+                Starvis IHM logs
+              </p>
+              <span className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-700">
+                Last {webRequestLogs.length.toLocaleString()} web requests
+              </span>
+            </div>
+            {loading && webRequestLogs.length === 0 ? (
+              <div className="flex items-center justify-center py-10 text-slate-600"><Loader2 size={18} className="animate-spin" /></div>
+            ) : webRequestLogs.length === 0 ? (
+              <p className="px-3 py-8 text-center font-mono-sc text-xs text-slate-700">No Starvis IHM request logs yet.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="border-b border-slate-800/60 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
+                      <th className="px-3 py-2 font-normal">Time</th>
+                      <th className="px-3 py-2 font-normal">Request</th>
+                      <th className="px-3 py-2 text-right font-normal">Status</th>
+                      <th className="px-3 py-2 text-right font-normal">Duration</th>
+                      <th className="px-3 py-2 font-normal">IP Address</th>
+                      <th className="px-3 py-2 font-normal">Actor</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {webRequestLogs.map((log) => (
+                      <tr key={log.id} className="border-b border-slate-800/40 last:border-0 hover:bg-cyan-950/10 transition-colors">
+                        <td className="whitespace-nowrap px-3 py-2 font-mono-sc text-xs text-slate-500">{fmtTime(log.timestamp)}</td>
+                        <td className="px-3 py-2">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <span className="rounded-sm border border-cyan-900/60 bg-cyan-950/20 px-1.5 py-0.5 font-mono-sc text-[10px] font-bold text-cyan-400">
+                              {log.method}
+                            </span>
+                            <span className="max-w-md truncate font-mono-sc text-xs text-slate-300" title={log.path}>{log.path}</span>
+                          </div>
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <span className={`inline-flex rounded-sm border px-1.5 py-0.5 font-mono-sc text-[10px] font-bold ${statusStyle(log.statusCode)}`}>
+                            {log.statusCode}
+                          </span>
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2 text-right font-mono-sc text-xs text-slate-400">{fmtMs(log.durationMs)}</td>
+                        <td className="px-3 py-2 font-mono-sc text-xs text-slate-500">
+                          {log.ip ?? 'unknown'}
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="flex items-center gap-1.5 font-mono-sc text-xs text-slate-500" title={clientLabel(log)}>
+                            <User size={11} className="text-slate-600" />
+                            <span className="max-w-[12rem] truncate">{ihmActorLabel(log)}</span>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}
