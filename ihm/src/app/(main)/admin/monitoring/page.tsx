@@ -282,7 +282,7 @@ function statusStyle(statusCode: number) {
 
 function externalActorLabel(log: RequestLogEntry) {
   if (log.apiTokenName) {
-    return log.apiTokenName;
+    return log.username ? `${log.apiTokenName} (by ${log.username})` : log.apiTokenName;
   }
   if (log.username) {
     return `${log.username} (API Token)`;
