@@ -106,7 +106,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
       ].join(' ')}
     >
       {/* Header — logo + env switcher */}
-      <div className="h-14 flex items-center justify-between px-4 border-b border-border gap-3">
+      <div className="h-14 flex items-center justify-between px-4 border-b border-border gap-3 shrink-0">
         <div className="flex items-center gap-2.5 min-w-0">
           <img src="/brand/starvis.png" alt="STARVIS" className="w-8 h-8 rounded-sm object-cover shrink-0" />
           <span className="font-orbitron text-cyan-400 text-sm font-bold tracking-widest glow-text whitespace-nowrap">
@@ -114,30 +114,39 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
           </span>
         </div>
 
-        <div className="flex items-center gap-1 shrink-0">
+        {/* Mobile close */}
+        <button
+          onClick={onClose}
+          className="md:hidden p-1 text-slate-600 hover:text-slate-300 transition-colors"
+          aria-label="Close menu"
+        >
+          <X size={16} />
+        </button>
+      </div>
 
-          {/* Advanced Mode Toggle */}
-          <button
-            onClick={toggleAdvancedMode}
-            title={isAdvancedMode ? "Switch to Standard View" : "Switch to Advanced View"}
-            className={[
-              'py-1 px-2 rounded-sm text-[9px] font-orbitron font-bold tracking-widest uppercase transition-all duration-150 border',
-              isAdvancedMode
-                ? 'bg-purple-950/60 border-purple-700 text-purple-400'
-                : 'border-transparent text-slate-600 hover:text-slate-400',
-            ].join(' ')}
-          >
-            ADV
-          </button>
-          
-          {/* Env switcher */}
+      {/* Settings Row */}
+      <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-slate-950/20 shrink-0">
+        <button
+          onClick={toggleAdvancedMode}
+          title={isAdvancedMode ? "Switch to Standard View" : "Switch to Advanced View"}
+          className={[
+            'py-1 px-2 rounded-sm text-[9px] font-orbitron font-bold tracking-widest uppercase transition-all duration-150 border',
+            isAdvancedMode
+              ? 'bg-purple-950/60 border-purple-700 text-purple-400'
+              : 'border-transparent text-slate-600 hover:text-slate-400 bg-slate-900/30',
+          ].join(' ')}
+        >
+          ADV
+        </button>
+        
+        <div className="flex items-center gap-1">
           <button
             onClick={() => setEnv('live')}
             className={[
               'py-1 px-2 rounded-sm text-[9px] font-orbitron font-bold tracking-widest uppercase transition-all duration-150 border',
               env === 'live'
                 ? 'bg-cyan-950/60 border-cyan-700 text-cyan-400'
-                : 'border-transparent text-slate-600 hover:text-slate-400',
+                : 'border-transparent text-slate-600 hover:text-slate-400 bg-slate-900/30',
             ].join(' ')}
           >
             LIVE
@@ -148,18 +157,10 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
               'py-1 px-2 rounded-sm text-[9px] font-orbitron font-bold tracking-widest uppercase transition-all duration-150 border',
               env === 'ptu'
                 ? 'bg-orange-950/60 border-orange-700 text-orange-400'
-                : 'border-transparent text-slate-600 hover:text-slate-400',
+                : 'border-transparent text-slate-600 hover:text-slate-400 bg-slate-900/30',
             ].join(' ')}
           >
             PTU
-          </button>
-          {/* Mobile close */}
-          <button
-            onClick={onClose}
-            className="md:hidden p-1 ml-0.5 text-slate-600 hover:text-slate-300 transition-colors"
-            aria-label="Close menu"
-          >
-            <X size={16} />
           </button>
         </div>
       </div>
