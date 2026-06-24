@@ -8,7 +8,6 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
-import { useAdvancedMode } from '@/contexts/AdvancedModeContext';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { PageShell } from '@/components/ui/PageShell';
 import { GlowBadge } from '@/components/ui/GlowBadge';
@@ -100,7 +99,6 @@ function ResBar({ label, value, color }: { label: string; value: number | null |
 // ── Weapon stats block ────────────────────────────────────────────────────────
 
 function WeaponStats({ item }: { item: Item }) {
-  const { isAdvancedMode } = useAdvancedMode();
   const dj = item.data_json as Record<string, number> | null;
   return (
     <ScifiPanel title="Weapon Stats">
@@ -147,7 +145,7 @@ function WeaponStats({ item }: { item: Item }) {
           Damage type: <span className="text-slate-300 capitalize">{item.weapon_damage_type}</span>
         </p>
       )}
-      {isAdvancedMode && dj && (dj.damagePhysical != null || dj.damageEnergy != null || dj.damageDistortion != null) && (
+      {dj && (dj.damagePhysical != null || dj.damageEnergy != null || dj.damageDistortion != null) && (
         <div className="space-y-2 mt-4 pt-4 border-t border-slate-800">
           <p className="text-[10px] font-mono-sc text-slate-600 uppercase tracking-widest mb-1">Damage breakdown</p>
           {dj.damagePhysical != null && <ResBar label="Physical" value={dj.damagePhysical / ((dj.damagePhysical ?? 0) + (dj.damageEnergy ?? 0) + (dj.damageDistortion ?? 0))} color="bg-orange-500" />}
@@ -162,7 +160,6 @@ function WeaponStats({ item }: { item: Item }) {
 // ── Armor stats block ────────────────────────────────────────────────────────
 
 function ArmorStats({ item }: { item: Item }) {
-  const { isAdvancedMode } = useAdvancedMode();
   const dj = item.data_json as Record<string, number | null> | null;
   return (
     <ScifiPanel title="Protection Stats">
@@ -186,7 +183,7 @@ function ArmorStats({ item }: { item: Item }) {
           </div>
         )}
       </div>
-      {isAdvancedMode && dj && (dj.drPhysical != null || dj.drEnergy != null) && (
+      {dj && (dj.drPhysical != null || dj.drEnergy != null) && (
         <div className="space-y-2 mt-4 pt-4 border-t border-slate-800">
           <p className="text-[10px] font-mono-sc text-slate-600 uppercase tracking-widest mb-1">Resistance per damage type</p>
           {dj.drPhysical != null && <ResBar label="Physical" value={dj.drPhysical} color="bg-orange-500" />}

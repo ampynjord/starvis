@@ -26,7 +26,6 @@ import { useEnv } from '@/contexts/EnvContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { NAV_GROUPS, type NavItemDef } from '@/components/layout/navigation';
 import { ADMIN_ROLE, hasDeveloperAccess, PUBLIC_RSI_URL } from '@/lib/app-constants';
-import { useAdvancedMode } from '@/contexts/AdvancedModeContext';
 
 function NavItem({ to, icon: Icon, label, earlyAccess, auth: requiresAuth, exact, onNavigate }: NavItemDef & { onNavigate?: () => void }) {
   const pathname = usePathname();
@@ -89,7 +88,6 @@ function NavGroup({ label, items, onNavigate }: { label: string; items: NavItemD
 export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { env, setEnv } = useEnv();
   const { user } = useAuth();
-  const { isAdvancedMode, toggleAdvancedMode } = useAdvancedMode();
 
 
   return (
@@ -125,20 +123,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
       </div>
 
       {/* Settings Row */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-slate-950/20 shrink-0">
-        <button
-          onClick={toggleAdvancedMode}
-          title={isAdvancedMode ? "Switch to Standard View" : "Switch to Advanced View"}
-          className={[
-            'py-1 px-2 rounded-sm text-[9px] font-orbitron font-bold tracking-widest uppercase transition-all duration-150 border',
-            isAdvancedMode
-              ? 'bg-purple-950/60 border-purple-700 text-purple-400'
-              : 'border-transparent text-slate-600 hover:text-slate-400 bg-slate-900/30',
-          ].join(' ')}
-        >
-          ADV
-        </button>
-        
+      <div className="flex items-center justify-end px-4 py-2 border-b border-border bg-slate-950/20 shrink-0">
         <div className="flex items-center gap-1">
           <button
             onClick={() => setEnv('live')}
