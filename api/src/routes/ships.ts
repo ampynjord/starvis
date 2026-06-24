@@ -6,6 +6,7 @@ import type { Router } from 'express';
 import { SearchQuery, ShipQuery } from '../schemas.js';
 import { parseIncludes } from '../services/shared.js';
 import { CTM_CACHE_DIR } from '../utils/config.js';
+import { compactObject, success } from '../utils/response.js';
 import { asyncHandler, makeGameDataGuard, makeShipResolver, sendCsvOrJson, sendWithETag } from './helpers.js';
 import {
   DEFAULT_RANKING_SORT,
@@ -45,16 +46,22 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
         // Override vehicle_category to the route's category (ignore query param)
         filters.vehicle_category = category;
         const result = await gameDataService!.ships.getAllShips(filters);
-        const payload = {
-          success: true,
+        let outputData = result.data as Record<string, unknown>[];
+        if (filters.view === 'compact') {
+          outputData = outputData.map((ship) =>
+            compactObject(ship, ['uuid', 'name', 'manufacturer', 'role', 'career', 'size', 'price', 'total_hp']),
+          );
+        }
+
+        const payload = success(outputData, {
           count: result.data.length,
           total: result.total,
           page: result.page,
           limit: result.limit,
           pages: result.pages,
-          data: result.data,
-          meta: { source: 'Game Data', responseTime: `${Date.now() - t}ms` },
-        };
+          source: 'Game Data',
+          responseTime: `${Date.now() - t}ms`,
+        });
         if (req.query.format === 'csv') return void sendCsvOrJson(req, res, result.data as Record<string, unknown>[], payload);
         sendWithETag(req, res, payload);
       }),

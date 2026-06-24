@@ -265,8 +265,8 @@ describe('GET /api/v1/ships', () => {
     gds.ships.getAllShips.mockResolvedValueOnce({ data: [{ uuid: 's1', name: 'Aurora MR' }], total: 1, page: 1, limit: 20, pages: 1 });
     const res = await request(app).get('/api/v1/ships');
     expect(res.status).toBe(200);
-    expect(res.body.success).toBe(true);
-    expect(res.body.total).toBe(1);
+    expect(res.body.status).toBe('success');
+    expect(res.body.meta.total).toBe(1);
   });
 });
 
@@ -454,7 +454,7 @@ describe('GET /api/v1/items', () => {
   it('returns 200', async () => {
     const res = await request(app).get('/api/v1/items');
     expect(res.status).toBe(200);
-    expect(res.body.success).toBe(true);
+    expect(res.body.status).toBe('success');
   });
 });
 

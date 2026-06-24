@@ -280,7 +280,7 @@ export function ShipStatsBanner({ ship, loadout, category }: { ship: Ship, loado
         )}
 
         {/* G-force + boost — ships uniquement */}
-        {!isGroundOrGravlev && gForce != null && (
+        {isAdvancedMode && !isGroundOrGravlev && gForce != null && (
           <div className="flex items-center justify-between mt-2 rounded-md border border-slate-800 bg-slate-900/40 px-3 py-1.5">
             <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-widest">Accel (fwd)</span>
             <div className="flex items-baseline gap-2">
@@ -293,7 +293,7 @@ export function ShipStatsBanner({ ship, loadout, category }: { ship: Ship, loado
         )}
 
         {/* Boost ramp — ships only */}
-        {!isGroundOrGravlev && rampUp != null && (
+        {isAdvancedMode && !isGroundOrGravlev && rampUp != null && (
           <div className="mt-2">
             <div className="flex flex-col items-center rounded-md border border-amber-900/30 bg-amber-950/10 py-1.5 px-1">
               <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-widest mb-0.5">Boost Ramp</span>
@@ -594,7 +594,7 @@ export function ShipStatsBanner({ ship, loadout, category }: { ship: Ship, loado
       {/* ════════════════════════════════════════
           SYSTEMS — Output + Consumption
       ════════════════════════════════════════ */}
-      {hasPower && (
+      {isAdvancedMode && hasPower && (
         <div>
           <SectionLabel>Systems</SectionLabel>
           {(() => {
@@ -639,7 +639,7 @@ export function ShipStatsBanner({ ship, loadout, category }: { ship: Ship, loado
       {/* ════════════════════════════════════════
           RADAR
       ════════════════════════════════════════ */}
-      {!isGroundOrGravlev && radarNode && (
+      {isAdvancedMode && !isGroundOrGravlev && radarNode && (
         <div>
           <SectionLabel>Radar</SectionLabel>
           <div className="grid grid-cols-3 gap-1.5">

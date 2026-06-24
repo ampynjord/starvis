@@ -1,6 +1,7 @@
 import type { Router } from 'express';
 import { ItemQuery } from '../schemas.js';
 import { parseIncludes } from '../services/shared.js';
+import { compactObject, success } from '../utils/response.js';
 import {
   asyncHandler,
   getQueryEnv,
@@ -219,16 +220,20 @@ export function mountItemRoutes(router: Router, deps: RouteDependencies): void {
       const t = Date.now();
       const filters = ItemQuery.parse(req.query) as Record<string, unknown>;
       const result = await gameDataService!.items.getAllItems(filters);
-      const payload = {
-        success: true,
+      let outputData = result.data as Record<string, unknown>[];
+      if (filters.view === 'compact') {
+        outputData = outputData.map((item) => compactObject(item, ['uuid', 'name', 'type', 'sub_type', 'manufacturer', 'size', 'price']));
+      }
+
+      const payload = success(outputData, {
         count: result.data.length,
         total: result.total,
         page: result.page,
         limit: result.limit,
         pages: result.pages,
-        data: result.data,
-        meta: { source: 'Game Data', responseTime: `${Date.now() - t}ms` },
-      };
+        source: 'Game Data',
+        responseTime: `${Date.now() - t}ms`,
+      });
       if (req.query.format === 'csv') return void sendCsvOrJson(req, res, result.data as Record<string, unknown>[], payload);
       sendWithETag(req, res, payload);
     }),
@@ -251,17 +256,22 @@ export function mountItemRoutes(router: Router, deps: RouteDependencies): void {
         sub_types: def.subTypes?.join(','),
         exclude_sub_types: def.excludeSubTypes?.join(','),
       });
-      const payload = {
-        success: true,
-        category: { slug, label: def.label },
+
+      let outputData = result.data as Record<string, unknown>[];
+      if (base.view === 'compact') {
+        outputData = outputData.map((item) => compactObject(item, ['uuid', 'name', 'type', 'sub_type', 'manufacturer', 'size', 'price']));
+      }
+
+      const payload = success(outputData, {
         count: result.data.length,
         total: result.total,
         page: result.page,
         limit: result.limit,
         pages: result.pages,
-        data: result.data,
-        meta: { source: 'Game Data', responseTime: `${Date.now() - t}ms` },
-      };
+        category: { slug, label: def.label, group: def.group },
+        source: 'Game Data',
+        responseTime: `${Date.now() - t}ms`,
+      });
       if (req.query.format === 'csv') return void sendCsvOrJson(req, res, result.data as Record<string, unknown>[], payload);
       sendWithETag(req, res, payload);
     }),

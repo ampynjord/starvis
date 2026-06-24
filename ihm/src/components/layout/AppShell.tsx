@@ -2,15 +2,29 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePathname } from 'next/navigation';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
+import { SearchOmnibar } from '../ui/SearchOmnibar';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [omnibarOpen, setOmnibarOpen] = useState(false);
+  
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
   const toggleSidebar = useCallback(() => setSidebarOpen((v) => !v), []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setOmnibarOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   return (
     <div className="flex h-dvh min-w-0 overflow-hidden bg-void">
@@ -40,7 +54,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <Sidebar open={sidebarOpen} onClose={closeSidebar} />
 
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-        <TopBar onMenuToggle={toggleSidebar} />
+        <TopBar onMenuToggle={toggleSidebar} onSearchClick={() => setOmnibarOpen(true)} />
         <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden bg-void bg-grid">
           <motion.div
             key={pathname}
@@ -54,6 +68,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </motion.div>
         </main>
       </div>
+
+      <SearchOmnibar open={omnibarOpen} onClose={() => setOmnibarOpen(false)} />
     </div>
   );
 }

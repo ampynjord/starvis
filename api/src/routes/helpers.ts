@@ -39,7 +39,7 @@ function setETag(res: Response, jsonStr: string): string {
 
 /** Serialize once, check ETag, and send — avoids double JSON.stringify.
  *  ETag is computed without volatile fields (meta.responseTime). */
-export function sendWithETag(req: Request, res: Response, payload: Record<string, unknown>): void {
+export function sendWithETag(req: Request, res: Response, payload: any): void {
   const { meta, ...stable } = payload;
   const replacer = (_key: string, value: unknown) => (typeof value === 'bigint' ? Number(value) : value);
   const stableStr = JSON.stringify(stable, replacer);
