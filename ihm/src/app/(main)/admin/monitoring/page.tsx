@@ -295,7 +295,7 @@ function externalActorLabel(log: RequestLogEntry) {
 
 function ihmActorLabel(log: RequestLogEntry) {
   if (log.internalClient) {
-    if (log.internalClient === 'anonymous') return 'anonymous';
+    if (log.internalClient === 'anonymous' || log.internalClient === 'ihm-public-proxy') return 'anonymous';
     return log.internalClient;
   }
   if (log.username && log.username !== 'ihm-public-proxy') {
