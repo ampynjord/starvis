@@ -65,7 +65,7 @@ function numeric(value) {
 }
 
 function getTotal(body) {
-  const candidates = [body?.total, body?.count, body?.data?.total, body?.data?.count];
+  const candidates = [body?.total, body?.count, body?.data?.total, body?.data?.count, body?.meta?.total, body?.meta?.count];
   for (const candidate of candidates) {
     const value = numeric(candidate);
     if (value !== null) return value;
@@ -150,6 +150,7 @@ function validateList(name, body, options = {}) {
     return [];
   }
   if (body.success !== undefined && body.success !== true) fail(`${name}: success is not true`, body);
+  if (body.status !== undefined && body.status !== 'success') fail(`${name}: status is not success`, body);
 
   const data = asArray(body);
   const total = getTotal(body);
@@ -297,7 +298,7 @@ async function audit() {
   });
 
   const missionFilters = await requestJson('missions/filters', '/api/v1/missions/filters', { env }, { allowEmpty: true });
-  if (missionFilters && (!isObject(missionFilters) || missionFilters.success !== true)) {
+  if (missionFilters && (!isObject(missionFilters) || (missionFilters.success !== true && missionFilters.status !== 'success'))) {
     fail('missions/filters: unexpected shape', missionFilters);
   }
 
