@@ -10,3 +10,5 @@ export {
   requireJwtBetaOrAdmin,
   requireJwtDeveloperOrAdmin,
 } from './auth.js';
+
+export { ApiError, rfc7807ErrorHandler } from './errorHandler.js';
