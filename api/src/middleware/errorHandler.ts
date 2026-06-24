@@ -1,4 +1,4 @@
-import type { Request, Response, NextFunction } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import logger from '../utils/logger.js';
 
 export class ApiError extends Error {
@@ -27,7 +27,7 @@ export function rfc7807ErrorHandler(err: Error, req: Request, res: Response, nex
   const type = isApiError ? err.type : 'about:blank';
 
   if (status >= 500) {
-    logger.error({ err, path: req.path }, 'Unhandled exception caught by error middleware');
+    logger.error('Unhandled exception caught by error middleware', { err, path: req.path });
   }
 
   res.status(status).json({

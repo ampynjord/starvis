@@ -2,6 +2,14 @@
  * ItemQueryService — FPS weapons, armor, clothing, attachments, gadgets, consumables
  */
 import type { PrismaLike as PrismaClient } from '@starvis/db';
+import {
+  CHIP_SUBTYPES,
+  CONSUMABLE_SUBTYPE_ORDER,
+  FPS_COVERED_TYPES,
+  FPS_SUBTYPE_OPTIONS,
+  ITEM_CATEGORY_FILTERS,
+  TAXONOMY_GROUPS,
+} from '../data/taxonomy/items-taxonomy.js';
 import { cleanItemDisplayName } from '../normalizers/items.js';
 import {
   convertBigIntToNumber,
@@ -12,16 +20,6 @@ import {
   stripInternal,
   toPostgres,
 } from './shared.js';
-import {
-  FPS_ALL_TYPES,
-  FPS_COVERED_TYPES,
-  CHIP_SUBTYPES,
-  CONSUMABLE_SUBTYPE_ORDER,
-  TAXONOMY_GROUPS,
-  ITEM_CATEGORY_FILTERS,
-  ARMOR_WEIGHT,
-  FPS_SUBTYPE_OPTIONS
-} from '../data/taxonomy/items-taxonomy.js';
 
 const ITEM_JSON_SORT_MAP: Record<string, string> = {
   'game_data.weapon_damage': "(i.game_data#>>'{weapon_damage}')::numeric",
@@ -49,8 +47,6 @@ const ITEM_SORT = new Set([
   'armor_temp_min',
   'armor_temp_max',
 ]);
-
-
 
 type AttachmentSlot = 'barrel' | 'underbarrel' | 'optic' | 'other';
 

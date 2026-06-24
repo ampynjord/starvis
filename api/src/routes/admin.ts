@@ -81,20 +81,30 @@ export function mountAdminRoutes(router: Router, deps: RouteDependencies): void 
 
   router.post(
     '/admin/maintenance/prune-old-env',
-    asyncHandler(async (req, res) => {
+    asyncHandler(async (_req, res) => {
       // Deletes all rows in game schema tables where env is not 'live' or 'ptu'
-      const tables = ['ships', 'components', 'items', 'commodities', 'missions', 'crafting_recipes', 'mining_elements', 'shops', 'starmap_systems'];
+      const tables = [
+        'ships',
+        'components',
+        'items',
+        'commodities',
+        'missions',
+        'crafting_recipes',
+        'mining_elements',
+        'shops',
+        'starmap_systems',
+      ];
       const results: Record<string, number> = {};
-      
+
       for (const table of tables) {
         try {
           const count = await prisma.$executeRawUnsafe(`DELETE FROM game.${table} WHERE env NOT IN ('live', 'ptu');`);
           results[table] = count;
-        } catch (e) {
+        } catch (_e) {
           // ignore if table doesn't have env or doesn't exist
         }
       }
-      
+
       res.json({ success: true, data: results });
     }),
   );
