@@ -50,7 +50,7 @@ export class MiningQueryService {
        LEFT JOIN game.mining_composition_parts p ON p.element_uuid = e.uuid AND p.element_env = e.env
        LEFT JOIN game.mining_compositions c      ON c.uuid = p.composition_uuid AND c.env = p.composition_env
        WHERE e.env = ? AND e.uuid = ?
-       GROUP BY e.uuid`),
+       GROUP BY e.uuid, e.env`),
       env,
       uuid,
     );
@@ -98,7 +98,7 @@ export class MiningQueryService {
        LEFT JOIN game.mining_composition_parts mcp ON mcp.composition_uuid = mc.uuid AND mcp.composition_env = mc.env
        LEFT JOIN game.mining_elements e            ON e.uuid = mcp.element_uuid AND e.env = mcp.element_env
        WHERE mc.env = ? AND mc.uuid = ?
-       GROUP BY mc.uuid`),
+       GROUP BY mc.uuid, mc.env`),
       env,
       uuid,
     );
