@@ -400,7 +400,7 @@ export class RsiWebsiteService {
     return this.prisma.$queryRawUnsafe<Row[]>(
       `SELECT id, rsi_id, name, system_code, system_name, jump_points, web_url
        FROM rsi.starmap_locations
-       WHERE type = 'JUMPPOINT'
+       WHERE jump_points IS NOT NULL
        ORDER BY system_name, name`,
     );
   }
