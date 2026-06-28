@@ -711,14 +711,14 @@ export class RsiSyncService {
 
       // ── Step 1.5: Pre-compute jump points by system from the global tunnels ──
       const jumpPointsBySystemId = new Map<string, any[]>();
-      
+
       for (const tunnel of tunnels) {
         const entrySysId = String(tunnel.entry?.star_system_id ?? '');
         const exitSysId = String(tunnel.exit?.star_system_id ?? '');
         if (!entrySysId || !exitSysId) continue;
 
-        const entrySys = systems.find(s => String(s.id) === entrySysId);
-        const exitSys = systems.find(s => String(s.id) === exitSysId);
+        const entrySys = systems.find((s) => String(s.id) === entrySysId);
+        const exitSys = systems.find((s) => String(s.id) === exitSysId);
         if (!entrySys || !exitSys) continue;
 
         // Entry -> Exit
