@@ -702,11 +702,47 @@ export class RsiSyncService {
       }
 
       const systems: any[] = bootupData.data?.systems?.resultset ?? [];
+      const tunnels: any[] = bootupData.data?.tunnels?.resultset ?? [];
       if (systems.length === 0) {
         logger.warn('[starmap] RSI bootup returned no systems');
         return { upserted, errors };
       }
       onProgress?.(`  [starmap] ${systems.length} systems from RSI`);
+
+      // ── Step 1.5: Pre-compute jump points by system from the global tunnels ──
+      const jumpPointsBySystemId = new Map<string, any[]>();
+      
+      for (const tunnel of tunnels) {
+        const entrySysId = String(tunnel.entry?.star_system_id ?? '');
+        const exitSysId = String(tunnel.exit?.star_system_id ?? '');
+        if (!entrySysId || !exitSysId) continue;
+
+        const entrySys = systems.find(s => String(s.id) === entrySysId);
+        const exitSys = systems.find(s => String(s.id) === exitSysId);
+        if (!entrySys || !exitSys) continue;
+
+        // Entry -> Exit
+        if (!jumpPointsBySystemId.has(entrySysId)) jumpPointsBySystemId.set(entrySysId, []);
+        jumpPointsBySystemId.get(entrySysId)!.push({
+          id: String(tunnel.id ?? ''),
+          direction: tunnel.direction === 'B' ? 'BIDIRECTIONAL' : 'ONEWAY',
+          status: tunnel.entry?.status ?? null,
+          exitSystemCode: exitSys.code ?? null,
+          exitSystemName: exitSys.name ?? null,
+        });
+
+        // Exit -> Entry (if bidirectional)
+        if (tunnel.direction === 'B') {
+          if (!jumpPointsBySystemId.has(exitSysId)) jumpPointsBySystemId.set(exitSysId, []);
+          jumpPointsBySystemId.get(exitSysId)!.push({
+            id: String(tunnel.id ?? ''),
+            direction: 'BIDIRECTIONAL',
+            status: tunnel.exit?.status ?? null,
+            exitSystemCode: entrySys.code ?? null,
+            exitSystemName: entrySys.name ?? null,
+          });
+        }
+      }
 
       // ── Step 2: upsert each system ──────────────────────────────────────────────
       for (const sys of systems) {
@@ -714,18 +750,8 @@ export class RsiSyncService {
         const systemCode: string | null = sys.code ?? null;
         if (!rsiId) continue;
 
-        // Jump points: store destination system codes for drawing connections
-        const jumpPoints = Array.isArray(sys.jumppoints)
-          ? sys.jumppoints
-              .map((jp: any) => ({
-                id: String(jp.id ?? ''),
-                direction: jp.direction ?? 'BIDIRECTIONAL',
-                status: jp.status ?? null,
-                exitSystemCode: jp.exit_system?.code ?? null,
-                exitSystemName: jp.exit_system?.name ?? null,
-              }))
-              .filter((jp: any) => jp.exitSystemCode)
-          : [];
+        // Jump points: use our pre-computed map instead of the deprecated sys.jumppoints
+        const jumpPoints = jumpPointsBySystemId.get(rsiId) ?? [];
 
         // Description: RSI returns an object with language keys
         const description =
