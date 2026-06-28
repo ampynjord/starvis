@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -16,6 +16,8 @@ import { PageShell } from '@/components/ui/PageShell';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { SmartTag } from '@/components/ui/SmartTag';
+import { generateShipTags } from '@/lib/smart-tags';
 import { PriceAvailabilityPanel, type PriceAvailabilityRow } from '@/components/economy/PriceAvailabilityPanel';
 import { ShipCard } from '@/components/ship/ShipCard';
 import { ShipLoadout } from '@/components/ship/ShipLoadout';
@@ -486,6 +488,9 @@ export default function ShipDetailPage() {
                 <p className="text-[10px] font-mono-sc text-slate-600 mt-0.5 uppercase tracking-widest">{ship.short_name}</p>
               )}
               <div className="flex flex-wrap gap-2 mt-3">
+                {generateShipTags(ship as unknown as import('@/types/api').ShipListItem).map((tag) => (
+                  <SmartTag key={tag} id={tag} label={tag.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())} />
+                ))}
                 {ship.career && <GlowBadge color="cyan">{ship.career}</GlowBadge>}
                 {ship.role && ship.role !== ship.career && <GlowBadge color="slate">{ship.role}</GlowBadge>}
                 {isGround && <GlowBadge color="slate">{category}</GlowBadge>}

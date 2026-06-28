@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
@@ -24,6 +24,8 @@ import { PageShell } from "@/components/ui/PageShell";
 import { PageTabs } from "@/components/ui/PageTabs";
 import { MarketSummary } from "@/components/economy/MarketSummary";
 import { ListFilterBar, ListFilterChips, ListFilterSelect } from "@/components/ui/ListFilters";
+import { SmartTag } from '@/components/ui/SmartTag';
+import { generateComponentTags } from '@/lib/smart-tags';
 import type { ComponentListItem } from "@/types/api";
 import { getComponentMetricGroups, getComponentPrimaryMetrics } from "@/utils/componentMetrics";
 
@@ -402,6 +404,9 @@ export default function ComponentsPage() {
                               <span className="font-orbitron text-sm text-slate-200 group-hover:text-cyan-400 transition-colors truncate">
                                 {comp.name}
                               </span>
+                              {generateComponentTags(comp).map((tag) => (
+                                <SmartTag key={tag} id={tag} label={tag.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())} />
+                              ))}
                               {comp.grade && (
                                 <GlowBadge color="amber" size="xs">{comp.grade}</GlowBadge>
                               )}
