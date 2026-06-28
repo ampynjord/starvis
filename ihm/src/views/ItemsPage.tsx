@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
@@ -13,6 +13,8 @@ import { Pagination } from "@/components/ui/Pagination";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { GlowBadge } from "@/components/ui/GlowBadge";
+import { SmartTag } from '@/components/ui/SmartTag';
+import { generateItemTags } from '@/lib/smart-tags';
 import { useListQueryState } from "@/hooks/useListQueryState";
 import { ITEM_TYPE_LABELS } from "@/utils/constants";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -430,6 +432,9 @@ export default function ItemsPage({ group }: ItemsPageProps = {}) {
 													<span className="font-orbitron text-sm text-slate-200 group-hover:text-cyan-400 transition-colors truncate">
 														{getItemName(item)}
 													</span>
+													{generateItemTags(item).map((tag) => (
+														<SmartTag key={tag} id={tag} label={tag.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())} />
+													))}
 													{item.grade && (
 														<GlowBadge color="amber" size="xs">{item.grade}</GlowBadge>
 													)}

@@ -10,10 +10,12 @@ import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { PageShell } from '@/components/ui/PageShell';
-import { GlowBadge } from '@/components/ui/GlowBadge';
-import { LoadingGrid } from '@/components/ui/LoadingGrid';
-import { ErrorState } from '@/components/ui/ErrorState';
-import { PriceAvailabilityPanel } from '@/components/economy/PriceAvailabilityPanel';
+import { GlowBadge } from "@/components/ui/GlowBadge";
+import { LoadingGrid } from "@/components/ui/LoadingGrid";
+import { ErrorState } from "@/components/ui/ErrorState";
+import { SmartTag } from "@/components/ui/SmartTag";
+import { generateItemTags } from "@/lib/smart-tags";
+import { PriceAvailabilityPanel } from "@/components/economy/PriceAvailabilityPanel";
 import type { Item } from '@/types/api';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -292,6 +294,9 @@ export default function ItemDetailPage() {
               <p className="text-xs font-mono-sc text-cyan-700 uppercase tracking-widest mb-1">{typeLabel}</p>
               <h1 className="font-orbitron text-3xl font-black text-slate-100 leading-tight">{displayName}</h1>
               <div className="flex flex-wrap gap-2 mt-3">
+                {generateItemTags(item as unknown as import('@/types/api').ItemListItem).map((tag) => (
+                  <SmartTag key={tag} id={tag} label={tag.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())} />
+                ))}
                 {item.grade && <GlowBadge color="amber">{item.grade}</GlowBadge>}
                 {item.size != null && <GlowBadge color="slate">S{item.size}</GlowBadge>}
                 {item.sub_type && item.sub_type !== 'UNDEFINED' && <GlowBadge color="slate">{item.sub_type}</GlowBadge>}

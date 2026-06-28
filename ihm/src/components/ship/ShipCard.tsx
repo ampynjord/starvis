@@ -3,9 +3,11 @@ import { Users, Package, Zap, Gauge } from 'lucide-react';
 import Link from 'next/link';
 import type { ShipListItem } from '@/types/api';
 import { GlowBadge } from '@/components/ui/GlowBadge';
+import { SmartTag } from '@/components/ui/SmartTag';
 import { MarketSummary } from '@/components/economy/MarketSummary';
 import { fSpeed } from '@/utils/formatters';
 import { VARIANT_TYPE_LABELS } from '@/utils/constants';
+import { generateShipTags } from '@/lib/smart-tags';
 
 interface Props {
   ship: ShipListItem;
@@ -106,7 +108,10 @@ export function ShipCard({ ship, index = 0 }: Props) {
             <MarketSummary item={ship} />
 
             {/* Badges */}
-            <div className="flex gap-2 min-w-0 overflow-hidden">
+            <div className="flex gap-2 min-w-0 overflow-x-auto overflow-y-hidden pb-1 no-scrollbar">
+              {generateShipTags(ship).map((tag) => (
+                <SmartTag key={tag} id={tag} label={tag.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())} />
+              ))}
               {ship.career && (
                 <GlowBadge color="cyan" size="xs">{ship.career}</GlowBadge>
               )}

@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -18,6 +18,8 @@ import { PageShell } from "@/components/ui/PageShell";
 import { GlowBadge } from "@/components/ui/GlowBadge";
 import { LoadingGrid } from "@/components/ui/LoadingGrid";
 import { ErrorState } from "@/components/ui/ErrorState";
+import { SmartTag } from "@/components/ui/SmartTag";
+import { generateComponentTags } from "@/lib/smart-tags";
 import { PriceAvailabilityPanel } from "@/components/economy/PriceAvailabilityPanel";
 import { COMPONENT_TYPE_COLORS } from "@/utils/constants";
 import { getComponentMetricGroups, type ComponentMetricGroup } from "@/utils/componentMetrics";
@@ -346,6 +348,9 @@ export default function ComponentDetailPage() {
 								{comp.name}
 							</h1>
 							<div className="flex flex-wrap gap-2 mt-3">
+								{generateComponentTags(comp as unknown as import('@/types/api').ComponentListItem).map((tag) => (
+									<SmartTag key={tag} id={tag} label={tag.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())} />
+								))}
 								{comp.grade && <GlowBadge color="amber">{comp.grade}</GlowBadge>}
 								{comp.size != null && <GlowBadge color="slate">S{comp.size}</GlowBadge>}
 								{comp.manufacturer_name && <GlowBadge color="cyan">{comp.manufacturer_name}</GlowBadge>}
