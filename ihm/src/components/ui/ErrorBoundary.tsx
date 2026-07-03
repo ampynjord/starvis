@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { isStaleBuildError, reloadOnceForStaleBuild } from '@/lib/stale-build';
 
 interface Props {
   children: ReactNode;
@@ -19,6 +20,9 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error('[ErrorBoundary]', error, info.componentStack);
+    if (isStaleBuildError(error.message)) {
+      reloadOnceForStaleBuild();
+    }
   }
 
   render() {
