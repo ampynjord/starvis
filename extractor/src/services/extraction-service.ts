@@ -196,7 +196,9 @@ export class ExtractionService {
 
     // ── Ship Matrix pre-sync (before main transaction so crossReferenceShipMatrix has data) ──
     // ship_matrix lives in rsi_website (separate DB/pool) — safe to populate before the P4K tx.
-    if ((run('ship-matrix') || run('ship-galleries')) && options.rsiPool) {
+    // Also refresh when ships are extracted without the ship-matrix module: cross-referencing
+    // against a stale matrix silently prunes newly released ships as 'special' variants.
+    if ((run('ship-matrix') || run('ship-galleries') || run('ships')) && options.rsiPool) {
       onProgress?.('Pre-syncing Ship Matrix from RSI website (needed for cross-reference)…');
       try {
         const rsiSync = new RsiSyncService(options.rsiPool);

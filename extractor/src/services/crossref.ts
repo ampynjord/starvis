@@ -30,6 +30,7 @@ export const SM_TO_P4K_ALIASES: Record<string, string> = {
   'F7C-S Hornet Ghost Mk II': 'Hornet F7CS Mk2',
   'F7C-M Super Hornet Mk I': 'Hornet F7CM',
   'F7C-M Super Hornet Heartseeker Mk I': 'Hornet F7CM Heartseeker',
+  'F7C-M Super Hornet Heartseeker Mk II': 'Hornet F7CM Mk2 Heartseeker',
   'F7C-M Super Hornet Mk II': 'Hornet F7CM Mk2',
   'F8C Lightning': 'Lightning F8C',
   'F8C Lightning Executive Edition': 'Lightning F8C Exec',
@@ -426,6 +427,12 @@ export async function populateChassisId(conn: PoolClient, env: GameEnv): Promise
 
 /** Tag variant types for ships not linked to Ship Matrix */
 export async function tagVariantTypes(conn: PoolClient, env: GameEnv): Promise<void> {
+  // A ship tagged standalone on a previous run becomes a normal ship once RSI
+  // publishes its Ship Matrix entry and crossReferenceShipMatrix links it.
+  await conn.query(
+    "UPDATE game.ships SET variant_type = NULL WHERE variant_type = 'standalone' AND ship_matrix_id IS NOT NULL AND env = $1",
+    [env],
+  );
   // Tag SM-linked ships that are ultra-rare collectors
   await conn.query(
     "UPDATE game.ships SET variant_type = 'collector' WHERE class_name IN ('VNCL_Scythe', 'ANVL_Lightning_F8C_Exec') AND variant_type IS NULL AND env = $1",
@@ -475,6 +482,16 @@ export async function tagVariantTypes(conn: PoolClient, env: GameEnv): Promise<v
     );
   }
 
+  // Brand-new flyable ships ship in the P4K one or more patches before RSI adds
+  // them to the Ship Matrix (e.g. GLSN_Basher, GAMA_Tyilui in 4.9.0). A clean
+  // two-segment MFG_Name class name with no variant suffix is the signature of a
+  // base hull, not a one-off oddity: keep those visible instead of letting the
+  // 'special' catch-all prune them.
+  await conn.query(
+    "UPDATE game.ships SET variant_type = 'standalone' WHERE ship_matrix_id IS NULL AND variant_type IS NULL AND class_name ~ '^[A-Z]{2,5}_[A-Za-z0-9]+$' AND env = $1",
+    [env],
+  );
+
   await conn.query("UPDATE game.ships SET variant_type = 'special' WHERE ship_matrix_id IS NULL AND variant_type IS NULL AND env = $1", [
     env,
   ]);
@@ -494,7 +511,7 @@ export async function tagVariantTypes(conn: PoolClient, env: GameEnv): Promise<v
  *  - arena_ai     → swarm AI ships used only in Arena Commander
  *  - npc          → NPC-only ships (EA, pirate packages, Hammerhead Showdown…)
  *
- * Ships tagged pyam_exec, collector, or wikelo are kept.
+ * Ships tagged pyam_exec, collector, wikelo, or standalone are kept.
  * Cascading FK deletes will clean ship_loadouts, ship_modules, ship_paints automatically.
  */
 export async function pruneExcludedVariants(conn: PoolClient, env: GameEnv): Promise<number> {
