@@ -11,8 +11,3 @@ export const DEVELOPER_ACCESS_ROLES = [DEVELOPER_ROLE, ADMIN_ROLE] as const;
 export function hasDeveloperAccess(role: string | undefined): boolean {
   return DEVELOPER_ACCESS_ROLES.includes(role as (typeof DEVELOPER_ACCESS_ROLES)[number]);
 }
-
-/** @deprecated use DEVELOPER_ROLE */
-export const BETA_TESTER_ROLE = DEVELOPER_ROLE;
-/** @deprecated use hasDeveloperAccess */
-export const hasBetaAccess = hasDeveloperAccess;

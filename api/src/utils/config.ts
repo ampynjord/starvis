@@ -54,11 +54,6 @@ export const ADMIN_ROLE = 'admin';
 export const USER_ROLES = [USER_ROLE, DEVELOPER_ROLE, ADMIN_ROLE] as const;
 export const DEVELOPER_ACCESS_ROLES = [DEVELOPER_ROLE, ADMIN_ROLE] as const;
 
-/** @deprecated use DEVELOPER_ROLE */
-export const BETA_TESTER_ROLE = DEVELOPER_ROLE;
-/** @deprecated use DEVELOPER_ACCESS_ROLES */
-export const BETA_ACCESS_ROLES = DEVELOPER_ACCESS_ROLES;
-
 export const JWT_EXPIRES = (process.env.JWT_EXPIRES ?? '7d') as SignOptions['expiresIn'];
 export const JWT_API_TOKEN_EXPIRES = (process.env.JWT_API_TOKEN_EXPIRES ?? '1y') as SignOptions['expiresIn'];
 export const JWT_2FA_PENDING_EXPIRES = (process.env.JWT_2FA_PENDING_EXPIRES ?? '5m') as SignOptions['expiresIn'];

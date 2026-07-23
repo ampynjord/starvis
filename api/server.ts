@@ -395,7 +395,7 @@ async function start() {
   gameDataService = new GameDataService(() => prisma, prisma);
 
   // 5. Mount routes
-  app.use('/', createRoutes({ prisma, getGamePrisma: () => prisma, shipMatrixService, gameDataService, rsiWebsiteService }));
+  app.use('/', createRoutes({ prisma, shipMatrixService, gameDataService, rsiWebsiteService }));
 
   // 6. Global Error Handler
   const { rfc7807ErrorHandler } = await import('./src/middleware/errorHandler.js');

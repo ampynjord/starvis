@@ -1,4 +1,4 @@
-import type { GamePrismaClient as PrismaClient } from '@starvis/db';
+import type { PrismaClient } from '@starvis/db';
 
 export interface FpsDamageInput {
   itemUuid: string;
