@@ -326,7 +326,7 @@ export default function ComparePage() {
                 <Legend iconSize={10} wrapperStyle={{ fontSize: '11px', fontFamily: 'Rajdhani, sans-serif' }} />
                 <Tooltip
                   contentStyle={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '6px', fontSize: '11px' }}
-                  formatter={(val: number) => [`${val}%`]}
+                  formatter={(val) => [`${val}%`]}
                 />
               </RadarChart>
             </ResponsiveContainer>

@@ -255,7 +255,7 @@ export default function RankingPage() {
                     />
                     <Tooltip
                       contentStyle={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '6px', fontSize: '11px' }}
-                      formatter={(value: number) => [formatStatValue(activeStatDef, value), activeStatDef.label]}
+                      formatter={(value) => [formatStatValue(activeStatDef, Number(value)), activeStatDef.label]}
                       cursor={{ fill: 'rgba(255,255,255,0.04)' }}
                     />
                     <Bar dataKey="value" radius={[0, 3, 3, 0]} maxBarSize={18}>
@@ -265,7 +265,7 @@ export default function RankingPage() {
                       <LabelList
                         dataKey="value"
                         position="right"
-                        formatter={(value: number) => formatStatValue(activeStatDef, value)}
+                        formatter={(value: unknown) => formatStatValue(activeStatDef, Number(value))}
                         style={{ fill: '#64748b', fontSize: 10, fontFamily: 'monospace' }}
                       />
                     </Bar>
