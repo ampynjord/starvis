@@ -12,6 +12,7 @@
     "resolveJsonModule": true,
     "sourceMap": true,
     "types": ["node"],
+    "rootDir": "./src",
     "outDir": "./dist"
   },
   "include": ["src/**/*.ts"],
