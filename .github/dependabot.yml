@@ -1,4 +1,15 @@
 version: 2
+
+# TypeScript is pinned to 6.x monorepo-wide: the TS 7 native compiler crashes
+# Next 16's build worker ("The id argument must be of type string"). Re-allow
+# once Next supports it. @types/node stays on 22 to match the deployed Node 22
+# runtime (CI NODE_VERSION and node:22-alpine images).
+x-toolchain-ignores: &toolchain-ignores
+  - dependency-name: "typescript"
+    update-types: ["version-update:semver-major"]
+  - dependency-name: "@types/node"
+    update-types: ["version-update:semver-major"]
+
 updates:
   - package-ecosystem: "npm"
     directory: "/api"
@@ -8,6 +19,7 @@ updates:
     groups:
       minor-and-patch:
         update-types: ["minor", "patch"]
+    ignore: *toolchain-ignores
 
   - package-ecosystem: "npm"
     directory: "/extractor"
@@ -17,6 +29,7 @@ updates:
     groups:
       minor-and-patch:
         update-types: ["minor", "patch"]
+    ignore: *toolchain-ignores
 
   - package-ecosystem: "npm"
     directory: "/ihm"
@@ -26,6 +39,7 @@ updates:
     groups:
       minor-and-patch:
         update-types: ["minor", "patch"]
+    ignore: *toolchain-ignores
 
   - package-ecosystem: "github-actions"
     directory: "/"
