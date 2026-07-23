@@ -5,8 +5,15 @@
 import { createDecipheriv } from 'node:crypto';
 import { statSync } from 'node:fs';
 import { type FileHandle, open } from 'node:fs/promises';
-import { inflateRawSync } from 'node:zlib';
+import { inflateRawSync, zstdDecompressSync } from 'node:zlib';
 import logger from '../logger.js';
+
+// fzstd is a minimal pure-JS decoder that rejects frames using zstd features it
+// doesn't implement (e.g. it throws "invalid zstd data" on the frame header's
+// reserved bit, which newer CIG builds set). Node's native zlib binding wraps the
+// real libzstd and has none of those gaps, so it's tried first; fzstd stays as a
+// fallback for Node builds without zstd support in zlib (<22.15).
+const hasNativeZstd = typeof zstdDecompressSync === 'function';
 
 export interface P4KEntry {
   fileName: string;
@@ -241,6 +248,7 @@ export class P4KProvider {
     if (entry.compressionMethod === 0) return comp;
     if (entry.compressionMethod === 8) return inflateRawSync(comp);
     if (entry.compressionMethod === 93 || entry.compressionMethod === 100) {
+      if (hasNativeZstd) return zstdDecompressSync(comp);
       const z = await loadFzstd();
       if (!z) throw new Error('ZSTD unavailable');
       return Buffer.from(z.decompress(new Uint8Array(comp)));
