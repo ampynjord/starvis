@@ -145,10 +145,6 @@ vi.mock('@starvis/db', () => ({
   getPrisma: () => prismaMock,
   initPrisma: vi.fn(),
   resolveEnv: (env: string | undefined) => (env === 'ptu' ? 'ptu' : 'live'),
-  getGamePrisma: vi.fn(),
-  getRsiWebsitePrisma: vi.fn(),
-  getStarvisPrisma: vi.fn(),
-  initAllPrisma: vi.fn(),
 }));
 
 const SERVER_API_KEY = 'authz-test-server-api-key';
@@ -178,7 +174,7 @@ beforeAll(() => {
     res.json({ success: true, actor: req.jwtPayload?.username ?? null, role: req.jwtPayload?.role ?? null });
   });
   router.use('/api', requireJwt);
-  const deps = { prisma: prismaMock, getGamePrisma: vi.fn(), shipMatrixService: { getStats: vi.fn() }, gameDataService: null } as any;
+  const deps = { prisma: prismaMock, shipMatrixService: { getStats: vi.fn() }, gameDataService: null } as any;
   mountAuthRoutes(router, deps);
   mountAdminRoutes(router, deps);
   mountCorporationRoutes(router, deps);

@@ -3,7 +3,7 @@ import { asyncHandler, getQueryString, makeGameDataGuard, sendDataWithETag } fro
 import type { RouteDependencies } from './types.js';
 
 export function mountMiningRoutes(router: Router, deps: RouteDependencies): void {
-  const { getGamePrisma, gameDataService } = deps;
+  const { prisma, gameDataService } = deps;
   const requireGameData = makeGameDataGuard(gameDataService);
 
   // GET /api/v1/mining/elements — all mineral elements
@@ -94,8 +94,9 @@ export function mountMiningRoutes(router: Router, deps: RouteDependencies): void
     '/api/v1/mining/lasers',
     asyncHandler(async (req, res) => {
       const env = String(req.query.env ?? 'live');
-      const components = await getGamePrisma(env).component.findMany({
+      const components = await prisma.component.findMany({
         where: {
+          env,
           type: 'MiningLaser',
           OR: [{ miningSpeed: { not: null } }, { miningResistance: { not: null } }, { miningInstability: { not: null } }],
         },

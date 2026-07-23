@@ -25,13 +25,13 @@ const MiningYieldBody = z.object({
 });
 
 export function mountCalculateRoutes(router: Router, deps: RouteDependencies): void {
-  const { getGamePrisma } = deps;
+  const { prisma } = deps;
 
   router.post(
     '/api/v1/calculate/fps-damage',
     asyncHandler(async (req, res) => {
       const input = FpsDamageBody.parse(req.body);
-      const result = await calculateFpsDamage(getGamePrisma(input.env || 'live'), input);
+      const result = await calculateFpsDamage(prisma, input);
       if (!result) return void res.status(404).json({ success: false, error: 'Item not found' });
       res.json({ success: true, data: result });
     }),
@@ -41,7 +41,7 @@ export function mountCalculateRoutes(router: Router, deps: RouteDependencies): v
     '/api/v1/calculate/mining-yield',
     asyncHandler(async (req, res) => {
       const input = MiningYieldBody.parse(req.body);
-      const result = await calculateMiningYield(getGamePrisma(input.env || 'live'), input);
+      const result = await calculateMiningYield(prisma, input);
       if (!result) return void res.status(404).json({ success: false, error: 'Composition not found' });
       res.json({ success: true, data: result });
     }),
