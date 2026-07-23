@@ -19,9 +19,9 @@
     "discord.js": "^14.18.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.4",
-    "@types/node": "^20.19.0",
+    "@biomejs/biome": "^2.5.5",
+    "@types/node": "^22.20.1",
     "tsx": "^4.19.0",
-    "typescript": "^5.8.0"
+    "typescript": "^6.0.3"
   }
 }

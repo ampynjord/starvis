@@ -29,6 +29,6 @@
     "sync": "npm run extract --workspace=@starvis/extractor -- --modules galactapedia,comm-links,starmap"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.9"
+    "@biomejs/biome": "^2.5.5"
   }
 }

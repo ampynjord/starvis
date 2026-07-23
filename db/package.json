@@ -20,5 +20,8 @@
     "pg": "^8.21.0",
     "prisma": "^7.9.0"
   },
-  "type": "module"
+  "type": "module",
+  "devDependencies": {
+    "typescript": "^6.0.3"
+  }
 }
