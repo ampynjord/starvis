@@ -76,6 +76,10 @@ model-cache/
 *.sql.bak
 *.sql.backup
 db-backup/
+# Filet de sécurité : le dossier de sauvegarde vit hors du dépôt (voir
+# db/scripts/backup.sh), mais s'il est redirigé ici, l'ignorer le préserve
+# du `git clean -fd` du déploiement.
+backups/
 
 # Prisma generated clients (rebuilt on npm install)
 db/generated/

@@ -12,7 +12,10 @@ set -euo pipefail
 
 APP_DIR="${APP_DIR:-/home/debian/starvis}"
 ENV_FILE="${ENV_FILE:-${APP_DIR}/.env.prod}"
-BACKUP_DIR="${BACKUP_DIR:-${APP_DIR}/backups}"
+# Deliberately outside APP_DIR: the deploy runs `git clean -fd`, which deletes any
+# untracked directory inside the repo. A backup directory there is wiped at the
+# next deploy — which is exactly what happened to the first backup ever taken.
+BACKUP_DIR="${BACKUP_DIR:-/home/debian/starvis-backups}"
 RETENTION_DAYS="${RETENTION_DAYS:-7}"
 
 if [ ! -f "$ENV_FILE" ]; then
