@@ -5,7 +5,6 @@ export const dynamic = 'force-dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Activity,
-  Building2,
   CheckCircle2,
   ClipboardCheck,
   Eye,
@@ -14,7 +13,6 @@ import {
   Pencil,
   Plus,
   Search,
-  Ship,
   Trash2,
   UserCheck,
   X,
@@ -23,7 +21,6 @@ import {
 import Link from 'next/link';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PageShell } from '@/components/ui/PageShell';
-import { RsiOrgPicker, type RsiOrg } from '@/components/ui/RsiOrgPicker';
 import { StatCard, StatGrid } from '@/components/ui/StatCard';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth, type AuthUser } from '@/contexts/AuthContext';
@@ -32,18 +29,6 @@ import { ADMIN_ROLE, DEVELOPER_ROLE, USER_ROLE, USER_ROLES } from '@/lib/app-con
 // ── Types ────────────────────────────────────────────────────────────────────
 
 type Role = (typeof USER_ROLES)[number];
-
-interface AdminFleetItem {
-  id: number;
-  corporationId: number | null;
-  itemType: string;
-  itemClassName: string;
-  shipUuid?: string | null;
-  quantity: number;
-  notes: string | null;
-  addedAt: string;
-  corporation?: { id: number; name: string; tag: string } | null;
-}
 
 interface DeveloperAccessRequest {
   id: number;
@@ -439,183 +424,6 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
   );
 }
 
-// ── Modal: Corp assignment ─────────────────────────────────────────────────────
-
-function CorpModal({ target, onClose }: { target: AuthUser; onClose: () => void }) {
-  const [currentOrg, setCurrentOrg] = useState<{ name: string; tag: string } | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    fetch(`/api/admin/users/${target.id}/corporation`)
-      .then((r) => r.json())
-      .then((d) => setCurrentOrg(d.data?.corporation ?? null))
-      .finally(() => setLoading(false));
-  }, [target.id]);
-
-  const handleAssign = async (org: RsiOrg) => {
-    setSaving(true);
-    setError('');
-    try {
-      await apiFetch(`/api/admin/users/${target.id}/corporation`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          symbol: org.symbol, name: org.name, logoUrl: org.logoUrl,
-          archetype: org.archetype, language: org.language, commitment: org.commitment,
-          recruiting: org.recruiting, roleplay: org.roleplay, memberCount: org.memberCount,
-        }),
-      });
-      setCurrentOrg({ name: org.name, tag: org.symbol });
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleRemove = async () => {
-    setSaving(true);
-    setError('');
-    try {
-      await apiFetch(`/api/admin/users/${target.id}/corporation`, { method: 'DELETE' });
-      setCurrentOrg(null);
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <Modal title={`Organization — ${target.username}`} onClose={onClose}>
-      <div className="space-y-3">
-        {loading ? (
-          <p className="text-xs text-slate-600 font-mono-sc">Loading…</p>
-        ) : (
-          <>
-            <p className="text-xs text-slate-500">
-              {currentOrg
-                ? <>Current: <span className="text-cyan-400 font-orbitron">[{currentOrg.tag}] {currentOrg.name}</span></>
-                : 'No organization assigned.'}
-            </p>
-            <RsiOrgPicker selected={null} onSelect={(org) => org && handleAssign(org)} disabled={saving} placeholder="Search RSI org to assign…" />
-            {currentOrg && (
-              <button
-                type="button"
-                onClick={handleRemove}
-                disabled={saving}
-                className="text-[11px] text-red-500 hover:text-red-400 font-mono-sc transition-colors disabled:opacity-40"
-              >
-                Remove from organization
-              </button>
-            )}
-            {error && <p className="text-[10px] text-red-400 font-mono-sc">{error}</p>}
-          </>
-        )}
-      </div>
-    </Modal>
-  );
-}
-
-function UserFleetModal({ target, onClose }: { target: AuthUser; onClose: () => void }) {
-  const [items, setItems] = useState<AdminFleetItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<number | null>(null);
-  const [editing, setEditing] = useState<AdminFleetItem | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await apiFetch(`/api/admin/users/${target.id}/fleet`);
-      setItems(data.data ?? []);
-    } finally {
-      setLoading(false);
-    }
-  }, [target.id]);
-
-  useEffect(() => { void load(); }, [load]);
-
-  const remove = async (id: number) => {
-    setBusy(id);
-    try {
-      await apiFetch(`/api/admin/fleet/${id}`, { method: 'DELETE' });
-      setItems((prev) => prev.filter((item) => item.id !== id));
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const save = async () => {
-    if (!editing) return;
-    setBusy(editing.id);
-    try {
-      const data = await apiFetch(`/api/admin/fleet/${editing.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          itemType: editing.itemType,
-          itemClassName: editing.itemClassName,
-          quantity: editing.quantity,
-          notes: editing.notes,
-        }),
-      });
-      setItems((prev) => prev.map((item) => (item.id === editing.id ? data.data : item)));
-      setEditing(null);
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  return (
-    <Modal title={`Fleet — ${target.username}`} onClose={onClose}>
-      <div className="space-y-3">
-        {loading ? (
-          <p className="py-4 text-center font-mono-sc text-xs text-slate-600">Loading...</p>
-        ) : items.length === 0 ? (
-          <p className="py-4 text-center font-mono-sc text-xs text-slate-600">No fleet or bank item declared by this user.</p>
-        ) : (
-          <div className="max-h-[45vh] space-y-1 overflow-y-auto pr-1">
-            {items.map((item) => (
-              <div key={item.id} className="rounded-sm border border-slate-800/60 bg-slate-950/40 px-2.5 py-2">
-                <div className="flex items-center gap-2">
-                  <span className="w-20 shrink-0 font-orbitron text-[9px] uppercase tracking-widest text-slate-600">{item.itemType}</span>
-                  <span className="min-w-0 flex-1 truncate font-mono-sc text-xs text-slate-300">{item.itemClassName}</span>
-                  <span className="font-mono-sc text-[10px] text-slate-600">x{item.quantity}</span>
-                  <button type="button" onClick={() => setEditing(item)} className="p-1 text-slate-700 hover:text-cyan-400">
-                    <Pencil size={11} />
-                  </button>
-                  <button type="button" disabled={busy === item.id} onClick={() => remove(item.id)} className="p-1 text-slate-700 hover:text-red-500 disabled:opacity-40">
-                    <Trash2 size={11} />
-                  </button>
-                </div>
-                <p className="mt-1 truncate font-mono-sc text-[10px] text-slate-700">
-                  {item.corporation ? `[${item.corporation.tag}] ${item.corporation.name}` : 'Personal fleet'}
-                  {item.notes ? ` · ${item.notes}` : ''}
-                </p>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {editing && (
-          <div className="space-y-2 rounded-sm border border-cyan-900/50 bg-cyan-950/10 p-3">
-            <select value={editing.itemType} onChange={(event) => setEditing({ ...editing, itemType: event.target.value })} className="sci-input w-full text-xs">
-              {['ship', 'component', 'item', 'commodity', 'other'].map((type) => <option key={type} value={type}>{type}</option>)}
-            </select>
-            <Input value={editing.itemClassName} onChange={(event) => setEditing({ ...editing, itemClassName: event.target.value })} />
-            <Input type="number" min={1} value={editing.quantity} onChange={(event) => setEditing({ ...editing, quantity: Math.max(1, Number(event.target.value)) })} />
-            <Input value={editing.notes ?? ''} onChange={(event) => setEditing({ ...editing, notes: event.target.value || null })} placeholder="Notes" />
-            <button type="button" onClick={save} disabled={busy === editing.id || !editing.itemClassName.trim()} className="sci-btn-primary w-full py-2 text-xs disabled:opacity-40">
-              Save asset
-            </button>
-          </div>
-        )}
-      </div>
-    </Modal>
-  );
-}
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
@@ -625,8 +433,6 @@ type ModalState =
   | { type: 'password'; user: AuthUser }
   | { type: 'delete'; user: AuthUser }
   | { type: 'create' }
-  | { type: 'corp'; user: AuthUser }
-  | { type: 'fleet'; user: AuthUser }
   | null;
 
 export default function AdminPage() {
@@ -764,7 +570,7 @@ export default function AdminPage() {
         <PageHeader
           eyebrow="Administration"
           title="Users"
-          subtitle="Manage accounts, roles, passwords and corporation links."
+          subtitle="Manage accounts, roles and passwords."
           actions={(
             <button
               type="button"
@@ -779,13 +585,6 @@ export default function AdminPage() {
 
         {/* Nav links */}
         <div className="flex flex-wrap gap-2">
-          <Link
-            href="/admin/corporations"
-            className="flex items-center gap-2 sci-panel px-3 py-2.5 border border-slate-800/60 hover:border-cyan-800/50 text-slate-500 hover:text-cyan-400 transition-colors w-fit"
-          >
-            <Building2 size={13} />
-            <span className="text-[10px] font-orbitron uppercase tracking-widest">Corporations</span>
-          </Link>
           <Link
             href="/admin/monitoring"
             className="flex items-center gap-2 sci-panel px-3 py-2.5 border border-slate-800/60 hover:border-cyan-800/50 text-slate-500 hover:text-cyan-400 transition-colors w-fit"
@@ -948,22 +747,6 @@ export default function AdminPage() {
                   <div className="flex items-center gap-1 shrink-0">
                     <button
                       type="button"
-                      onClick={() => setModal({ type: 'corp', user: u })}
-                      title="Corporation"
-                      className="p-1.5 rounded border border-transparent hover:border-slate-700/50 hover:bg-white/5 text-slate-600 hover:text-cyan-400 transition-colors"
-                    >
-                      <Building2 size={13} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setModal({ type: 'fleet', user: u })}
-                      title="Fleet and bank items"
-                      className="p-1.5 rounded border border-transparent hover:border-slate-700/50 hover:bg-white/5 text-slate-600 hover:text-violet-400 transition-colors"
-                    >
-                      <Ship size={13} />
-                    </button>
-                    <button
-                      type="button"
                       onClick={() => setModal({ type: 'edit', user: u })}
                       title="Edit"
                       className="p-1.5 rounded border border-transparent hover:border-slate-700/50 hover:bg-white/5 text-slate-600 hover:text-slate-300 transition-colors"
@@ -1025,8 +808,6 @@ export default function AdminPage() {
         {modal?.type === 'password' && <ResetPasswordModal key="password" target={modal.user} onClose={() => setModal(null)} />}
         {modal?.type === 'delete'   && <DeleteModal        key="delete"   target={modal.user} onClose={() => setModal(null)} onDeleted={removeUser} />}
         {modal?.type === 'create'   && <CreateModal        key="create"                       onClose={() => setModal(null)} onCreated={addUser} />}
-        {modal?.type === 'corp'     && <CorpModal          key="corp"     target={modal.user} onClose={() => setModal(null)} />}
-        {modal?.type === 'fleet'    && <UserFleetModal     key="fleet"    target={modal.user} onClose={() => setModal(null)} />}
       </AnimatePresence>
     </>
   );

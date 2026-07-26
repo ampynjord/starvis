@@ -192,50 +192,6 @@ export interface SyncStats {
 export class RsiSyncService {
   constructor(private pool: Pool) {}
 
-  async syncOrganizations(onProgress?: (msg: string) => void): Promise<{ updated: number; skipped: number; errors: number }> {
-    const stats = { updated: 0, skipped: 0, errors: 0 };
-    const conn = await this.pool.connect();
-    try {
-      const { rows } = await conn.query<{ id: number; tag: string }>(
-        "SELECT id, tag FROM meta.corporations WHERE tag IS NOT NULL AND tag != '' ORDER BY tag",
-      );
-      onProgress?.(`  [organizations] ${rows.length} cached corporation(s) to refresh`);
-      for (const row of rows) {
-        try {
-          const org = await fetchOrganizationBySymbol(row.tag);
-          if (!org) {
-            stats.skipped++;
-            onProgress?.(`  [organizations] ${row.tag}: not found on RSI`);
-            continue;
-          }
-          await conn.query(
-            `UPDATE meta.corporations SET
-              name = $1,
-              logo_url = $2,
-              rsi_archetype = $3,
-              rsi_language = $4,
-              rsi_commitment = $5,
-              rsi_recruiting = $6,
-              rsi_roleplay = $7,
-              rsi_member_count = $8,
-              rsi_synced_at = NOW(),
-              updated_at = NOW()
-             WHERE id = $9`,
-            [org.name, org.logoUrl, org.archetype, org.language, org.commitment, org.recruiting, org.roleplay, org.memberCount, row.id],
-          );
-          stats.updated++;
-          onProgress?.(`  [organizations] ${row.tag}: updated`);
-        } catch (err) {
-          logger.warn(`[organizations] sync error ${row.tag}: ${(err as Error).message}`);
-          stats.errors++;
-        }
-      }
-    } finally {
-      conn.release();
-    }
-    return stats;
-  }
-
   // ── Galactapedia — source officielle RSI (GraphQL API) ──────────────────────
 
   async syncGalactapedia(onProgress?: (msg: string) => void): Promise<SyncStats> {

@@ -15,7 +15,6 @@ const STATIC_ROUTES: { path: string; priority: number; changefreq: MetadataRoute
   { path: '/vehicles', priority: 0.8, changefreq: 'weekly' },
   { path: '/compare', priority: 0.7, changefreq: 'monthly' },
   { path: '/ranking', priority: 0.7, changefreq: 'weekly' },
-  { path: '/loadout-manager', priority: 0.7, changefreq: 'weekly' },
   { path: '/armor', priority: 0.7, changefreq: 'weekly' },
   { path: '/clothing', priority: 0.7, changefreq: 'weekly' },
   { path: '/weapons', priority: 0.7, changefreq: 'weekly' },

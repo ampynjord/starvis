@@ -21,7 +21,6 @@ export const EXTRACTION_MODULES = [
   'starmap-assets',
   'ship-matrix',
   'ship-galleries',
-  'organizations',
   'rsi-content',
   'uex',
 ] as const;
@@ -78,7 +77,6 @@ export const MODULE_REGISTRY: readonly ExtractionModuleDefinition[] = [
     runtime: 'network',
     aliases: ['gallery', 'galleries', 'ship-gallery', 'official-gallery', 'official-galleries'],
   },
-  { id: 'organizations', runtime: 'network', aliases: ['organization', 'organisation', 'organisations', 'orgs'] },
   { id: 'rsi-content', runtime: 'network', aliases: ['rsi-html', 'enrich-content', 'comm-link-html', 'galactapedia-html'] },
   { id: 'uex', runtime: 'network', aliases: ['uex-market', 'uexcorp', 'prices', 'market'] },
 ] as const;

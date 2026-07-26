@@ -515,17 +515,6 @@ export class ExtractionService {
           onProgress?.('Starmap sync skipped after extraction (already pre-synced for location cross-reference)');
         }
 
-        if (run('organizations')) {
-          onProgress?.('Syncing RSI organizations for cached corporations...');
-          try {
-            const s = await rsiSync.syncOrganizations(onProgress);
-            onProgress?.(`Organizations: updated=${s.updated}, errors=${s.errors}, skipped=${s.skipped}`);
-            if (s.errors) stats.errors.push(`Organizations: ${s.errors} errors`);
-          } catch (e) {
-            stats.errors.push(`Organizations sync failed: ${(e as Error).message}`);
-          }
-        }
-
         if (run('rsi-content')) {
           onProgress?.('Enriching comm-link content from RSI (scraping HTML)…');
           try {

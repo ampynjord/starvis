@@ -49,7 +49,6 @@ const SHIPS_ITEMS: NavItemDef[] = [
   { to: '/ships', icon: Rocket, label: 'Ships & Vehicles' },
   { to: '/compare', icon: BarChart3, label: 'Compare' },
   { to: '/ranking', icon: Trophy, label: 'Ranking' },
-  { to: '/loadout-manager', icon: SlidersHorizontal, label: 'Loadout Manager', earlyAccess: true },
   { to: '/vehicles', icon: Zap, label: 'Vehicle Equipment' },
 ];
 

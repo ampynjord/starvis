@@ -5,7 +5,6 @@ import { mountCalculateRoutes } from './calculate.js';
 import { mountChatRoutes } from './chat.js';
 import { mountCommodityRoutes } from './commodities.js';
 import { mountComponentRoutes } from './components.js';
-import { mountCorporationRoutes } from './corporations.js';
 import { mountCorrelationRoutes } from './correlations.js';
 import { mountCraftingRoutes } from './crafting.js';
 import { mountFactionRoutes } from './factions.js';
@@ -70,8 +69,8 @@ export const routeGroups = [
   },
   {
     id: 'user-features',
-    description: 'Corporations and assistant/chat features.',
-    mounts: [mountCorporationRoutes, mountChatRoutes],
+    description: 'Assistant/chat features.',
+    mounts: [mountChatRoutes],
   },
 ] as const satisfies readonly RouteGroup[];
 

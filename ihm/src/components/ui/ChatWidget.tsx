@@ -42,7 +42,7 @@ const PAGE_CONTEXTS: { match: RegExp; label: string; prompts: string[] }[] = [
     prompts: ['Compare this ship with alternatives for solo play', 'Explain the combat strengths and weaknesses', 'Find useful loadout ideas from Starvis data'],
   },
   {
-    match: /^\/compare|^\/ranking|^\/loadout-manager/,
+    match: /^\/compare|^\/ranking/,
     label: 'Ship tools',
     prompts: ['Help me choose the best ship for my use case', 'Summarize the biggest stat trade-offs', 'Which data should I check before deciding?'],
   },

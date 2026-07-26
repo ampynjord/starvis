@@ -6,17 +6,13 @@ import {
   AlertTriangle,
   BookOpen,
   Bug,
-  Building2,
   Code2,
   ExternalLink,
   Home,
   Info,
   Lock,
-  Package,
-  Radar,
   Scale,
   Shield,
-  Ship,
   User,
   X,
 } from 'lucide-react';
@@ -158,19 +154,6 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
           <NavGroup key={group.id} label={group.label} items={group.items} onNavigate={onClose} />
         ))}
 
-        {user && (
-          <NavGroup
-            label="Corporation"
-            items={[
-              { to: '/corp',       icon: Building2, label: 'Corporation HQ', exact: true },
-              { to: '/corp/fleet', icon: Ship,    label: 'Fleet Manager', earlyAccess: true },
-              { to: '/corp/tactics', icon: Radar, label: 'Tactics', earlyAccess: true },
-              { to: '/corp/bank',  icon: Package, label: 'Corp Bank', earlyAccess: true },
-            ]}
-            onNavigate={onClose}
-          />
-        )}
-
         {hasDeveloperAccess(user?.role) && (
           <NavGroup
             label="Developer"
@@ -184,7 +167,6 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
             label="Administration"
             items={[
               { to: '/admin',              icon: Shield,    label: 'Users',         exact: true },
-              { to: '/admin/corporations', icon: Building2, label: 'Corporations' },
               { to: '/admin/bug-reports',  icon: Bug,       label: 'Bug Reports' },
               { to: '/admin/monitoring',    icon: Activity,  label: 'Monitoring' },
             ]}

@@ -155,7 +155,6 @@ process.env.SERVER_API_KEY = SERVER_API_KEY;
 
 const { mountAuthRoutes } = await import('../src/routes/auth.js');
 const { mountAdminRoutes } = await import('../src/routes/admin.js');
-const { mountCorporationRoutes } = await import('../src/routes/corporations.js');
 const { requireExternalApiAccess, requireJwt } = await import('../src/middleware/index.js');
 
 function signToken(id: number, role: string): string {
@@ -177,7 +176,6 @@ beforeAll(() => {
   const deps = { prisma: prismaMock, shipMatrixService: { getStats: vi.fn() }, gameDataService: null } as any;
   mountAuthRoutes(router, deps);
   mountAdminRoutes(router, deps);
-  mountCorporationRoutes(router, deps);
   app.use('/', router);
 });
 
@@ -254,19 +252,6 @@ describe('admin routes authorization', () => {
       .send({ role: 'developer' });
     expect(res.status).toBe(200);
     expect(res.body.user.role).toBe('developer');
-  });
-
-  it('rejects role "user" on admin corporation routes with 403', async () => {
-    const res = await request(app)
-      .put('/admin/corporations/1')
-      .set('Authorization', `Bearer ${signToken(2, 'user')}`)
-      .send({ name: 'x' });
-    expect(res.status).toBe(403);
-  });
-
-  it('rejects unauthenticated access to admin corporation routes with 401', async () => {
-    const res = await request(app).get('/admin/corporations');
-    expect(res.status).toBe(401);
   });
 });
 

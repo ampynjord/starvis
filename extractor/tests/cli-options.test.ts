@@ -9,7 +9,7 @@ describe('extractor CLI options', () => {
   });
 
   it('parses module aliases and comma-separated modules', () => {
-    expect([...parseModules('ships,orgs,comm-links')]).toEqual(['ships', 'organizations', 'comm-links']);
+    expect([...parseModules('ships,gallery,comm-links')]).toEqual(['ships', 'ship-galleries', 'comm-links']);
     expect([...parseModules('shop-inventory')]).toEqual(['shops']);
   });
 

@@ -7,7 +7,6 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { AuthPanel } from '@/components/ui/AuthPanel';
 import { useAuth } from '@/contexts/AuthContext';
-import { RsiOrgPicker, type RsiOrg } from '@/components/ui/RsiOrgPicker';
 
 interface PasswordRule {
   label: string;
@@ -39,7 +38,6 @@ export default function RegisterPage() {
   const [showRules, setShowRules] = useState(false);
   const [consented, setConsented] = useState(false);
   const [verificationPending, setVerificationPending] = useState(false);
-  const [selectedOrg, setSelectedOrg] = useState<RsiOrg | null>(null);
 
   const passwordsMatch = confirm === '' || password === confirm;
   const strongEnough = isStrongPassword(password);
@@ -64,19 +62,6 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       const result = await register(email, username, password);
-      // If an RSI org was selected, declare membership instantly (fire-and-forget)
-      if (selectedOrg) {
-        fetch('/api/auth/me/corporation', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            symbol: selectedOrg.symbol, name: selectedOrg.name, logoUrl: selectedOrg.logoUrl,
-            archetype: selectedOrg.archetype, language: selectedOrg.language,
-            commitment: selectedOrg.commitment, recruiting: selectedOrg.recruiting,
-            roleplay: selectedOrg.roleplay, memberCount: selectedOrg.memberCount,
-          }),
-        }).catch(() => {});
-      }
       if (result?.requiresVerification) {
         setVerificationPending(true);
       } else {
@@ -205,17 +190,6 @@ export default function RegisterPage() {
             {confirm.length > 0 && !passwordsMatch && (
               <p className="text-xs text-red-400">Passwords do not match</p>
             )}
-          </div>
-
-          {/* RSI Organization (optional) */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-mono-sc text-cyan-700 uppercase tracking-wider">
-              RSI Organization <span className="text-slate-600 normal-case font-rajdhani text-[11px]">(optional)</span>
-            </label>
-            <RsiOrgPicker selected={selectedOrg} onSelect={setSelectedOrg} />
-            <p className="text-xs text-slate-600">
-              {selectedOrg ? `Will join ${selectedOrg.name} immediately.` : 'Search your org by name or tag.'}
-            </p>
           </div>
 
           {/* RGPD — consentement */}

@@ -1,22 +1,13 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { AlertTriangle, Building2, Code2, LogOut, QrCode, Save, Shield, ShieldCheck, ShieldOff, Trash2, User, X } from 'lucide-react';
+import { AlertTriangle, Code2, LogOut, QrCode, Save, Shield, ShieldCheck, ShieldOff, Trash2, User } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PageShell } from '@/components/ui/PageShell';
-import { RsiOrgPicker, type RsiOrg } from '@/components/ui/RsiOrgPicker';
 import { useAuth } from '@/contexts/AuthContext';
-
-interface Membership {
-  id: number;
-  role: 'member' | 'leader';
-  status: 'pending' | 'active' | 'rejected';
-  declaredAt: string;
-  corporation: { id: number; name: string; tag: string; rsiArchetype: string | null; logoUrl: string | null };
-}
 
 export default function ProfilePage() {
   const { user, logout, refresh } = useAuth();
@@ -35,64 +26,6 @@ export default function ProfilePage() {
   const [twoFaCode, setTwoFaCode] = useState('');
   const [twoFaLoading, setTwoFaLoading] = useState(false);
   const [twoFaMessage, setTwoFaMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-
-  // Corporation state
-  const [membership, setMembership] = useState<Membership | null | undefined>(undefined);
-  const [corpLoading, setCorpLoading] = useState(false);
-  const [corpMessage, setCorpMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-
-  const loadMembership = useCallback(async () => {
-    try {
-      const res = await fetch('/api/auth/me/corporation');
-      const data = await res.json();
-      setMembership(data.data ?? null);
-    } catch {
-      setMembership(null);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (user) loadMembership();
-  }, [user, loadMembership]);
-
-  const handleDeclareOrg = async (org: RsiOrg) => {
-    setCorpLoading(true);
-    setCorpMessage(null);
-    try {
-      const res = await fetch('/api/auth/me/corporation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          symbol: org.symbol, name: org.name, logoUrl: org.logoUrl,
-          archetype: org.archetype, language: org.language, commitment: org.commitment,
-          recruiting: org.recruiting, roleplay: org.roleplay, memberCount: org.memberCount,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? 'Failed');
-      setMembership(data.data);
-      setCorpMessage({ type: 'success', text: `Request sent to ${org.name}. A corporation leader or admin must approve it.` });
-    } catch (err: any) {
-      setCorpMessage({ type: 'error', text: err.message });
-    } finally {
-      setCorpLoading(false);
-    }
-  };
-
-  const handleLeave = async () => {
-    setCorpLoading(true);
-    setCorpMessage(null);
-    try {
-      const res = await fetch('/api/auth/me/corporation', { method: 'DELETE' });
-      if (!res.ok) { const d = await res.json(); throw new Error(d.error ?? 'Failed'); }
-      setMembership(null);
-      setCorpMessage({ type: 'success', text: 'Left the organization.' });
-    } catch (err: any) {
-      setCorpMessage({ type: 'error', text: err.message });
-    } finally {
-      setCorpLoading(false);
-    }
-  };
 
   useEffect(() => {
     if (user) {
@@ -215,7 +148,7 @@ export default function ProfilePage() {
       <PageHeader
         eyebrow="Account"
         title="My Profile"
-        subtitle="Manage identity, corporation membership, API token and security."
+        subtitle="Manage identity, API token and security."
         actions={(
           <div className="flex items-center gap-2 rounded-sm border border-cyan-900/50 bg-cyan-950/20 px-2.5 py-1.5">
             <User size={13} className="text-cyan-400" />
@@ -302,76 +235,6 @@ export default function ProfilePage() {
             {saving ? 'SAVING...' : 'SAVE'}
           </button>
         </form>
-      </motion.div>
-
-      {/* Corporation */}
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.08 }}
-        className="sci-panel p-5 space-y-4"
-      >
-        <div className="flex items-center gap-2">
-          <Building2 size={14} className="text-cyan-600" />
-          <h2 className="text-sm font-mono-sc text-cyan-700 uppercase tracking-wider">Corporation</h2>
-        </div>
-
-        {membership === undefined ? (
-          <p className="text-xs text-slate-600 font-mono-sc">Loading…</p>
-        ) : membership ? (
-          <div className="space-y-3">
-            <div className="flex items-center gap-3 py-2 px-3 border border-slate-800/60 rounded-sm bg-slate-900/40">
-              {membership.corporation.logoUrl && (
-                <img src={membership.corporation.logoUrl} alt={membership.corporation.tag} className="w-9 h-9 rounded-sm object-cover shrink-0" />
-              )}
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-rajdhani font-semibold text-white truncate">{membership.corporation.name}</p>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[9px] font-orbitron text-slate-500 border border-slate-700 px-1 py-0.5 rounded-sm">[{membership.corporation.tag}]</span>
-                  {membership.corporation.rsiArchetype && (
-                    <span className="text-[9px] text-slate-600 font-mono-sc">{membership.corporation.rsiArchetype}</span>
-                  )}
-                  {membership.status !== 'active' && (
-                    <span className="text-[9px] font-orbitron text-amber-400 border border-amber-800/50 bg-amber-950/20 px-1 py-0.5 rounded-sm">
-                      {membership.status}
-                    </span>
-                  )}
-                  {membership.status === 'active' && membership.role === 'leader' && (
-                    <span className="text-[9px] font-orbitron text-emerald-400 border border-emerald-800/50 bg-emerald-950/20 px-1 py-0.5 rounded-sm">
-                      leader
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-            {membership.status === 'pending' && (
-              <p className="text-xs text-amber-400 bg-amber-950/20 border border-amber-800/30 rounded-sm px-3 py-2">
-                Your membership request is waiting for approval by a corporation leader or admin.
-              </p>
-            )}
-            <p className="text-[11px] text-slate-600">Change organization:</p>
-            <RsiOrgPicker selected={null} onSelect={(org) => org && handleDeclareOrg(org)} disabled={corpLoading} placeholder="Search another org to switch…" />
-            <button
-              type="button"
-              onClick={handleLeave}
-              disabled={corpLoading}
-              className="flex items-center gap-1.5 text-[11px] text-red-500 hover:text-red-400 font-mono-sc transition-colors disabled:opacity-40"
-            >
-              <X size={11} /> Leave organization
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <p className="text-xs text-slate-500">You are not in any organization. Search your RSI org below.</p>
-            <RsiOrgPicker selected={null} onSelect={(org) => org && handleDeclareOrg(org)} disabled={corpLoading} />
-          </div>
-        )}
-
-        {corpMessage && (
-          <p className={`text-xs font-mono-sc px-3 py-2 rounded border ${
-            corpMessage.type === 'success' ? 'text-green-400 bg-green-950/30 border-green-800/30' : 'text-red-400 bg-red-950/30 border-red-800/30'
-          }`}>{corpMessage.text}</p>
-        )}
       </motion.div>
 
       {/* Developer API */}
