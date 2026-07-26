@@ -20,13 +20,20 @@ if [ ! -f "$ENV_FILE" ]; then
   exit 1
 fi
 
-set -a
-# shellcheck disable=SC1090
-source "$ENV_FILE"
-set +a
+# Read one key from the env file without sourcing it. `source` would execute any
+# value containing spaces — LEGAL_PUBLISHER_STATUS alone was enough to kill this
+# script before it reached pg_dump, which is why no backup had ever been produced.
+# docker compose parses the same file without issue, so the fix belongs here.
+read_env() {
+  sed -n "s/^${1}=//p" "$ENV_FILE" | tail -1 | sed -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'$/\1/"
+}
 
+DB_NAME="${DB_NAME:-$(read_env DB_NAME)}"
 DB_NAME="${DB_NAME:-starvis}"
+DB_USER="${DB_USER:-$(read_env DB_USER)}"
 DB_USER="${DB_USER:-starvis_user}"
+DB_PASSWORD="${DB_PASSWORD:-$(read_env DB_PASSWORD)}"
+COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-$(read_env COMPOSE_PROJECT_NAME)}"
 COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-starvis}"
 CONTAINER="${POSTGRES_CONTAINER:-${COMPOSE_PROJECT_NAME}-postgres}"
 
@@ -42,20 +49,34 @@ mkdir -p "$BACKUP_DIR"
 
 echo "[$(date)] Starting PostgreSQL backup from ${CONTAINER}/${DB_NAME}..."
 
+set +e
 docker exec -e PGPASSWORD="$DB_PASSWORD" "$CONTAINER" \
   pg_dump -U "$DB_USER" -d "$DB_NAME" --no-password \
   | gzip > "$BACKUP_FILE"
+DUMP_STATUS="${PIPESTATUS[0]}"
+set -e
 
-DUMP_SIZE="$(stat -c%s "$BACKUP_FILE" 2>/dev/null || echo 0)"
-
-if [ "$DUMP_SIZE" -gt 0 ]; then
-  SIZE="$(du -h "$BACKUP_FILE" | cut -f1)"
-  echo "[$(date)] Backup complete: $(basename "$BACKUP_FILE") (${SIZE})"
-else
-  echo "[$(date)] Backup failed: empty dump" >&2
+if [ "$DUMP_STATUS" -ne 0 ]; then
+  echo "[$(date)] Backup failed: pg_dump exited ${DUMP_STATUS}" >&2
   rm -f "$BACKUP_FILE"
   exit 1
 fi
+
+# A dump that cannot be decompressed is not a backup: verify before trusting it.
+if ! gzip -t "$BACKUP_FILE" 2>/dev/null; then
+  echo "[$(date)] Backup failed: corrupt archive" >&2
+  rm -f "$BACKUP_FILE"
+  exit 1
+fi
+
+DUMP_SIZE="$(stat -c%s "$BACKUP_FILE" 2>/dev/null || echo 0)"
+if [ "$DUMP_SIZE" -lt 1000000 ]; then
+  echo "[$(date)] Backup failed: suspicious size (${DUMP_SIZE} bytes)" >&2
+  rm -f "$BACKUP_FILE"
+  exit 1
+fi
+
+echo "[$(date)] Backup complete: $(basename "$BACKUP_FILE") ($(du -h "$BACKUP_FILE" | cut -f1))"
 
 find "$BACKUP_DIR" -name "starvis_*.sql.gz" -mtime +"$RETENTION_DAYS" -delete
 echo "[$(date)] Removed backups older than ${RETENTION_DAYS} days"
