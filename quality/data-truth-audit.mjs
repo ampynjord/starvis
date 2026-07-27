@@ -205,9 +205,11 @@ async function auditEntities() {
   requireCoverage('components', components, 'name', 1);
   requireCoverage('components', components, 'type', 1);
   requireHumanNames('components', components);
-  // 3,6 % au relevé du 27/07 — armement de capitaux (« Bengal Ballistic Cannon »),
-  // lisible par chance mais sans entrée de localisation.
-  requireLocalizedNames('components', components, 0.04);
+  // 3,6 % avant que les clés de localisation cessent d'être jetées, 1,9 % après
+  // sur la population visible. Le reste tient à des prototypes et des montures
+  // de minage que le jeu ne nomme pas. Le plafond garde un peu de marge : trop
+  // près du constat, il céderait au premier composant ajouté.
+  requireLocalizedNames('components', components, 0.03);
   requirePlausible('components', components, 'size', { min: 0, max: 12 });
 
   const items = await getAll('/items', { env });

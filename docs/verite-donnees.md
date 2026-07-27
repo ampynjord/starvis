@@ -93,7 +93,7 @@ mesurais l'efficacité du maquillage, pas la présence des libellés. En compara
 |---|---|
 | Vaisseaux pilotables | 0 |
 | Vaisseaux concepts | 22 sur 22 — **légitime** (voir ci-dessous) |
-| Composants | 119 sur 3 271 (3,6 %) |
+| Composants | 119 sur 3 271 (3,6 %) → **32 (1,0 %)** après correction |
 | Objets | 548 sur 5 551 (9,9 %) |
 | **Marchandises** | **135 sur 135 (100 %)** |
 
@@ -185,6 +185,62 @@ déterministe pour que deux exécutions restent comparables.
 
 **À corriger étape 2/3** : distinguer le port structurel du port d'équipement à
 l'extraction, puis combler le croisement sur les seconds.
+
+### D7 — Le wiki listait 1 579 composants inachevés
+
+Second effet du correctif de libellés, et lui non plus n'était pas prévisible.
+
+L'API masque les composants dont le nom contient « temp », « template » ou
+« placeholder ». Ce filtre était **aveugle** tant que les noms étaient fabriqués
+depuis l'identifiant : `MASTER_PowerPlant` devenait « MASTER Power Plant », qui
+ne déclenche rien.
+
+Une fois les vrais noms résolus, 1 579 composants se révèlent porter le libellé
+`<= PLACEHOLDER =>` — le marqueur de CIG pour du contenu non fini. Le catalogue
+public passe donc de 3 271 à 1 692 entrées.
+
+Ce n'est pas une perte : la base conserve ses 3 271 lignes, et les 1 579 masqués
+sont **tous** exactement `<= PLACEHOLDER =>`, sans un seul faux positif. Ce que
+le wiki présentait auparavant, c'étaient des objets de jeu inachevés sous des
+noms inventés — « QIG Prototype », « MASTER PowerPlant », « Ammo Crate 01 Port ».
+
+Près de la moitié du catalogue de composants était du contenu fantôme.
+
+### D6 — Chaque vaisseau affichait deux fois son équipement
+
+Le défaut le plus grave trouvé jusqu'ici, et il n'a été révélé que par le
+correctif précédent.
+
+Un composant a pour clé `(uuid, env)` : le même existe en LIVE et en PTU. Les
+deux jointures de `loadout-service` portaient sur le seul `uuid`, ramenaient donc
+les deux lignes, et doublaient chaque port.
+
+Statistiques du Gladius servies par la production, contre la réalité :
+
+| | affiché | réel |
+|---|---|---|
+| points d'emport | 33 | 17 |
+| armes | 6 | 3 |
+| boucliers | 4 | 2 |
+| centrales | 2 | 1 |
+| missiles | 12 | 6 |
+
+`getLoadoutRows` alimente `aggregateLoadoutStats`, qui **somme** : toutes les
+statistiques agrégées d'un vaisseau étaient gonflées. La jointure pouvait en
+outre servir la valeur PTU sur le site LIVE.
+
+**Pourquoi personne ne l'avait vu** : les deux environnements portaient les mêmes
+libellés, donc la ligne en trop était indiscernable de la bonne. Il a fallu que
+la résolution des noms fasse diverger « AEGS Gladius » (PTU) de « Internal Tank »
+(LIVE) sur un même réservoir pour que le nom affiché trahisse la ligne jointe.
+
+C'est l'argument le plus net en faveur de l'ordre choisi pour cette refonte :
+corriger la donnée d'abord fait apparaître les défauts que l'affichage masquait.
+
+**Corrigé** — `AND c.env = sl.env` sur les deux jointures, avec une garde qui
+porte sur la requête et non sur les valeurs agrégées : un test sur les totaux
+n'aurait rien vu, puisqu'ils étaient cohérents entre eux, simplement comptés deux
+fois.
 
 ### D5 — Les noms de vaisseaux ne viennent pas du jeu
 
