@@ -12,7 +12,7 @@ import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { fCredits } from '@/utils/formatters';
-import type { CommodityPrice } from '@/types/api';
+import type { Commodity, CommodityPrice } from '@/types/api';
 
 function fmtNum(v: number | null | undefined, unit = '', digits = 2): string {
   if (v == null) return '—';
@@ -71,16 +71,21 @@ function PriceRow({ price }: { price: CommodityPrice }) {
   );
 }
 
-export default function CommodityDetailPage() {
+/** `initialCommodity` : voir ShipDetailPage — rend la fiche dès le rendu serveur. */
+export default function CommodityDetailPage({ initialCommodity }: { initialCommodity?: Commodity | null } = {}) {
   const params = useParams<{ uuid: string }>();
   const uuid = params?.uuid;
   const router = useRouter();
   const { env } = useEnv();
 
+  // La page serveur interroge toujours LIVE : ne réutiliser sa réponse que là.
+  const seedCommodity = env === 'live' && initialCommodity && initialCommodity.uuid === uuid ? initialCommodity : undefined;
+
   const { data: commodity, isLoading, error, refetch } = useQuery({
     queryKey: ['commodities.get', uuid, env],
     queryFn: () => api.commodities.get(uuid!, env),
     enabled: !!uuid,
+    initialData: seedCommodity,
   });
 
   const { data: prices } = useQuery({

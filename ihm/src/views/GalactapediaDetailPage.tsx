@@ -38,7 +38,8 @@ function isRichHtml(content: string): boolean {
   return /<p[\s>]|<img[\s>]|<h[1-6][\s>]/i.test(content);
 }
 
-export default function GalactapediaDetailPage() {
+/** `initialEntry` : voir ShipDetailPage — rend l'article dès le rendu serveur. */
+export default function GalactapediaDetailPage({ initialEntry }: { initialEntry?: GalactapediaEntry | null } = {}) {
   const params = useParams<{ id: string }>();
   const id = params?.id;
 
@@ -46,6 +47,7 @@ export default function GalactapediaDetailPage() {
     queryKey: ['galactapedia.single', id],
     queryFn: () => api.galactapedia.get(id!),
     enabled: !!id,
+    initialData: initialEntry ?? undefined,
   });
 
   const primaryCat = entry ? parseArray(entry.categories)[0] : undefined;

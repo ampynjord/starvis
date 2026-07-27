@@ -44,7 +44,11 @@ const nextConfig: NextConfig = {
       { source: '/minerals', destination: '/commodities', permanent: true },
       { source: '/other-items', destination: '/consumables', permanent: true },
       { source: '/items', destination: '/consumables', permanent: true },
-      { source: '/items/:uuid', destination: '/consumables/:uuid', permanent: true },
+      // Pas de redirection pour /items/:uuid : seul le listing a été renommé en
+      // /consumables. La variante à identifiant avait suivi par erreur et
+      // renvoyait vers /consumables/:uuid, qui n'existe pas — toutes les fiches
+      // d'items répondaient donc 404, alors que l'IHM y lie depuis la liste des
+      // items et les ingrédients de recettes.
     ];
   },
 };

@@ -67,7 +67,7 @@ export default async function Page({ params }: PageParams) {
         </>
       ) : null}
       <Suspense>
-        <GalactapediaDetailPage />
+        <GalactapediaDetailPage initialEntry={data} />
       </Suspense>
     </>
   );

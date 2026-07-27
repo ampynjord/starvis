@@ -12,6 +12,7 @@ import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { PageShell } from '@/components/ui/PageShell';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { api } from '@/services/api';
+import type { CommLink } from '@/types/api';
 
 type BadgeColor = 'cyan' | 'amber' | 'green' | 'purple' | 'slate';
 
@@ -80,7 +81,8 @@ function isRichHtml(content: string): boolean {
   return /<p[\s>]|<img[\s>]|<h[1-6][\s>]|<div[\s>]/i.test(content);
 }
 
-export default function CommLinkDetailPage() {
+/** `initialEntry` : voir ShipDetailPage — rend l'article dès le rendu serveur. */
+export default function CommLinkDetailPage({ initialEntry }: { initialEntry?: CommLink | null } = {}) {
   const params = useParams<{ id: string }>();
   const id = params?.id;
 
@@ -88,6 +90,7 @@ export default function CommLinkDetailPage() {
     queryKey: ['commlinks.single', id],
     queryFn: () => api.commLinks.get(id!),
     enabled: !!id,
+    initialData: initialEntry ?? undefined,
   });
 
   const { data: relatedData } = useQuery({

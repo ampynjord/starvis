@@ -49,7 +49,7 @@ export default async function Page({ params }: PageParams) {
           />
         </>
       ) : null}
-      <CommodityDetailPage />
+      <CommodityDetailPage initialCommodity={commodity} />
     </>
   );
 }

@@ -62,7 +62,7 @@ export default async function Page({ params }: PageParams) {
         </>
       ) : null}
       <Suspense>
-        <CommLinkDetailPage />
+        <CommLinkDetailPage initialEntry={data} />
       </Suspense>
     </>
   );

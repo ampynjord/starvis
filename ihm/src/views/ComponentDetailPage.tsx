@@ -265,11 +265,15 @@ function getHeroStats(comp: Component) {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default function ComponentDetailPage() {
+/** `initialComponent` : voir ShipDetailPage — rend la fiche dès le rendu serveur. */
+export default function ComponentDetailPage({ initialComponent }: { initialComponent?: Component | null } = {}) {
 	const params = useParams<{ uuid: string }>();
 	const uuid = params?.uuid;
 	const router = useRouter();
 	const { env } = useEnv();
+
+	// La page serveur interroge toujours LIVE : ne réutiliser sa réponse que là.
+	const seedComponent = env === "live" && initialComponent && initialComponent.uuid === uuid ? initialComponent : undefined;
 
 	const {
 		data: comp,
@@ -280,6 +284,7 @@ export default function ComponentDetailPage() {
 		queryKey: ["components.get", uuid, env],
 		queryFn: () => api.components.get(uuid!, env),
 		enabled: !!uuid,
+		initialData: seedComponent,
 	});
 	const { data: ships } = useQuery({
 		queryKey: ["components.ships", uuid, env],

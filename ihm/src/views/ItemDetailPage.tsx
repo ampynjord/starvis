@@ -202,16 +202,21 @@ function ArmorStats({ item }: { item: Item }) {
 
 // ── Main page ────────────────────────────────────────────────────────────────
 
-export default function ItemDetailPage() {
+/** `initialItem` : voir ShipDetailPage — rend la fiche dès le rendu serveur. */
+export default function ItemDetailPage({ initialItem }: { initialItem?: Item | null } = {}) {
   const params = useParams<{ uuid: string }>();
   const uuid = params?.uuid;
   const router = useRouter();
   const { env } = useEnv();
 
+  // La page serveur interroge toujours LIVE : ne réutiliser sa réponse que là.
+  const seedItem = env === 'live' && initialItem && initialItem.uuid === uuid ? initialItem : undefined;
+
   const { data: item, isLoading, error, refetch } = useQuery({
     queryKey: ['items.get', uuid, env],
     queryFn: () => api.items.get(uuid!, env),
     enabled: !!uuid,
+    initialData: seedItem,
   });
 
   const { data: buyLocs } = useQuery({
