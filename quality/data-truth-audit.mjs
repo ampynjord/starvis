@@ -302,7 +302,10 @@ async function auditLoadouts(ships) {
     `loadouts : ${equipmentResolved}/${equipment} port(s) d'équipement résolu(s) (${(rate * 100).toFixed(1)}%) sur ${sample.length} vaisseaux`,
   );
   fact(`loadouts : ${structural} port(s) structurel(s) ignoré(s) — mobilier d'habitacle, sans composant équipable`);
-  if (rate < 0.7) fail(`loadouts : résolution ${(rate * 100).toFixed(1)}% sous le plancher 70%`);
+  // 83 % tant que les commandes de cockpit, écrans et sièges étaient comptés
+  // comme de l'équipement ; 93 % une fois `classifyPort` corrigé. Le plancher
+  // suit, avec la marge nécessaire à l'échantillonnage.
+  if (rate < 0.85) fail(`loadouts : résolution ${(rate * 100).toFixed(1)}% sous le plancher 85%`);
 }
 
 /**

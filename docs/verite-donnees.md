@@ -183,8 +183,38 @@ alphabétique donnaient 77,4 %, contre 83,4 % à pas régulier. Prendre la tête
 liste ne voit que les constructeurs du début d'alphabet — d'où le pas, qui reste
 déterministe pour que deux exécutions restent comparables.
 
-**À corriger étape 2/3** : distinguer le port structurel du port d'équipement à
-l'extraction, puis combler le croisement sur les seconds.
+**Corrigé (étape 3), et le diagnostic ci-dessus était faux.** Les ports
+« d'équipement non résolus » n'en étaient presque pas. `classifyPort` classait par
+mots-clés dans le **nom du port**, ce qui confondait l'équipement avec ce qui le
+commande ou l'affiche :
+
+| Classé comme | Ce que c'était | Ports |
+|---|---|---|
+| Refroidisseur | la **commande** du refroidisseur | 273 |
+| Radar | un **écran** d'affichage | 182 |
+| Lance-missiles | la **commande** de tir | 180 |
+| Tourelle | un **siège** de tourelle | 18 |
+| Refroidisseur | une **porte** (`…_Cooler_Left`) | 3 |
+
+Le test porte désormais sur la **classe du composant**, qui nomme ce qui est
+monté, plutôt que sur le nom du port, qui nomme l'endroit. Vérifié avant
+application : aucun des 14 453 ports correctement résolus ne portait ces
+préfixes, la règle ne pouvait donc dégrader aucun rattachement.
+
+Mesuré sur extraction réelle : **15 232 → 13 507 ports d'équipement**, résolution
+**82,7 % → 93,3 %**.
+
+`Controller_Flight_*` est une exception assumée : le contrôleur de vol est un
+vrai système du vaisseau, simplement non extrait comme composant. Le ranger en
+aménagement masquerait un manque au lieu de le signaler.
+
+**Ce qui reste est enfin réel** — de vrais composants absents du catalogue :
+
+| Composant | Ports |
+|---|---|
+| `MISL_S02_CS_FSKI_Tempest` (un missile) | 160 |
+| `ARGO_ATLS_GEO_Thruster_Small` | 50 |
+| `APAR_BallisticGatling_S4_CapitalShip` | 12 |
 
 ### D8 — Nos identifiants ne sont pas ceux du reste de l'écosystème
 

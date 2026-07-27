@@ -233,9 +233,54 @@ export function resolveComponentName(className: string): string {
 
 // ============ Port type classifier ============
 
+/**
+ * Le port porte-t-il un aménagement plutôt qu'un équipement ?
+ *
+ * La classification se faisait par mots-clés dans le nom du port, ce qui
+ * confondait l'équipement avec ce qui le commande ou l'affiche :
+ *
+ * - `hardpoint_controller_cooler` → « Cooler », alors qu'il porte la **commande**
+ *   du refroidisseur, pas le refroidisseur (273 ports) ;
+ * - `Screen_Radar` → « Radar », alors qu'il porte un **écran** (182 ports) ;
+ * - `hardpoint_seat_turret_rear_bottom_left` → « Turret », pour un **siège** ;
+ * - `hardpoint_cooler_door_left` → « Cooler », pour une **porte**.
+ *
+ * Le test porte sur la classe du composant, qui nomme ce qui est réellement
+ * monté, plutôt que sur le nom du port, qui nomme l'endroit. Vérifié sur la base
+ * du 4.9.0 : aucun des 14 453 ports correctement résolus ne porte ces préfixes,
+ * la règle ne peut donc dégrader aucun rattachement existant.
+ *
+ * `Controller_Flight_*` fait exception : le contrôleur de vol est un vrai
+ * système du vaisseau, simplement non extrait comme composant. Le classer en
+ * aménagement masquerait un manque au lieu de le signaler.
+ */
+function isFurnishingPort(portName: string, compClassName: string): boolean {
+  const lp = portName.toLowerCase();
+  const cc = (compClassName || '').toLowerCase();
+
+  if (cc.startsWith('controller_') && !cc.startsWith('controller_flight')) return true;
+  // `Radar_Display_Screen_Template`, `Radar_Display_Mantis`, mais aussi
+  // `AEGS_Sabre_RADR_Display` : c'est « display » qui fait l'affichage, et il
+  // apparaît au milieu comme en fin de nom.
+  if (/_display(_|$)/.test(cc) || cc.startsWith('vehicle_screen')) return true;
+  if (cc.startsWith('door_')) return true;
+  if (cc.includes('_seat') || cc.endsWith('_dashboard')) return true;
+  if (cc.includes('_lighting_')) return true;
+
+  // Pièces d'animation : `anim_thruster_flap_04` décrit un volet mobile, pas un
+  // propulseur équipable.
+  if (lp.startsWith('anim_')) return true;
+  if (lp.startsWith('screen_')) return true;
+
+  return false;
+}
+
 export function classifyPort(portName: string, compClassName: string): string {
   const lp = portName.toLowerCase();
   const cc = (compClassName || '').toLowerCase();
+
+  // Avant tout le reste : ce qui commande ou affiche n'est pas ce qui équipe.
+  if (isFurnishingPort(portName, compClassName)) return 'Other';
 
   // Component-based classification
   if (cc) {
