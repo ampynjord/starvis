@@ -239,90 +239,113 @@ export async function saveShips(ctx: PersistContext): Promise<{ ships: number; l
   return { ships: savedShips, loadoutPorts: totalPorts };
 }
 
+interface LoadoutPort {
+  portName: string;
+  portType?: string;
+  componentClassName?: string | null;
+  minSize?: number;
+  maxSize?: number;
+  children?: LoadoutPort[];
+}
+
 async function saveLoadout(
   conn: PoolClient,
   env: GameEnv,
   shipUuid: string,
-  loadout: Array<{
-    portName: string;
-    portType?: string;
-    componentClassName?: string | null;
-    minSize?: number;
-    maxSize?: number;
-    children?: any[];
-  }>,
+  loadout: LoadoutPort[],
   componentUuidCache: Map<string, string>,
 ): Promise<number> {
   let count = 0;
 
-  // Recursive helper: inserts a port and all its children at any depth
-  const insertPort = async (
-    port: {
-      portName: string;
-      portType?: string;
-      componentClassName?: string | null;
-      minSize?: number;
-      maxSize?: number;
-      children?: any[];
-    },
-    parentId: number | null,
-  ): Promise<void> => {
-    const compUuid = port.componentClassName ? componentUuidCache.get(port.componentClassName) || null : null;
-    let insertId: number;
-    if (parentId === null) {
-      // Root port — include size columns
-      const result = await conn.query<any>(
-        `INSERT INTO game.ship_loadouts
-          (env, ship_uuid, port_name, port_type, component_class_name, component_uuid, port_min_size, port_max_size)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-         RETURNING id`,
-        [
-          env,
-          shipUuid,
-          port.portName,
-          port.portType || null,
-          port.componentClassName || null,
-          compUuid,
-          port.minSize ?? null,
-          port.maxSize ?? null,
-        ],
-      );
-      insertId = result.rows[0].id;
-    } else {
-      const result = await conn.query<any>(
-        `INSERT INTO game.ship_loadouts
-          (env, ship_uuid, port_name, port_type, component_class_name, component_uuid, parent_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         RETURNING id`,
-        [
-          env,
-          shipUuid,
-          port.portName,
-          port.portType || classifyPort(port.portName, port.componentClassName || ''),
-          port.componentClassName || null,
-          compUuid,
-          parentId,
-        ],
-      );
-      insertId = result.rows[0].id;
-    }
-    count++;
-    if (port.children && port.children.length > 0) {
-      for (const child of port.children) {
-        await insertPort(child, insertId);
-      }
-    }
-  };
+  // Un niveau de profondeur à la fois : tous les ports d'un même niveau
+  // s'insèrent en une requête, et leurs identifiants générés servent de
+  // `parent_id` au niveau suivant.
+  //
+  // L'écriture était auparavant récursive et unitaire — une requête par port,
+  // soit 41 806 allers-retours. Sur la base locale c'est indolore ; à travers le
+  // tunnel SSH de production, la même extraction demandait 35 minutes, et chaque
+  // minute est une occasion de perdre la connexion. C'est arrivé.
+  let level: Array<{ port: LoadoutPort; parentId: number | null }> = loadout.map((port) => ({ port, parentId: null }));
 
-  for (const port of loadout) {
+  while (level.length > 0) {
+    let ids: number[];
     try {
-      await insertPort(port, null);
+      ids = await insertLoadoutLevel(conn, env, shipUuid, level, componentUuidCache);
     } catch (e: unknown) {
-      logger.error(`Loadout port ${port.portName}: ${e instanceof Error ? e.message : String(e)}`);
+      logger.error(`Loadout for ${shipUuid}: ${e instanceof Error ? e.message : String(e)}`);
+      break;
     }
+    count += ids.length;
+
+    const next: Array<{ port: LoadoutPort; parentId: number | null }> = [];
+    level.forEach((entry, i) => {
+      for (const child of entry.port.children ?? []) next.push({ port: child, parentId: ids[i] });
+    });
+    level = next;
   }
 
   return count;
+}
+
+/** Nombre de lignes par requête. PostgreSQL plafonne à 65 535 paramètres. */
+const LOADOUT_BATCH_SIZE = 500;
+
+/**
+ * Insère un niveau entier et renvoie les identifiants générés, dans l'ordre des
+ * ports fournis.
+ *
+ * **La correspondance repose sur l'ordre de `RETURNING`.** PostgreSQL renvoie
+ * les lignes d'un `INSERT ... VALUES (…), (…)` dans l'ordre des tuples fournis ;
+ * c'est stable et universellement utilisé, mais ce n'est pas une garantie du
+ * standard SQL. Le choix est donc conscient, et vérifié : l'empreinte de la
+ * hiérarchie complète (32 320 lignes, couples port ↔ port parent) est identique
+ * avant et après ce changement.
+ */
+async function insertLoadoutLevel(
+  conn: PoolClient,
+  env: GameEnv,
+  shipUuid: string,
+  entries: Array<{ port: LoadoutPort; parentId: number | null }>,
+  componentUuidCache: Map<string, string>,
+): Promise<number[]> {
+  const ids: number[] = [];
+
+  for (let start = 0; start < entries.length; start += LOADOUT_BATCH_SIZE) {
+    const chunk = entries.slice(start, start + LOADOUT_BATCH_SIZE);
+    const values: unknown[] = [];
+    const rows = chunk.map(({ port, parentId }, i) => {
+      const compUuid = port.componentClassName ? componentUuidCache.get(port.componentClassName) || null : null;
+      // Les racines portent leurs bornes de taille et gardent un type nul quand
+      // le jeu n'en donne pas ; les enfants sont classés à défaut. Cette
+      // asymétrie vient du code d'origine et est conservée telle quelle : la
+      // corriger ici mêlerait un changement de données à un changement de
+      // performance, et rendrait la comparaison d'empreinte muette.
+      values.push(
+        env,
+        shipUuid,
+        port.portName,
+        parentId === null ? port.portType || null : port.portType || classifyPort(port.portName, port.componentClassName || ''),
+        port.componentClassName || null,
+        compUuid,
+        parentId === null ? (port.minSize ?? null) : null,
+        parentId === null ? (port.maxSize ?? null) : null,
+        parentId,
+      );
+      const base = i * 9;
+      return `($${base + 1},$${base + 2},$${base + 3},$${base + 4},$${base + 5},$${base + 6},$${base + 7},$${base + 8},$${base + 9})`;
+    });
+
+    const result = await conn.query<{ id: number }>(
+      `INSERT INTO game.ship_loadouts
+        (env, ship_uuid, port_name, port_type, component_class_name, component_uuid, port_min_size, port_max_size, parent_id)
+       VALUES ${rows.join(',')}
+       RETURNING id`,
+      values,
+    );
+    for (const row of result.rows) ids.push(row.id);
+  }
+
+  return ids;
 }
 
 async function computeAndStoreMissileDamage(conn: PoolClient, env: GameEnv, shipUuid: string): Promise<void> {
