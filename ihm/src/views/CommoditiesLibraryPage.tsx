@@ -32,9 +32,9 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { PageShell } from '@/components/ui/PageShell';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { ListFilterBar, ListFilterResetButton, ListFilterSelect } from '@/components/ui/ListFilters';
-import { useListQueryState } from '@/hooks/useListQueryState';
+import { useEntityList } from '@/hooks/useEntityList';
 import { useDebounce } from '@/hooks/useDebounce';
-import type { MiningElement } from '@/types/api';
+import type { Commodity, MiningElement } from '@/types/api';
 import { ORE_PRICES } from '@/data/mining-static';
 
 // ── Tabs ─────────────────────────────────────────────────────────────────────
@@ -47,7 +47,6 @@ const TRADE_LIMIT = 30;
 
 function TradeGoodsTab() {
   const { env } = useEnv();
-  const { page, search, debouncedSearch, updateSearch, updatePageWithScroll, setPage } = useListQueryState();
   const [activeCategory, setActiveCategory] = useState('All');
 
   const { data: categories } = useQuery({
@@ -56,14 +55,16 @@ function TradeGoodsTab() {
     staleTime: Number.POSITIVE_INFINITY,
   });
 
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['commodities.list', env, { page, search: debouncedSearch, category: activeCategory }],
-    queryFn: () =>
+  const { data, isLoading, error, refetch, search, updateSearch, goToPage } = useEntityList<Commodity>({
+    key: 'commodities.list',
+    filters: { env, category: activeCategory },
+    limit: TRADE_LIMIT,
+    fetcher: ({ page, limit, search }) =>
       api.commodities.list({
         env,
         page,
-        limit: TRADE_LIMIT,
-        search: debouncedSearch || undefined,
+        limit,
+        search,
         category: activeCategory === 'All' ? undefined : activeCategory,
       }),
   });
@@ -73,12 +74,12 @@ function TradeGoodsTab() {
       <ListFilterBar>
         <ListFilterSelect
           value={activeCategory === 'All' ? '' : activeCategory}
-          onChange={(value) => { setActiveCategory(value || 'All'); setPage(1); }}
+          onChange={(value) => { setActiveCategory(value || 'All'); }}
           options={(categories ?? []).map((c) => ({ label: c.count ? `${c.label} (${c.count})` : c.label, value: c.label }))}
           allLabel="All categories"
         />
         {activeCategory !== 'All' && (
-          <ListFilterResetButton onClick={() => { setActiveCategory('All'); setPage(1); }} />
+          <ListFilterResetButton onClick={() => { setActiveCategory('All'); }} />
         )}
       </ListFilterBar>
 
@@ -129,7 +130,7 @@ function TradeGoodsTab() {
                   </motion.div>
                 ))}
               </div>
-              {data && <Pagination className="mt-6" page={data.page} totalPages={data.pages} onPageChange={updatePageWithScroll} />}
+              {data && <Pagination className="mt-6" page={data.page} totalPages={data.pages} onPageChange={goToPage} />}
             </>
           )}
     </div>
