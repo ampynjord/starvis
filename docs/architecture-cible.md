@@ -116,8 +116,20 @@ allowlists dupliquées.
 
 ### D4 — Le contrat public est généré, pas écrit
 
-Les schémas zod **stricts** (fin de `.passthrough()` et des `.catch()` silencieux)
-deviennent la source unique. `openapi.json` en est généré. Les types sont publiés
+Les schémas zod **stricts** (fin des `.catch()` silencieux) deviennent la source
+unique. `openapi.json` en est dérivé plutôt que maintenu en parallèle.
+
+La bascule est progressive : un registre (`api/src/openapi/query-registry.ts`)
+déclare les routes dont les paramètres sont dérivés de zod, et `openapi:check`
+échoue en CI dès qu'ils divergent. Le reste du contrat demeure écrit à la main
+en attendant d'être couvert à son tour ; ajouter une entrée au registre étend la
+part générée. Le partage est net : **zod possède la structure** (noms, types,
+bornes, valeurs par défaut), **la prose reste écrite à la main** et est
+conservée à chaque régénération.
+
+Ce que la dérive coûtait, mesuré à la mise en place : `/api/v1/commodities`
+documentait un paramètre `is_illegal` qu'aucun service n'a jamais traité, et
+taisait `types` et `category` réellement supportés. Les types sont publiés
 pour l'IHM **et** pour les consommateurs tiers — Stelliverse intègre des types,
 plus une documentation à recopier.
 

@@ -3784,22 +3784,31 @@
         "operationId": "searchShipsAutocomplete",
         "parameters": [
           {
-            "name": "search",
+            "name": "env",
             "in": "query",
-            "required": true,
             "schema": {
               "type": "string",
-              "minLength": 2
-            }
+              "enum": ["live", "ptu", "custom"]
+            },
+            "description": "Game environment"
           },
           {
-            "name": "limit",
+            "name": "format",
             "in": "query",
             "schema": {
-              "type": "integer",
-              "default": 10,
-              "maximum": 20
-            }
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Response format"
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Full-text search query"
           }
         ],
         "responses": {
@@ -4189,139 +4198,183 @@
         "operationId": "getComponents",
         "parameters": [
           {
-            "$ref": "#/components/parameters/search"
-          },
-          {
-            "name": "type",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            },
-            "description": "Component type (WeaponGun, Shield, QuantumDrive, …)"
-          },
-          {
-            "name": "category",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "ordnance",
-                "coolers",
-                "emp",
-                "qi",
-                "utility",
-                "ordnance-racks",
-                "power-plants",
-                "quantum-drives",
-                "shields",
-                "turrets",
-                "weapons",
-                "cm",
-                "liveries",
-                "jump-modules",
-                "radar",
-                "mining",
-                "missile-racks",
-                "cm-launchers"
-              ]
-            },
-            "description": "Game component category. New slugs are utility, ordnance-racks and cm; legacy slugs mining, missile-racks and cm-launchers are still accepted."
-          },
-          {
-            "name": "types",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            },
-            "description": "Comma-separated component types for curated subcategory filters, e.g. Missile,WeaponMissile."
-          },
-          {
-            "name": "sub_type",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "sub_types",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            },
-            "description": "Comma-separated component sub_type values."
-          },
-          {
-            "name": "weapon_damage_type",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": ["Ballistic", "Laser", "Distortion", "Plasma", "Tachyon"]
-            },
-            "description": "Weapon damage family filter."
-          },
-          {
             "name": "cm_type",
             "in": "query",
             "schema": {
               "type": "string",
-              "enum": ["Noise", "Decoy"]
+              "maxLength": 200
             },
             "description": "Countermeasure launcher type filter."
-          },
-          {
-            "name": "size",
-            "in": "query",
-            "schema": {
-              "type": "integer"
-            }
-          },
-          {
-            "name": "grade",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": ["A", "B", "C", "D"]
-            },
-            "description": "Component grade exposed by Starvis."
           },
           {
             "name": "component_class",
             "in": "query",
             "schema": {
               "type": "string",
-              "enum": ["Civilian", "Competition", "Industrial", "Military", "Stealth"]
+              "maxLength": 200
             },
             "description": "Game component class"
+          },
+          {
+            "name": "env",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["live", "ptu", "custom"]
+            },
+            "description": "Game environment"
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Response format"
+          },
+          {
+            "name": "grade",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Component grade exposed by Starvis."
           },
           {
             "name": "is_bespoke",
             "in": "query",
             "schema": {
-              "type": "boolean"
+              "type": "string",
+              "maxLength": 200
             },
             "description": "Filter ship-specific bespoke components versus universal components."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "maximum": 200,
+              "type": "integer",
+              "minimum": 1,
+              "default": 50
+            },
+            "description": "Items per page"
           },
           {
             "name": "manufacturer",
             "in": "query",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Manufacturer code (e.g. AEGS, RSI)"
+          },
+          {
+            "name": "max_size",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
             }
           },
           {
-            "$ref": "#/components/parameters/sort"
+            "name": "min_size",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
           },
           {
-            "$ref": "#/components/parameters/order"
+            "name": "order",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Sort direction"
           },
           {
-            "$ref": "#/components/parameters/page"
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
+            "description": "Page number"
           },
           {
-            "$ref": "#/components/parameters/limit"
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Full-text search query"
           },
           {
-            "$ref": "#/components/parameters/format"
+            "name": "size",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Field to sort by (supports dot-notation for JSON fields, e.g. `game_data.scm_speed`)"
+          },
+          {
+            "name": "sub_type",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "sub_types",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Comma-separated component sub_type values."
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Component type (WeaponGun, Shield, QuantumDrive, …)"
+          },
+          {
+            "name": "types",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Comma-separated component types for curated subcategory filters, e.g. Missile,WeaponMissile."
+          },
+          {
+            "name": "weapon_damage_type",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Weapon damage family filter."
           }
         ],
         "responses": {
@@ -4768,44 +4821,147 @@
         "operationId": "getItems",
         "parameters": [
           {
-            "$ref": "#/components/parameters/search"
-          },
-          {
-            "name": "type",
+            "name": "env",
             "in": "query",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": ["live", "ptu", "custom"]
             },
-            "description": "Item type (Weapon_Personal, Char_Armor_Helmet, …)"
+            "description": "Game environment"
           },
           {
-            "name": "sub_type",
+            "name": "exclude_sub_types",
             "in": "query",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 200
             }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Response format"
+          },
+          {
+            "name": "include",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Comma-separated relations: manufacturer, paints, similar, matrix"
+          },
+          {
+            "name": "item_group",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "maximum": 200,
+              "type": "integer",
+              "minimum": 1,
+              "default": 50
+            },
+            "description": "Items per page"
           },
           {
             "name": "manufacturer",
             "in": "query",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Manufacturer code (e.g. AEGS, RSI)"
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Sort direction"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
+            "description": "Page number"
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Full-text search query"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Field to sort by (supports dot-notation for JSON fields, e.g. `game_data.scm_speed`)"
+          },
+          {
+            "name": "sub_type",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
             }
           },
           {
-            "$ref": "#/components/parameters/sort"
+            "name": "sub_types",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Comma-separated component sub_type values."
           },
           {
-            "$ref": "#/components/parameters/order"
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Component type (WeaponGun, Shield, QuantumDrive, …)"
           },
           {
-            "$ref": "#/components/parameters/page"
+            "name": "types",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Comma-separated component types for curated subcategory filters, e.g. Missile,WeaponMissile."
           },
           {
-            "$ref": "#/components/parameters/limit"
-          },
-          {
-            "$ref": "#/components/parameters/format"
+            "name": "view",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
           }
         ],
         "responses": {
@@ -5072,22 +5228,147 @@
             "description": "Category slug (weapons, helmet, core, arms, legs, backpack, undersuit, tools-medics, magazines, attachments, clothing, other, throwable)"
           },
           {
-            "$ref": "#/components/parameters/env"
+            "name": "env",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["live", "ptu", "custom"]
+            },
+            "description": "Game environment"
           },
           {
-            "$ref": "#/components/parameters/search"
+            "name": "exclude_sub_types",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
           },
           {
-            "$ref": "#/components/parameters/sort"
+            "name": "format",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Response format"
           },
           {
-            "$ref": "#/components/parameters/order"
+            "name": "include",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Comma-separated relations: manufacturer, paints, similar, matrix"
           },
           {
-            "$ref": "#/components/parameters/page"
+            "name": "item_group",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
           },
           {
-            "$ref": "#/components/parameters/limit"
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "maximum": 200,
+              "type": "integer",
+              "minimum": 1,
+              "default": 50
+            },
+            "description": "Items per page"
+          },
+          {
+            "name": "manufacturer",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Manufacturer code (e.g. AEGS, RSI)"
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Sort direction"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
+            "description": "Page number"
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Full-text search query"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Field to sort by (supports dot-notation for JSON fields, e.g. `game_data.scm_speed`)"
+          },
+          {
+            "name": "sub_type",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "sub_types",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Comma-separated component sub_type values."
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Component type (WeaponGun, Shield, QuantumDrive, …)"
+          },
+          {
+            "name": "types",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Comma-separated component types for curated subcategory filters, e.g. Missile,WeaponMissile."
+          },
+          {
+            "name": "view",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
           }
         ],
         "responses": {
@@ -5155,36 +5436,97 @@
         "operationId": "getCommodities",
         "parameters": [
           {
-            "$ref": "#/components/parameters/search"
+            "name": "category",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Game component category. New slugs are utility, ordnance-racks and cm; legacy slugs mining, missile-racks and cm-launchers are still accepted."
+          },
+          {
+            "name": "env",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["live", "ptu", "custom"]
+            },
+            "description": "Game environment"
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Response format"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "maximum": 200,
+              "type": "integer",
+              "minimum": 1,
+              "default": 50
+            },
+            "description": "Items per page"
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Sort direction"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
+            "description": "Page number"
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Full-text search query"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Field to sort by (supports dot-notation for JSON fields, e.g. `game_data.scm_speed`)"
           },
           {
             "name": "type",
             "in": "query",
             "schema": {
-              "type": "string"
-            }
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Component type (WeaponGun, Shield, QuantumDrive, …)"
           },
           {
-            "name": "is_illegal",
+            "name": "types",
             "in": "query",
             "schema": {
-              "type": "boolean"
-            }
-          },
-          {
-            "$ref": "#/components/parameters/sort"
-          },
-          {
-            "$ref": "#/components/parameters/order"
-          },
-          {
-            "$ref": "#/components/parameters/page"
-          },
-          {
-            "$ref": "#/components/parameters/limit"
-          },
-          {
-            "$ref": "#/components/parameters/format"
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Comma-separated component types for curated subcategory filters, e.g. Missile,WeaponMissile."
           }
         ],
         "responses": {
@@ -5335,21 +5677,61 @@
         "operationId": "getPaints",
         "parameters": [
           {
+            "name": "env",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["live", "ptu", "custom"]
+            },
+            "description": "Game environment"
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Response format"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "maximum": 5000,
+              "type": "integer",
+              "minimum": 1,
+              "default": 50
+            },
+            "description": "Items per page"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
+            "description": "Page number"
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Full-text search query"
+          },
+          {
             "name": "ship_uuid",
             "in": "query",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 200
             },
             "description": "Filter by ship UUID"
-          },
-          {
-            "$ref": "#/components/parameters/page"
-          },
-          {
-            "$ref": "#/components/parameters/limit"
-          },
-          {
-            "$ref": "#/components/parameters/format"
           }
         ],
         "responses": {
@@ -5432,36 +5814,78 @@
         "operationId": "getShops",
         "parameters": [
           {
-            "$ref": "#/components/parameters/search"
-          },
-          {
-            "name": "type",
+            "name": "env",
             "in": "query",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": ["live", "ptu", "custom"]
             },
-            "description": "Shop type filter, for example weapons, armor, clothing, vehicles, medical or food_drink."
+            "description": "Game environment"
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Response format"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "type": "integer",
+              "minimum": 1,
+              "default": 20
+            },
+            "description": "Items per page"
+          },
+          {
+            "name": "location",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
+            "description": "Page number"
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Full-text search query"
           },
           {
             "name": "shop_type",
             "in": "query",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 200
             },
             "description": "Compatibility alias for type."
           },
           {
-            "name": "system",
+            "name": "type",
             "in": "query",
             "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "$ref": "#/components/parameters/page"
-          },
-          {
-            "$ref": "#/components/parameters/limit"
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Component type (WeaponGun, Shield, QuantumDrive, …)"
           }
         ],
         "responses": {
@@ -6204,16 +6628,31 @@
         "description": "Returns RSI Ship Matrix data, auto-synced daily.",
         "parameters": [
           {
-            "$ref": "#/components/parameters/search"
+            "name": "env",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["live", "ptu", "custom"]
+            },
+            "description": "Game environment"
           },
           {
-            "$ref": "#/components/parameters/page"
+            "name": "format",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Response format"
           },
           {
-            "$ref": "#/components/parameters/limit"
-          },
-          {
-            "$ref": "#/components/parameters/format"
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Full-text search query"
           }
         ],
         "responses": {
@@ -7168,25 +7607,31 @@
         "description": "Searches across ships, components, items, commodities, locations and missions simultaneously.",
         "parameters": [
           {
-            "name": "search",
+            "name": "env",
             "in": "query",
-            "required": true,
             "schema": {
               "type": "string",
-              "minLength": 2
+              "enum": ["live", "ptu", "custom"]
             },
-            "description": "Search query"
+            "description": "Game environment"
           },
           {
-            "name": "types",
+            "name": "format",
             "in": "query",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 200
             },
-            "description": "Comma-separated entity types to search (default: all)"
+            "description": "Response format"
           },
           {
-            "$ref": "#/components/parameters/limit"
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Full-text search query"
           }
         ],
         "responses": {
@@ -7228,17 +7673,27 @@
             "in": "query",
             "schema": {
               "type": "string",
-              "enum": ["live", "ptu", "eptu", "custom"]
-            }
+              "maxLength": 200
+            },
+            "description": "Game environment"
           },
           {
-            "$ref": "#/components/parameters/limit"
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "type": "integer",
+              "minimum": 1,
+              "default": 20
+            },
+            "description": "Items per page"
           },
           {
             "name": "offset",
             "in": "query",
             "schema": {
               "type": "integer",
+              "minimum": 0,
               "default": 0
             }
           }
@@ -7730,7 +8185,61 @@
           "200": {
             "description": "Grouped changelog summary"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "change_type",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Filter by change type (added, removed, modified)"
+          },
+          {
+            "name": "entity_type",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Filter by entity type (ship, component, …)"
+          },
+          {
+            "name": "env",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["live", "ptu", "custom"]
+            },
+            "description": "Game environment"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Items per page"
+          },
+          {
+            "name": "markers_only",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          }
+        ]
       }
     },
     "/api/v1/changelog": {
@@ -7740,30 +8249,56 @@
         "operationId": "getChangelog",
         "parameters": [
           {
-            "name": "env",
+            "name": "change_type",
             "in": "query",
             "schema": {
-              "type": "string"
-            }
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Filter by change type (added, removed, modified)"
           },
           {
             "name": "entity_type",
             "in": "query",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 200
             },
             "description": "Filter by entity type (ship, component, …)"
           },
           {
-            "name": "change_type",
+            "name": "env",
             "in": "query",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": ["live", "ptu", "custom"]
             },
-            "description": "Filter by change type (added, removed, modified)"
+            "description": "Game environment"
           },
           {
-            "$ref": "#/components/parameters/limit"
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Items per page"
+          },
+          {
+            "name": "markers_only",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
           }
         ],
         "responses": {

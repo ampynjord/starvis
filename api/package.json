@@ -12,7 +12,9 @@
     "lint:ci": "biome check .",
     "openapi:lint": "swagger-cli validate openapi.json",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "openapi:sync": "tsx scripts/sync-openapi.mjs && biome check --write openapi.json",
+    "openapi:check": "tsx scripts/sync-openapi.mjs --check"
   },
   "keywords": [
     "star-citizen",

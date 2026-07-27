@@ -126,6 +126,11 @@ jobs:
       - name: Validate OpenAPI
         run: npm run openapi:lint --workspace=@starvis/api
 
+      # Les paramètres documentés doivent correspondre aux schémas zod : c'est
+      # ce qui empêche le contrat de dériver du code, comme il l'avait fait.
+      - name: Check OpenAPI matches zod schemas
+        run: npm run openapi:check --workspace=@starvis/api
+
       - name: Audit API contract coverage
         run: npm run quality:audit:contracts
 

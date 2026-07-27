@@ -21,25 +21,30 @@ export const qStr = z.preprocess((v) => (Array.isArray(v) ? v[0] : v) || undefin
 export const qEnv = z.preprocess((v) => (Array.isArray(v) ? v[0] : v) || 'live', z.enum(['live', 'ptu', 'custom']));
 
 export const qInt = (def: number, max?: number) =>
-  z.preprocess(
-    (v) => {
-      const s = Array.isArray(v) ? v[0] : v;
-      return s === undefined || s === '' ? def : s;
-    },
-    // Le plancher vaut 1 pour les paramètres 1-indexés (page, limit) mais suit la
-    // valeur par défaut quand celle-ci est plus basse : `offset` démarre à 0 et
-    // doit rester acceptable. Une valeur par défaut qui échouerait sa propre
-    // validation est un piège — c'est exactement ce que masquait le `.catch()`.
-    //
-    // Une valeur non numérique est rejetée (400) : retomber sur la valeur par
-    // défaut masquerait une erreur d'appel. Un dépassement du plafond est en
-    // revanche ramené au plafond — politique de service, pas faute du client.
-    z.coerce
-      .number()
-      .int()
-      .min(Math.min(1, def))
-      .transform((n) => (max ? Math.min(n, max) : n)),
-  );
+  z
+    .preprocess(
+      (v) => {
+        const s = Array.isArray(v) ? v[0] : v;
+        return s === undefined || s === '' ? def : s;
+      },
+      // Le plancher vaut 1 pour les paramètres 1-indexés (page, limit) mais suit la
+      // valeur par défaut quand celle-ci est plus basse : `offset` démarre à 0 et
+      // doit rester acceptable. Une valeur par défaut qui échouerait sa propre
+      // validation est un piège — c'est exactement ce que masquait le `.catch()`.
+      //
+      // Une valeur non numérique est rejetée (400) : retomber sur la valeur par
+      // défaut masquerait une erreur d'appel. Un dépassement du plafond est en
+      // revanche ramené au plafond — politique de service, pas faute du client.
+      z.coerce
+        .number()
+        .int()
+        .min(Math.min(1, def))
+        .transform((n) => (max ? Math.min(n, max) : n)),
+      // Le plafond est appliqué par un `transform`, que la conversion en JSON
+      // Schema ne peut pas voir : sans cette métadonnée, la documentation générée
+      // annoncerait un maximum de 2^53 au lieu de la vraie limite de service.
+    )
+    .meta({ default: def, ...(max ? { maximum: max } : {}) });
 
 // ── Route schemas ─────────────────────────────────────────
 
