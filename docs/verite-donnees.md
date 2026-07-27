@@ -242,42 +242,47 @@ porte sur la requête et non sur les valeurs agrégées : un test sur les totaux
 n'aurait rien vu, puisqu'ils étaient cohérents entre eux, simplement comptés deux
 fois.
 
-### D5 — Les noms de vaisseaux ne viennent pas du jeu
+### D5 — 24 vaisseaux affichent un nom d'atelier
 
-Découvert en corrigeant D2, et distinct de lui : `resolveShipName()` ne teste que
-la forme de clé `vehicle_Name_<Classe>`, alors que `global.ini` utilise ici
-`vehicle_Name<Classe>`, sans séparateur. Résultat : **elle résout 0 vaisseau sur
-273**. Les noms affichés viennent d'un autre chemin de nettoyage.
+`resolveShipName()` ne teste que la forme de clé `vehicle_Name_<Classe>`, alors
+que `global.ini` utilise ici `vehicle_Name<Classe>`, sans séparateur : **elle
+résout 0 vaisseau sur 273**. Les noms en base viennent d'un autre chemin de
+nettoyage.
 
-Ce que le jeu nomme réellement, et que Starvis affiche autrement :
+> **Correction d'un relevé précédent.** J'avais d'abord conclu que Starvis
+> affichait « Scout » au lieu de « Khartu-al » et « Hornet F7CM » au lieu de
+> « F7C-M Super Hornet Mk I », en comparant les noms **en base** aux noms du jeu.
+> C'était faux : l'API sert `COALESCE(sm.name, s.name)` et substitue donc le nom
+> commercial RSI dès qu'un vaisseau est rattaché au Ship Matrix. `XIAN_Scout`
+> s'affiche bien « Khartu-Al ». Le défaut est nettement plus étroit que je ne
+> l'avais écrit.
 
-| Affiché aujourd'hui | Nom du jeu |
+Portée réelle, mesurée sur la production : 273 vaisseaux, dont **220 rattachés**
+au Ship Matrix — qui affichent le nom RSI, correct — et **53 non rattachés**, qui
+retombent sur le nom interne. Parmi ces derniers, **24 portent un nom d'atelier** :
+
+| Affiché | Nom du jeu |
 |---|---|
-| Scout | Khartu-al |
-| Reliant | Reliant Kore |
-| Gladius PIR | Gladius Pirate |
-| Hornet F7CM | F7C-M Super Hornet Mk I |
-| Dragonfly Pink | Dragonfly Star Kitten |
 | Prospector Collector Indust | Prospector Wikelo Work Special |
-| L21 Wolf | L-21 Wolf |
-| m50 | M50 Interceptor |
+| RAFT Collector Indust | RAFT Wikelo Work Special |
+| Dragonfly Pink | Dragonfly Star Kitten |
+| Meteor Collector Military | Meteor PYAM Exec |
+| Mauler | Mauler Destroyer |
+| ATLS IKTI | Argo ATLS IKTI |
 
-En retirant le préfixe constructeur — qu'une colonne dédiée porte déjà —
-**75 libellés changeraient**, presque tous pour le mieux.
+« Collector Indust », « Collector Military », « Collector Stealth » sont la
+nomenclature interne des variantes de récompense Wikelo — exactement le genre de
+nom qui n'a rien à faire dans un wiki.
 
-**Mais ce renommage ne peut pas être fait seul.** Simulé contre la base :
-il ferait **perdre 9 rattachements au Ship Matrix**, parce que le croisement se
-fait par nom normalisé. Un vaisseau qui perd son lien peut être élagué — c'est
-exactement ce qui avait fait disparaître deux vaisseaux du 4.9.0 en juillet.
+Le défaut recoupe donc [D4](#d4--un-pilotable-sur-cinq-sans-ship-matrix) : ce
+sont les vaisseaux que le croisement n'a pas rattachés qui exposent leur nom
+interne. Réparer le croisement corrige les deux d'un coup.
 
-La cause est visible dans `SM_TO_P4K_ALIASES` : **81 correspondances écrites à la
-main**, du type `'Khartu-Al' → 'Scout'` ou `'L-21 Wolf' → 'L21 Wolf'`. Cette
-table existe précisément parce que les noms n'ont jamais été résolus depuis le
-jeu. Corriger les noms rendrait la plupart de ces entrées inutiles — mais il faut
-défaire les deux ensemble.
-
-**Reporté à l'étape 3**, où le croisement devient explicite et tracé. Le faire
-avant reviendrait à réparer une moitié en cassant l'autre.
+**Reporté à l'étape 3.** Un renommage global reste par ailleurs risqué : simulé
+contre la base, il fait **perdre 9 rattachements**, et un vaisseau sans lien peut
+être élagué — ce qui avait fait disparaître deux vaisseaux du 4.9.0 en juillet.
+`SM_TO_P4K_ALIASES` compte 81 correspondances écrites à la main qui existent pour
+compenser ces noms ; les deux doivent être défaits ensemble.
 
 ### D4 — Un pilotable sur cinq sans Ship Matrix
 
