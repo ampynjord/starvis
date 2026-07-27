@@ -3,7 +3,6 @@
  */
 import { canonicalizeComponentRecord } from '../normalizers/canonical-source.js';
 import { getGameComponentCategory } from '../normalizers/component-taxonomy.js';
-import { fetchComponentWikiEnrichment } from '../services/sc-wiki-component-enrichment.js';
 import { batchUpsert } from './batch.js';
 import type { PersistContext } from './context.js';
 
@@ -25,17 +24,11 @@ export async function saveComponents(ctx: PersistContext): Promise<number> {
     onProgress?.(`Localized ${components.length} component names`);
   }
 
-  onProgress?.('Enriching component grades/classes from SC Wiki…');
-  const wikiEnrichment = await fetchComponentWikiEnrichment(new Set(components.map((c) => String(c.type)).filter(Boolean)));
-  let wikiEnriched = 0;
-  for (const c of components) {
-    const enrichment = wikiEnrichment.get(String(c.className).toLowerCase());
-    if (!enrichment) continue;
-    if (enrichment.grade) c.grade = enrichment.grade;
-    if (enrichment.componentClass) c.componentClass = enrichment.componentClass;
-    wikiEnriched++;
-  }
-  onProgress?.(`Component grades/classes enriched: ${wikiEnriched}/${components.length}`);
+  // L'enrichissement par le wiki SC a été retiré quand les grades et classes ont
+  // été tirés du P4K : la fonction ne renvoyait plus qu'une map vide, mais la
+  // boucle et ses deux messages de progression subsistaient. Le journal annonçait
+  // donc un travail qui n'avait plus lieu — pire qu'un silence, puisqu'il faisait
+  // croire la source encore branchée.
 
   const COMP_COLS = `env, uuid, class_name, name, normalized_name, canonical_component_key,
           type, game_component_category, sub_type, size, grade, component_class, is_bespoke, manufacturer_code,

@@ -45,6 +45,7 @@ import {
 import { captureExtractionSnapshot, cleanStaleGameData, restoreCtmUrls } from './extraction-state.js';
 import { LocalizationService } from './localization-service.js';
 import { RsiSyncService } from './rsi-sync-service.js';
+import { nameShipsMissingFromShipMatrix } from './ship-naming.js';
 
 export type { ExtractionModule, GameEnv };
 
@@ -353,6 +354,10 @@ export class ExtractionService {
         const pruned = await pruneExcludedVariants(conn, env);
         if (pruned > 0) onProgress?.(`Pruned ${pruned} excluded variant ships`);
         await applyHullSeriesCargoFallback(conn, env);
+        // Après l'élagage : renommer avant modifierait ce que celui-ci voit.
+        // Ne touche que les vaisseaux sans entrée au Ship Matrix, dont le nom
+        // interne remonte tel quel à l'affichage faute de nom commercial RSI.
+        await nameShipsMissingFromShipMatrix(conn, env, this.locService, onProgress);
         // Recompute ship market summaries from existing shop inventory data whenever
         // ships are re-extracted, even when the shops module is not in this run.
         if (!run('shops')) {

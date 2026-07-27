@@ -314,7 +314,54 @@ contre la base, il fait **perdre 9 rattachements**, et un vaisseau sans lien peu
 `SM_TO_P4K_ALIASES` compte 81 correspondances écrites à la main qui existent pour
 compenser ces noms ; les deux doivent être défaits ensemble.
 
-### D4 — Un pilotable sur cinq sans Ship Matrix
+### D4 — Un pilotable sur cinq sans Ship Matrix : ce n'était pas un défaut
+
+> **Correction.** J'avais présenté les 49 pilotables non rattachés comme un
+> manque de croisement à combler. Après examen, c'en est l'inverse : le taux est
+> juste.
+
+Les 53 vaisseaux sans `ship_matrix_id` sont presque tous des **variantes de
+récompense** que RSI ne vend pas et ne référence donc nulle part : 33 `wikelo`,
+12 `pyam_exec`, 2 `collector`, 1 `standalone`. L'extracteur les classait déjà
+correctement par `variant_type`.
+
+Il n'y a donc rien à rattacher. Le seul vrai problème était leur **nom** : sans
+entrée RSI, ils retombaient sur la nomenclature interne.
+
+**Corrigé (étape 3).** `nameShipsMissingFromShipMatrix` leur applique le nom du
+jeu, et à eux seuls. La restriction n'est pas de la prudence de principe, elle est
+mesurée : renommer tous les vaisseaux fait tomber le rattachement de 213 à 204,
+renommer les seuls non rattachés le laisse à 213 — ils n'ont aucun lien à perdre.
+Vérifié sur une extraction réelle : 23 renommés, 220 rattachements avant comme
+après.
+
+Reste 25 vaisseaux que **le jeu lui-même ne nomme pas** (`global.ini` n'a aucune
+entrée) : les ATLS GEO, les PYAM Exec, quelques Wikelo récents. Le wiki
+communautaire, lui, les nomme — voir ci-dessous.
+
+### D4 bis — Le wiki communautaire est indexé sur nos identifiants
+
+En cherchant ces 25 noms, découverte utile :
+`api.star-citizen.wiki/api/v3/vehicles/mrai-guardian-qi-collector-indust`
+répond avec
+
+```json
+{ "class_name": "MRAI_Guardian_QI_Collector_Indust",
+  "name": "Guardian QI Wikelo Special",
+  "game_name": "Mirai Guardian QI Wikelo Special" }
+```
+
+Trois choses en découlent :
+
+- il est **indexé sur notre `class_name`**, donc joignable sans correspondance de
+  noms — exactement ce que la couche de croisement cherche à obtenir ;
+- sa convention de libellé est **la nôtre** : constructeur retiré dans `name`,
+  conservé dans `game_name`. Cela valide indépendamment le choix de coupe ;
+- il nomme les vaisseaux que `global.ini` laisse anonymes.
+
+**À faire** : un module d'enrichissement qui ne comble que les noms manquants,
+sans jamais écraser ce que le jeu fournit. Ce serait la troisième source du
+croisement, après le P4K et le Ship Matrix.
 
 187 pilotables sur 236 sont rattachés (79,2 %). Les 49 restants sont surtout des
 variantes et des véhicules de sol, que RSI ne référence pas individuellement.
