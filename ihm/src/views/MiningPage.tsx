@@ -1,7 +1,7 @@
 ﻿'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useCallback, useState } from 'react';
 import { BarChart3, Clock, DollarSign, Pickaxe, Search, Users } from 'lucide-react';
 import { api } from '@/services/api';
@@ -160,15 +160,23 @@ export default function MiningPage() {
         )}
       </div>
 
-      {/* Tab content */}
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={activeTab}
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -4 }}
-          transition={{ duration: 0.2 }}
-        >
+      {/*
+        Contenu de l'onglet.
+
+        Pas d'AnimatePresence ici : en `mode="wait"`, il ne monte le nouveau
+        contenu qu'une fois la sortie de l'ancien terminée. Cette sortie ne se
+        terminait jamais, et l'onglet initial restait affiché quel que soit
+        l'onglet choisi — cinq des six onglets étaient donc inatteignables.
+
+        La clé sur le motion.div suffit : React remonte à chaque changement
+        d'onglet et rejoue l'animation d'entrée.
+      */}
+      <motion.div
+        key={activeTab}
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.2 }}
+      >
           {/* ── YIELD WORKFLOW ──────────────────────────────────────────── */}
           {activeTab === 'workflow' && (
             <div>
@@ -327,7 +335,6 @@ export default function MiningPage() {
           {/* ── REFINERY TIMER ──────────────────────────────────────────── */}
           {activeTab === 'timer' && <RefineryTimer />}
         </motion.div>
-      </AnimatePresence>
     </PageShell>
   );
 }
