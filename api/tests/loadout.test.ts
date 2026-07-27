@@ -445,3 +445,32 @@ describe('aggregateLoadoutStats', () => {
     });
   });
 });
+
+/**
+ * Garde d'invariant SQL.
+ *
+ * Un composant a pour clé `(uuid, env)` : le même existe en LIVE et en PTU.
+ * Joindre `game.components` sur le seul `uuid` ramène donc les deux lignes et
+ * double chaque port. En production, le Gladius affichait ainsi 33 points
+ * d'emport, 6 armes et 2 centrales au lieu de 17, 3 et 1 — et pouvait servir la
+ * valeur PTU sur le site LIVE.
+ *
+ * Le défaut est resté invisible des mois durant parce que les deux
+ * environnements portaient les mêmes libellés. Il n'a été révélé qu'en
+ * corrigeant la résolution des noms, qui les a fait diverger. Un test sur les
+ * seules valeurs agrégées ne l'aurait pas attrapé : c'est la requête elle-même
+ * qu'il faut contraindre, d'où cette vérification sur la source.
+ */
+describe('jointures sur game.components', () => {
+  it("contraint toujours l'environnement", async () => {
+    const { readFileSync } = await import('node:fs');
+    const source = readFileSync(new URL('../src/services/loadout-service.ts', import.meta.url), 'utf8');
+
+    const joins = source.split('\n').filter((line) => /JOIN\s+game\.components\b/i.test(line));
+    expect(joins.length).toBeGreaterThan(0);
+
+    for (const join of joins) {
+      expect(join, `jointure sans contrainte d'env : ${join.trim()}`).toMatch(/c\.env\s*=\s*sl\.env/);
+    }
+  });
+});

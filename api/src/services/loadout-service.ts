@@ -25,10 +25,20 @@ const SHIP_SELECT_WITH_DISPLAY =
 const SHIP_BY_UUID_SQL = `${SHIP_SELECT_WITH_DISPLAY} WHERE s.uuid = ? AND s.env = ?`;
 const SHIP_MATRIX_DIMENSIONS_SQL = 'SELECT length, beam, height FROM rsi.ship_matrix WHERE id = ?';
 
+/**
+ * La clé d'un composant est `(uuid, env)`, pas `uuid` seul : le même composant
+ * existe en LIVE et en PTU. Joindre sur le seul `uuid` ramenait donc les deux
+ * lignes et **dupliquait chaque port** — 131 lignes pour les 87 ports réels du
+ * Gladius — tout en pouvant afficher la valeur PTU sur le site LIVE.
+ *
+ * Le défaut est resté invisible tant que les deux environnements portaient les
+ * mêmes libellés ; il n'est apparu qu'en corrigeant la résolution des noms, qui
+ * les a fait diverger.
+ */
 const LOADOUT_SELECT = `SELECT sl.id, sl.port_name, sl.port_type, sl.port_min_size, sl.port_max_size,
         sl.parent_id, sl.component_uuid, sl.component_class_name, sl.port_editable,
         c.*
- FROM game.ship_loadouts sl LEFT JOIN game.components c ON sl.component_uuid = c.uuid`;
+ FROM game.ship_loadouts sl LEFT JOIN game.components c ON sl.component_uuid = c.uuid AND c.env = sl.env`;
 const LOADOUT_BY_SHIP_SQL = `${LOADOUT_SELECT} WHERE sl.ship_uuid = ? AND sl.env = ?`;
 
 function detectUtilityType(name: string, className: string): string {
@@ -664,7 +674,7 @@ export class LoadoutService {
               c.rack_count, c.rack_missile_size,
               c.cm_ammo_count,
               c.radar_range, c.radar_detection_lifetime, c.radar_tracking_signal
-       FROM game.ship_loadouts sl LEFT JOIN game.components c ON sl.component_uuid = c.uuid
+       FROM game.ship_loadouts sl LEFT JOIN game.components c ON sl.component_uuid = c.uuid AND c.env = sl.env
        WHERE sl.ship_uuid = ? AND sl.env = ? ORDER BY sl.port_type, sl.port_name`),
       shipUuid,
       env,
