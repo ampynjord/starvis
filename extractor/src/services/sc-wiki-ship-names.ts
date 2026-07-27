@@ -149,17 +149,6 @@ export async function nameShipsFromCommunityWiki(
   return applied;
 }
 
-/**
- * Applique les renommages, sauf ceux qui rendraient deux vaisseaux homonymes.
- *
- * Le wiki donne le même nom aux variantes Military et Stealth d'un même
- * vaisseau : `DRAK_Corsair_Exec_Military` et `DRAK_Corsair_Exec_StealthIndustrial`
- * y sont tous deux « Corsair PYAM Exec ». Les appliquer tels quels rendrait deux
- * vaisseaux distincts indiscernables dans une liste.
- *
- * Un nom laid qui identifie vaut mieux qu'un beau nom qui confond : en cas de
- * collision, l'ancien libellé est conservé et le conflit journalisé.
- */
 export interface RenameProposal {
   uuid: string;
   className: string;
@@ -170,9 +159,15 @@ export interface RenameProposal {
 /**
  * Sépare les renommages applicables de ceux qui créeraient un homonyme.
  *
+ * Le wiki donne le même nom aux variantes Military et Stealth d'un même
+ * vaisseau : `DRAK_Corsair_Exec_Military` et `DRAK_Corsair_Exec_StealthIndustrial`
+ * y sont tous deux « Corsair PYAM Exec ». Les appliquer tels quels rendrait deux
+ * vaisseaux distincts indiscernables dans une liste. Un nom laid qui identifie
+ * vaut mieux qu'un beau nom qui confond.
+ *
  * Pure et testable à part, parce que c'est la logique subtile : il faut compter
  * ensemble les noms proposés **et** ceux déjà portés par les vaisseaux qu'on ne
- * renomme pas, sans compter deux fois ceux qu'on est en train de remplacer.
+ * renomme pas, sans retenir celui qu'une proposition libère.
  */
 export function partitionByCollision(
   proposals: RenameProposal[],
