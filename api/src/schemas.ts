@@ -26,14 +26,18 @@ export const qInt = (def: number, max?: number) =>
       const s = Array.isArray(v) ? v[0] : v;
       return s === undefined || s === '' ? def : s;
     },
-    // Une valeur non numérique est rejetée (400) : renvoyer la valeur par défaut
-    // masquerait une erreur d'appel. Un dépassement du plafond est en revanche
-    // ramené au plafond — c'est une politique de service, pas une faute du client,
-    // et cela évite de casser les intégrations qui demandent large.
+    // Le plancher vaut 1 pour les paramètres 1-indexés (page, limit) mais suit la
+    // valeur par défaut quand celle-ci est plus basse : `offset` démarre à 0 et
+    // doit rester acceptable. Une valeur par défaut qui échouerait sa propre
+    // validation est un piège — c'est exactement ce que masquait le `.catch()`.
+    //
+    // Une valeur non numérique est rejetée (400) : retomber sur la valeur par
+    // défaut masquerait une erreur d'appel. Un dépassement du plafond est en
+    // revanche ramené au plafond — politique de service, pas faute du client.
     z.coerce
       .number()
       .int()
-      .min(1)
+      .min(Math.min(1, def))
       .transform((n) => (max ? Math.min(n, max) : n)),
   );
 

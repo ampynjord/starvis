@@ -70,10 +70,20 @@ describe('qEnv', () => {
 describe('qInt', () => {
   const page = qInt(1);
   const limit = qInt(50, 200);
+  const offset = qInt(0);
 
   it('defaults to fallback for undefined', () => {
     expect(page.parse(undefined)).toBe(1);
     expect(limit.parse(undefined)).toBe(50);
+  });
+
+  it('accepte une valeur par défaut à 0 (offset) et son plancher', () => {
+    // Régression : le plancher était figé à 1, donc `offset` échouait sur sa
+    // propre valeur par défaut dès que le `.catch()` masquant l'a été retiré.
+    expect(offset.parse(undefined)).toBe(0);
+    expect(offset.parse('0')).toBe(0);
+    expect(offset.parse('25')).toBe(25);
+    expect(() => offset.parse('-1')).toThrow();
   });
 
   it('parses valid string numbers', () => {
