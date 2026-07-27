@@ -2,6 +2,7 @@
  * Shared types, helpers and constants for game-data sub-services
  */
 import type { PrismaLike as PrismaClient } from '@starvis/db';
+import { dataForgeUuidToScUuid } from '../utils/sc-uuid.js';
 
 // ── Types ─────────────────────────────────────────────────
 
@@ -76,11 +77,27 @@ const INTERNAL_FIELDS = new Set([
   'normalized_name',
 ]);
 
-/** Remove internal/metadata columns that should not be exposed via the API */
+/**
+ * Remove internal/metadata columns that should not be exposed via the API.
+ *
+ * Ajoute au passage `sc_uuid`, la forme « standard » de l'identifiant. Starvis
+ * stocke le GUID réordonné de DataForge, alors qu'UEX, le wiki communautaire et
+ * les autres outils emploient la forme standard — les mêmes octets dans un autre
+ * ordre. Sans elle, aucun tiers ne peut joindre nos données aux leurs par
+ * identifiant.
+ *
+ * C'est ici parce que `paginate` et les fiches passent toutes par cette
+ * fonction : un seul endroit couvre toute la surface publique. L'ajout ne rompt
+ * rien — `uuid` reste inchangé.
+ */
 export function stripInternal(row: Row): Row {
   const result: Row = {};
   for (const [key, value] of Object.entries(row)) {
     if (!INTERNAL_FIELDS.has(key)) result[key] = value;
+  }
+  if (typeof row.uuid === 'string') {
+    const scUuid = dataForgeUuidToScUuid(row.uuid);
+    if (scUuid) result.sc_uuid = scUuid;
   }
   return result;
 }
