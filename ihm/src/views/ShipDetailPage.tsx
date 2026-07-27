@@ -10,7 +10,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
-import type { ShipGalleryImage, ShipModule } from '@/types/api';
+import type { Ship, ShipGalleryImage, ShipModule } from '@/types/api';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { PageShell } from '@/components/ui/PageShell';
 import { GlowBadge } from '@/components/ui/GlowBadge';
@@ -327,16 +327,27 @@ function DimensionBox({ L, W, H, mass }: { L: number; W: number; H: number; mass
 }
 
 // ── Page ─────────────────────────────────────────────────────────────────────
-export default function ShipDetailPage() {
+/**
+ * `initialShip` est le vaisseau déjà chargé par la page serveur pour les
+ * métadonnées. Le passer en donnée initiale fait rendre la fiche dès le premier
+ * rendu — donc côté serveur — au lieu d'un écran de chargement : le contenu
+ * devient indexable et s'affiche sans attendre l'aller-retour navigateur.
+ */
+export default function ShipDetailPage({ initialShip }: { initialShip?: Ship | null } = {}) {
   const params = useParams<{ uuid: string }>();
   const uuid = params?.uuid;
   const router = useRouter();
   const { env } = useEnv();
 
+  // La page serveur interroge toujours l'environnement LIVE : ne réutiliser sa
+  // réponse que si l'utilisateur consulte bien cet environnement et ce vaisseau.
+  const seedShip = env === 'live' && initialShip && initialShip.uuid === uuid ? initialShip : undefined;
+
   const { data: ship, isLoading, error, refetch } = useQuery({
     queryKey: ['ships.get', uuid, env],
     queryFn: () => api.ships.get(uuid!, env),
     enabled: !!uuid,
+    initialData: seedShip,
   });
   const { data: loadout } = useQuery({
     queryKey: ['ships.loadout', uuid, env],

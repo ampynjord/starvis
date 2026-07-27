@@ -21,7 +21,12 @@ function apiHeaders(): HeadersInit | undefined {
 }
 
 export function buildApiUrl(path: string, params?: Record<string, string | number | boolean | undefined>): string {
-  const url = new URL(path.startsWith('/') ? path : `/${path}`, `${SERVER_API_URL}/api/v1`);
+  // Concaténer plutôt que passer par une base : `new URL('/ships/x', '…/api/v1')`
+  // écrase le chemin de la base et produit `…/ships/x`, qui n'existe pas côté
+  // Express. Toutes les requêtes serveur (métadonnées, JSON-LD, extraits SEO)
+  // partaient ainsi en 404 silencieux — serverGet renvoyant null sans bruit.
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  const url = new URL(`${SERVER_API_URL}/api/v1${normalizedPath}`);
   if (params) {
     for (const [key, value] of Object.entries(params)) {
       if (value !== undefined && value !== '') url.searchParams.set(key, String(value));

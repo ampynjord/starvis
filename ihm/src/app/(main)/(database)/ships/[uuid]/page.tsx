@@ -65,7 +65,7 @@ export default async function Page({ params }: PageParams) {
           />
         </>
       ) : null}
-      <ShipDetailPage />
+      <ShipDetailPage initialShip={ship} />
     </>
   );
 }
