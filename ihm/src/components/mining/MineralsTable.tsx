@@ -12,7 +12,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { ChevronDown, ChevronUp, ChevronsUpDown, Crosshair, FlaskConical, Search, X } from 'lucide-react';
+import { Crosshair, FlaskConical, Search, X } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -20,6 +20,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
+import { SortableTh } from '@/components/ui/SortableTh';
 import { useEnv } from '@/contexts/EnvContext';
 import { ORE_PRICES } from '@/data/mining-static';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -70,33 +71,6 @@ function fmtNum(v: number | null | undefined, d = 2): string {
 
 type SortKey = 'name' | 'price' | 'instability' | 'resistance' | 'optimalWindow' | 'avgProb' | 'rocks';
 type SortDir = 'asc' | 'desc';
-function SortTh({
-  label,
-  sk,
-  current,
-  dir,
-  onSort,
-  left,
-}: {
-  label: string;
-  sk: SortKey;
-  current: SortKey;
-  dir: SortDir;
-  onSort: (k: SortKey) => void;
-  left?: boolean;
-}) {
-  const active = current === sk;
-  const Icon = active ? (dir === 'asc' ? ChevronUp : ChevronDown) : ChevronsUpDown;
-  return (
-    <th
-      onClick={() => onSort(sk)}
-      className={`p-2 cursor-pointer select-none hover:text-slate-300 transition-colors text-[10px] uppercase tracking-widest ${left ? 'text-left' : 'text-center'} ${active ? 'text-cyan-500' : 'text-slate-600'}`}
-    >
-      <span className="inline-flex items-center gap-1">{label} <Icon size={9} /></span>
-    </th>
-  );
-}
-
 // ── Detail Drawer ─────────────────────────────────────────────────────────────
 
 function MineralDetail({ element }: { element: MiningElement }) {
@@ -294,14 +268,14 @@ export function MineralsTable({ header }: MineralsTableProps) {
           <table className="w-full text-xs font-mono-sc">
             <thead>
               <tr className="border-b border-slate-800">
-                <SortTh label="Mineral" sk="name" current={sortKey} dir={sortDir} onSort={handleSort} left />
-                <SortTh label="Rarity" sk="instability" current={sortKey} dir={sortDir} onSort={handleSort} />
-                <SortTh label="Instab" sk="instability" current={sortKey} dir={sortDir} onSort={handleSort} />
-                <SortTh label="Resist" sk="resistance" current={sortKey} dir={sortDir} onSort={handleSort} />
-                <SortTh label="Opt Win" sk="optimalWindow" current={sortKey} dir={sortDir} onSort={handleSort} />
-                <SortTh label="Avg Prob" sk="avgProb" current={sortKey} dir={sortDir} onSort={handleSort} />
-                <SortTh label="Rocks" sk="rocks" current={sortKey} dir={sortDir} onSort={handleSort} />
-                <SortTh label="Price/SCU" sk="price" current={sortKey} dir={sortDir} onSort={handleSort} />
+                <SortableTh label="Mineral" sortKey="name" current={sortKey} dir={sortDir} onSort={handleSort} className="text-[10px] uppercase tracking-widest" inactiveClassName="text-slate-600" iconSize={9} left />
+                <SortableTh label="Rarity" sortKey="instability" current={sortKey} dir={sortDir} onSort={handleSort} className="text-[10px] uppercase tracking-widest" inactiveClassName="text-slate-600" iconSize={9} />
+                <SortableTh label="Instab" sortKey="instability" current={sortKey} dir={sortDir} onSort={handleSort} className="text-[10px] uppercase tracking-widest" inactiveClassName="text-slate-600" iconSize={9} />
+                <SortableTh label="Resist" sortKey="resistance" current={sortKey} dir={sortDir} onSort={handleSort} className="text-[10px] uppercase tracking-widest" inactiveClassName="text-slate-600" iconSize={9} />
+                <SortableTh label="Opt Win" sortKey="optimalWindow" current={sortKey} dir={sortDir} onSort={handleSort} className="text-[10px] uppercase tracking-widest" inactiveClassName="text-slate-600" iconSize={9} />
+                <SortableTh label="Avg Prob" sortKey="avgProb" current={sortKey} dir={sortDir} onSort={handleSort} className="text-[10px] uppercase tracking-widest" inactiveClassName="text-slate-600" iconSize={9} />
+                <SortableTh label="Rocks" sortKey="rocks" current={sortKey} dir={sortDir} onSort={handleSort} className="text-[10px] uppercase tracking-widest" inactiveClassName="text-slate-600" iconSize={9} />
+                <SortableTh label="Price/SCU" sortKey="price" current={sortKey} dir={sortDir} onSort={handleSort} className="text-[10px] uppercase tracking-widest" inactiveClassName="text-slate-600" iconSize={9} />
               </tr>
             </thead>
             <tbody>

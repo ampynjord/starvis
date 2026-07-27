@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { ChevronDown, ChevronUp, ChevronsUpDown, Search, X } from 'lucide-react';
+import { Search, X } from 'lucide-react';
+import { SortableTh } from '@/components/ui/SortableTh';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
@@ -135,15 +136,15 @@ export function OreTable() {
           <table className="w-full text-xs font-mono-sc">
             <thead>
               <tr className="border-b border-slate-800 text-slate-500">
-                <SortTh label="Mineral" sortKey="name" current={sortKey} dir={sortDir} onSort={handleSort} left />
-                <SortTh label="Avg Prob" sortKey="avgProb" current={sortKey} dir={sortDir} onSort={handleSort} />
-                <SortTh label="Min%" sortKey="avgMin" current={sortKey} dir={sortDir} onSort={handleSort} />
-                <SortTh label="Max%" sortKey="avgMax" current={sortKey} dir={sortDir} onSort={handleSort} />
-                <SortTh label="Instab" sortKey="instability" current={sortKey} dir={sortDir} onSort={handleSort} />
-                <SortTh label="Resist" sortKey="resistance" current={sortKey} dir={sortDir} onSort={handleSort} />
-                <SortTh label="Opt Win" sortKey="optimalWindow" current={sortKey} dir={sortDir} onSort={handleSort} />
-                <SortTh label="Rocks" sortKey="rocksContaining" current={sortKey} dir={sortDir} onSort={handleSort} />
-                <SortTh label="Price/SCU" sortKey="price" current={sortKey} dir={sortDir} onSort={handleSort} />
+                <SortableTh label="Mineral" sortKey="name" current={sortKey} dir={sortDir} onSort={handleSort} left />
+                <SortableTh label="Avg Prob" sortKey="avgProb" current={sortKey} dir={sortDir} onSort={handleSort} />
+                <SortableTh label="Min%" sortKey="avgMin" current={sortKey} dir={sortDir} onSort={handleSort} />
+                <SortableTh label="Max%" sortKey="avgMax" current={sortKey} dir={sortDir} onSort={handleSort} />
+                <SortableTh label="Instab" sortKey="instability" current={sortKey} dir={sortDir} onSort={handleSort} />
+                <SortableTh label="Resist" sortKey="resistance" current={sortKey} dir={sortDir} onSort={handleSort} />
+                <SortableTh label="Opt Win" sortKey="optimalWindow" current={sortKey} dir={sortDir} onSort={handleSort} />
+                <SortableTh label="Rocks" sortKey="rocksContaining" current={sortKey} dir={sortDir} onSort={handleSort} />
+                <SortableTh label="Price/SCU" sortKey="price" current={sortKey} dir={sortDir} onSort={handleSort} />
               </tr>
             </thead>
             <tbody>
@@ -282,32 +283,3 @@ function PropCard({ label, value, color }: { label: string; value: string; color
   );
 }
 
-function SortTh({
-  label,
-  sortKey,
-  current,
-  dir,
-  onSort,
-  left,
-}: {
-  label: string;
-  sortKey: SortKey;
-  current: SortKey;
-  dir: SortDir;
-  onSort: (k: SortKey) => void;
-  left?: boolean;
-}) {
-  const active = current === sortKey;
-  const Icon = active ? (dir === 'asc' ? ChevronUp : ChevronDown) : ChevronsUpDown;
-  return (
-    <th
-      className={`p-2 cursor-pointer select-none hover:text-slate-300 transition-colors ${left ? 'text-left' : 'text-center'} ${active ? 'text-cyan-500' : ''}`}
-      onClick={() => onSort(sortKey)}
-    >
-      <span className="inline-flex items-center gap-1">
-        {label}
-        <Icon size={10} />
-      </span>
-    </th>
-  );
-}
