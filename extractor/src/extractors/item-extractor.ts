@@ -21,6 +21,15 @@ interface ItemRecord {
   uuid: string;
   className: string;
   name: string;
+  /**
+   * Clé de localisation (`@item_Name…`) laissée telle quelle par DataForge.
+   *
+   * Elle était jusqu'ici écartée parce qu'elle n'est pas affichable, ce qui
+   * revenait à jeter la seule chose capable de produire le vrai libellé : la
+   * persistance retombait alors sur le `class_name` dé-souligné. On la conserve
+   * pour que `global.ini` puisse la résoudre plus tard.
+   */
+  nameLocKey: string | null;
   type: string;
   subType: string | null;
   size: number | null;
@@ -45,11 +54,31 @@ interface CommodityRecord {
   uuid: string;
   className: string;
   name: string;
+  /** Voir `ItemRecord.nameLocKey` — c'est ici que le manque était total. */
+  nameLocKey: string | null;
   type: string;
   subType: string | null;
   symbol: string | null;
   occupancyScu: number | null;
   dataJson: Record<string, unknown> | null;
+}
+
+/**
+ * DataForge livre trois sortes de valeurs dans les champs de nom, qu'il faut
+ * distinguer avant d'en faire quoi que ce soit :
+ *
+ * - un libellé affichable (« Arrowhead Sniper Rifle ») ;
+ * - une clé de localisation préfixée `@`, à résoudre via `global.ini` ;
+ * - un identifiant interne préfixé `LOC_`, qui n'est ni l'un ni l'autre.
+ *
+ * Le code les traitait tous par la négative — « si ça ne commence pas par `@`
+ * ni par `LOC_`, c'est un nom » — ce qui perdait silencieusement les clés.
+ */
+export function classifyNameValue(value: unknown): { display?: string; locKey?: string } {
+  if (typeof value !== 'string' || !value) return {};
+  if (value.startsWith('@')) return { locKey: value };
+  if (value.startsWith('LOC_')) return {};
+  return { display: value };
 }
 
 /** Path patterns for FPS/personal items → item type classification */
@@ -244,6 +273,7 @@ export function extractItems(ctx: DataForgeContext): { items: ItemRecord[]; comm
           uuid: r.id,
           className,
           name: className.replace(/^Commodities?_/i, '').replace(/_/g, ' '),
+          nameLocKey: null,
           type: commType,
           subType: null,
           symbol: null,
@@ -261,18 +291,17 @@ export function extractItems(ctx: DataForgeContext): { items: ItemRecord[]; comm
               }
             }
             if (cType === 'SCItemPurchasableParams') {
-              if (c.displayName && typeof c.displayName === 'string' && !c.displayName.startsWith('@')) {
-                comm.name = c.displayName;
-              }
+              const purchasable = classifyNameValue(c.displayName);
+              if (purchasable.display) comm.name = purchasable.display;
+              else if (purchasable.locKey) comm.nameLocKey ??= purchasable.locKey;
             }
             if (cType === 'SAttachableComponentParams') {
               const ad = c.AttachDef;
               if (ad) {
                 if (ad.SubType && typeof ad.SubType === 'string') comm.subType = ad.SubType;
-                const loc = ad.Localization;
-                if (loc?.Name && typeof loc.Name === 'string' && !loc.Name.startsWith('@') && !loc.Name.startsWith('LOC_')) {
-                  comm.name = loc.Name;
-                }
+                const attached = classifyNameValue(ad.Localization?.Name);
+                if (attached.display) comm.name = attached.display;
+                else if (attached.locKey) comm.nameLocKey ??= attached.locKey;
               }
             }
           }
@@ -301,6 +330,7 @@ export function extractItems(ctx: DataForgeContext): { items: ItemRecord[]; comm
         uuid: r.id,
         className,
         name: resolveComponentName(className),
+        nameLocKey: null,
         type: classification.type,
         subType: classification.subType,
         size: null,
@@ -357,12 +387,9 @@ export function extractItems(ctx: DataForgeContext): { items: ItemRecord[]; comm
             if (ad.SubType && typeof ad.SubType === 'string') {
               item.subType = item.subType || ad.SubType;
             }
-            const loc = ad.Localization;
-            if (loc?.Name && typeof loc.Name === 'string') {
-              if (!loc.Name.startsWith('LOC_') && !loc.Name.startsWith('@')) {
-                item.name = loc.Name;
-              }
-            }
+            const attached = classifyNameValue(ad.Localization?.Name);
+            if (attached.display) item.name = attached.display;
+            else if (attached.locKey) item.nameLocKey ??= attached.locKey;
             if (typeof ad.Manufacturer === 'string' && ad.Manufacturer) {
               extData.manufacturerRef = ad.Manufacturer;
               // Resolve GUID immediately so manufacturer_code is set from game data
@@ -491,9 +518,9 @@ export function extractItems(ctx: DataForgeContext): { items: ItemRecord[]; comm
 
         // Purchasable info
         if (cType === 'SCItemPurchasableParams') {
-          if (c.displayName && typeof c.displayName === 'string' && !c.displayName.startsWith('@')) {
-            item.name = c.displayName;
-          }
+          const purchasable = classifyNameValue(c.displayName);
+          if (purchasable.display) item.name = purchasable.display;
+          else if (purchasable.locKey) item.nameLocKey ??= purchasable.locKey;
         }
       }
 

@@ -26,6 +26,34 @@ export function titleCaseItemName(rawName: string, className: string): string {
     .join(' ');
 }
 
+/**
+ * Résout le libellé affichable d'un objet ou d'une marchandise.
+ *
+ * L'ordre compte, du plus fiable au plus approximatif :
+ *
+ * 1. **La clé de localisation portée par l'enregistrement.** C'est la seule
+ *    source qui donne le nom voulu par le jeu. Elle était jusqu'ici écartée à
+ *    l'extraction parce qu'elle n'est pas affichable telle quelle, ce qui privait
+ *    les marchandises de tout libellé propre — les 135 sortaient fabriquées
+ *    depuis leur identifiant.
+ * 2. **La recherche par `class_name`**, qui fonctionne pour les composants dont
+ *    les clés suivent les motifs de CIG, mais pas pour les marchandises.
+ * 3. **Le repli typographique**, qui n'invente rien : il met en forme ce qu'on a.
+ */
+function resolveDisplayName(
+  loc: PersistContext['loc'],
+  record: { className: string; nameLocKey?: string | null },
+  currentName: string,
+): string {
+  if (record.nameLocKey) {
+    const fromKey = loc.resolveKey(record.nameLocKey);
+    if (fromKey) return fromKey;
+  }
+  const fromClassName = loc.resolveComponentName(record.className);
+  if (fromClassName) return fromClassName;
+  return titleCaseItemName(currentName, record.className);
+}
+
 export async function saveItems(ctx: PersistContext): Promise<{ items: number; commodities: number }> {
   const { conn, env, df, loc, onProgress } = ctx;
   const { items, commodities } = df.extractItems();
@@ -36,18 +64,10 @@ export async function saveItems(ctx: PersistContext): Promise<{ items: number; c
   if (loc.isLoaded) {
     for (const it of items) {
       // Force LOC lookup first (don't rely on resolveOrFallback's "looks clean" bail-out)
-      const locName = loc.resolveComponentName(it.className);
-      if (locName) {
-        it.name = locName;
-      } else {
-        // Fallback: title-case the existing lowercase name and expand manufacturer codes
-        it.name = titleCaseItemName(it.name, it.className);
-      }
+      it.name = resolveDisplayName(loc, it, it.name);
     }
     for (const cm of commodities) {
-      const locName = loc.resolveComponentName(cm.className);
-      if (locName) cm.name = locName;
-      else cm.name = titleCaseItemName(cm.name, cm.className);
+      cm.name = resolveDisplayName(loc, cm, cm.name);
     }
   } else {
     // No localization — still apply title case
