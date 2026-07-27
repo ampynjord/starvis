@@ -1,16 +1,12 @@
-export function pct(v: number | string | null): string {
-  if (v == null) return '—';
-  const n = Number(v);
-  if (!Number.isFinite(n)) return '—';
-  return `${(n * 100).toFixed(1)}%`;
-}
+import { formatDecimal, formatPercent } from '@/lib/format';
 
-export function fNum(v: number | string | null, decimals = 2): string {
-  if (v == null) return '—';
-  const n = Number(v);
-  if (!Number.isFinite(n)) return '—';
-  return n.toFixed(decimals);
-}
+/**
+ * Ces deux-là déléguent au module de formatage partagé. Le nom local est
+ * conservé : il est employé par cinq composants de minage, et le renommer
+ * n'apporterait rien ici.
+ */
+export const pct = (v: number | string | null) => formatPercent(v as number | null);
+export const fNum = (v: number | string | null, decimals = 2) => formatDecimal(v, decimals);
 
 /** Color class from 0 (safe/green) to 1 (dangerous/red) */
 export function dangerColor(v: number | string | null): string {

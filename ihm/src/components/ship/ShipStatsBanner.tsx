@@ -3,14 +3,11 @@
  * Sections : Velocity ruler · Hardpoints · Survival · Systems
  */
 
+import { formatDecimal } from '@/lib/format';
 import type { LoadoutNode, Ship } from '@/types/api';
 
 // ── Helpers ──────────────────────────────────────────────
 function n(v: unknown): number { return Number(v ?? 0) || 0; }
-function fV(v: number | null | undefined, dec = 0): string {
-  if (v == null || Number.isNaN(Number(v))) return '—';
-  return Number(v).toFixed(dec);
-}
 function fK(val: number): string {
   if (val >= 1_000_000) return `${(val / 1_000_000).toFixed(1)}M`;
   if (val >= 1000)      return `${(val / 1000).toFixed(1)}k`;
@@ -193,7 +190,7 @@ export function ShipStatsBanner({ ship, loadout, category }: { ship: Ship, loado
               style={{ left: `${pctOf(ship.scm_speed)}%` }}
             >
               <span className="absolute top-0 left-1 text-[9px] font-mono-sc text-cyan-400 whitespace-nowrap">
-                {fV(ship.scm_speed)}
+                {formatDecimal(ship.scm_speed)}
               </span>
             </div>
           )}
@@ -205,7 +202,7 @@ export function ShipStatsBanner({ ship, loadout, category }: { ship: Ship, loado
               style={{ left: `${pctOf(ship.boost_speed_forward)}%` }}
             >
               <span className="absolute bottom-0 right-1 text-[9px] font-mono-sc text-amber-400 whitespace-nowrap">
-                {fV(ship.boost_speed_forward)}
+                {formatDecimal(ship.boost_speed_forward)}
               </span>
             </div>
           )}
@@ -214,7 +211,7 @@ export function ShipStatsBanner({ ship, loadout, category }: { ship: Ship, loado
           {n(ship.max_speed) > 0 && (
             <div className="absolute right-1 top-1/2 -translate-y-1/2">
               <span className="text-[9px] font-mono-sc text-violet-400">
-                {fV(ship.max_speed)} m/s
+                {formatDecimal(ship.max_speed)} m/s
               </span>
             </div>
           )}
@@ -223,12 +220,12 @@ export function ShipStatsBanner({ ship, loadout, category }: { ship: Ship, loado
         {/* Legend below the ruler */}
         <div className="flex gap-3 mb-3">
           {(isGround ? [
-            { label: 'Max Speed', color: 'bg-cyan-500', value: fV(ship.max_speed) + ' m/s' },
+            { label: 'Max Speed', color: 'bg-cyan-500', value: formatDecimal(ship.max_speed) + ' m/s' },
           ] : [
-            { label: 'SCM',  color: 'bg-cyan-500',   value: fV(ship.scm_speed) + ' m/s' },
-            { label: 'Boost',color: 'bg-amber-400',  value: fV(ship.boost_speed_forward) + ' m/s' },
-            { label: 'Ret.', color: 'bg-amber-700',  value: fV(ship.boost_speed_backward ?? 0) + ' m/s' },
-            { label: 'Nav',  color: 'bg-violet-500', value: fV(ship.max_speed) + ' m/s' },
+            { label: 'SCM',  color: 'bg-cyan-500',   value: formatDecimal(ship.scm_speed) + ' m/s' },
+            { label: 'Boost',color: 'bg-amber-400',  value: formatDecimal(ship.boost_speed_forward) + ' m/s' },
+            { label: 'Ret.', color: 'bg-amber-700',  value: formatDecimal(ship.boost_speed_backward ?? 0) + ' m/s' },
+            { label: 'Nav',  color: 'bg-violet-500', value: formatDecimal(ship.max_speed) + ' m/s' },
           ]).map(({ label, color, value }) => (
             <div key={label} className="flex items-center gap-1 min-w-0">
               <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${color}`} />
@@ -267,7 +264,7 @@ export function ShipStatsBanner({ ship, loadout, category }: { ship: Ship, loado
                       style={{ height: `${basePct}%` }}
                     />
                   </div>
-                  <span className="text-[10px] font-mono-sc text-slate-300 tabular-nums">{fV(val)}°</span>
+                  <span className="text-[10px] font-mono-sc text-slate-300 tabular-nums">{formatDecimal(val)}°</span>
                   {hasBoost && (
                     <span className="text-[9px] font-mono-sc text-amber-400 tabular-nums">↑{boostVal.toFixed(0)}°</span>
                   )}

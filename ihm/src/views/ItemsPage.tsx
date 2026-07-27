@@ -22,6 +22,7 @@ import { PageShell } from "@/components/ui/PageShell";
 import { MarketSummary } from "@/components/economy/MarketSummary";
 import { ListFilterBar, ListFilterChips, ListFilterResetButton, ListFilterSelect } from "@/components/ui/ListFilters";
 import type { AmmoInsight, InventoryContainerInsight, ItemListItem } from "@/types/api";
+import { formatCount } from '@/lib/format';
 
 const LIMIT = 30;
 
@@ -63,11 +64,6 @@ const TYPE_COLOR: Record<string, string> = {
 	Magazine:    "bg-amber-500",
 };
 
-function fNum(v: number | string | null | undefined, dec = 0): string {
-	if (v == null) return "—";
-	const n = Number(v);
-	return Number.isNaN(n) ? "—" : n.toLocaleString("en-US", { maximumFractionDigits: dec, minimumFractionDigits: dec });
-}
 
 function totalDamage(ammo: AmmoInsight): number {
 	return [
@@ -103,12 +99,12 @@ function AmmoInsightPanel({ rows, total }: { rows: AmmoInsight[]; total: number 
 					<div key={ammo.uuid} className="rounded-sm border border-slate-800/70 bg-slate-950/50 p-3">
 						<p className="truncate font-orbitron text-xs font-bold text-slate-100">{ammo.name ?? 'Ammunition'}</p>
 						<div className="mt-3 grid grid-cols-3 gap-2 font-mono-sc text-[10px] uppercase tracking-widest">
-							<span className="text-red-400">DMG {fNum(totalDamage(ammo), 0)}</span>
-							<span className="text-cyan-400">VEL {fNum(ammo.speed, 0)}</span>
+							<span className="text-red-400">DMG {formatCount(totalDamage(ammo), 0)}</span>
+							<span className="text-cyan-400">VEL {formatCount(ammo.speed, 0)}</span>
 							<span className="text-amber-400">S{ammo.size ?? 0}</span>
 						</div>
 						{ammo.explosion_max_radius != null && (
-							<p className="mt-2 font-mono-sc text-[10px] uppercase tracking-widest text-rose-400">Blast {fNum(ammo.explosion_max_radius, 1)}m</p>
+							<p className="mt-2 font-mono-sc text-[10px] uppercase tracking-widest text-rose-400">Blast {formatCount(ammo.explosion_max_radius, 1)}m</p>
 						)}
 					</div>
 				))}
@@ -139,10 +135,10 @@ function InventoryContainerPanel({ rows, total }: { rows: InventoryContainerInsi
 						<p className="truncate font-orbitron text-xs font-bold text-slate-100">{container.name ?? 'Inventory container'}</p>
 						<p className="mt-1 truncate font-mono-sc text-[10px] uppercase tracking-widest text-slate-600">{container.inventory_type ?? "Inventory"}</p>
 						<div className="mt-3 flex flex-wrap items-center gap-3 font-mono-sc text-[10px] uppercase tracking-widest">
-							<span className="text-amber-400">{fNum(container.capacity_scu, 3)} SCU</span>
+							<span className="text-amber-400">{formatCount(container.capacity_scu, 3)} SCU</span>
 							{container.size_x != null && container.size_y != null && container.size_z != null && (
 								<span className="text-slate-500">
-									{fNum(container.size_x, 1)}x{fNum(container.size_y, 1)}x{fNum(container.size_z, 1)}
+									{formatCount(container.size_x, 1)}x{formatCount(container.size_y, 1)}x{formatCount(container.size_z, 1)}
 								</span>
 							)}
 						</div>
@@ -165,19 +161,19 @@ function ItemStats({ item }: { item: ItemListItem }) {
 				{item.weapon_dps != null && (
 					<span className="flex items-center gap-1">
 						<span className="text-[10px] font-mono-sc text-slate-600 uppercase">DPS</span>
-						<span className="text-xs font-mono-sc text-red-400 font-semibold">{fNum(item.weapon_dps, 1)}</span>
+						<span className="text-xs font-mono-sc text-red-400 font-semibold">{formatCount(item.weapon_dps, 1)}</span>
 					</span>
 				)}
 				{item.weapon_range != null && (
 					<span className="flex items-center gap-1">
 						<span className="text-[10px] font-mono-sc text-slate-600 uppercase">Range</span>
-						<span className="text-xs font-mono-sc text-slate-300 font-semibold">{fNum(item.weapon_range)}m</span>
+						<span className="text-xs font-mono-sc text-slate-300 font-semibold">{formatCount(item.weapon_range)}m</span>
 					</span>
 				)}
 				{item.weapon_fire_rate != null && (
 					<span className="flex items-center gap-1">
 						<span className="text-[10px] font-mono-sc text-slate-600 uppercase">RPM</span>
-						<span className="text-xs font-mono-sc text-slate-300 font-semibold">{fNum(item.weapon_fire_rate)}</span>
+						<span className="text-xs font-mono-sc text-slate-300 font-semibold">{formatCount(item.weapon_fire_rate)}</span>
 					</span>
 				)}
 				{item.weapon_damage_type && (
@@ -196,7 +192,7 @@ function ItemStats({ item }: { item: ItemListItem }) {
 					<span className="flex items-center gap-1">
 						<span className="text-[10px] font-mono-sc text-slate-600 uppercase">DR</span>
 						<span className="text-xs font-mono-sc text-blue-400 font-semibold">
-							{fNum(item.armor_damage_reduction * 100, 0)}%
+							{formatCount(item.armor_damage_reduction * 100, 0)}%
 						</span>
 					</span>
 				)}
@@ -204,7 +200,7 @@ function ItemStats({ item }: { item: ItemListItem }) {
 					<span className="flex items-center gap-1">
 						<span className="text-[10px] font-mono-sc text-slate-600 uppercase">Temp</span>
 						<span className="text-xs font-mono-sc text-slate-300 font-semibold">
-							{fNum(item.armor_temp_min)}–{fNum(item.armor_temp_max)} °C
+							{formatCount(item.armor_temp_min)}–{formatCount(item.armor_temp_max)} °C
 						</span>
 					</span>
 				)}

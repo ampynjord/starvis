@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { formatDecimal } from '@/lib/format';
 import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft, BarChart3, ChevronLeft, ChevronRight, Clock, Coins,
@@ -28,10 +29,6 @@ import { fCredits, fDate, fMass } from '@/utils/formatters';
 import { VARIANT_TYPE_LABELS } from '@/utils/constants';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
-function fV(v: number | null | undefined, dec = 0) {
-  if (v == null || Number.isNaN(Number(v))) return '—';
-  return Number(v).toFixed(dec);
-}
 
 function n(v: number | string | null | undefined) {
   if (v == null || v === '') return null;
@@ -548,19 +545,19 @@ export default function ShipDetailPage({ initialShip }: { initialShip?: Ship | n
         {isGround ? (
           <>
             {(ship.max_speed ?? ship.scm_speed) != null && (
-              <QuickStat icon={<Zap size={9} />} label="Speed" value={`${fV(ship.max_speed ?? ship.scm_speed)} m/s`} />
+              <QuickStat icon={<Zap size={9} />} label="Speed" value={`${formatDecimal(ship.max_speed ?? ship.scm_speed)} m/s`} />
             )}
           </>
         ) : (
           <>
             {ship.scm_speed != null && (
-              <QuickStat icon={<Zap size={9} />} label="SCM" value={`${fV(ship.scm_speed)} m/s`} />
+              <QuickStat icon={<Zap size={9} />} label="SCM" value={`${formatDecimal(ship.scm_speed)} m/s`} />
             )}
             {ship.boost_speed_forward != null && (
-              <QuickStat icon={<Zap size={9} />} label="Boost" value={`${fV(ship.boost_speed_forward)} m/s`} />
+              <QuickStat icon={<Zap size={9} />} label="Boost" value={`${formatDecimal(ship.boost_speed_forward)} m/s`} />
             )}
             {ship.max_speed != null && (
-              <QuickStat icon={<Zap size={9} />} label="Nav" value={`${fV(ship.max_speed)} m/s`} />
+              <QuickStat icon={<Zap size={9} />} label="Nav" value={`${formatDecimal(ship.max_speed)} m/s`} />
             )}
           </>
         )}
