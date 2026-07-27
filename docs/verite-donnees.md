@@ -186,6 +186,36 @@ déterministe pour que deux exécutions restent comparables.
 **À corriger étape 2/3** : distinguer le port structurel du port d'équipement à
 l'extraction, puis combler le croisement sur les seconds.
 
+### D8 — Nos identifiants ne sont pas ceux du reste de l'écosystème
+
+Trouvé en confrontant les libellés aux sources externes, comme demandé.
+
+Le Dragonfly Star Kitten est référencé `d868dfb9-5bcd-4f7b-a40a-3aa5bbf7d705` par
+[star-citizen.wiki](https://api.star-citizen.wiki) et
+[finder.cstone.space](https://finder.cstone.space). Starvis l'expose sous
+`5bcd4f7b-dfb9-d868-05d7-f7bba53a0aa4`.
+
+**Les mêmes octets, dans un autre ordre.** La forme standard est celle qu'emploient
+UEX, le wiki communautaire et les outils tiers ; la nôtre est le GUID réordonné
+de DataForge. Conséquence directe : **aucun tiers ne peut joindre les données
+Starvis à celles des autres projets par identifiant** — ce qui contredit
+l'objectif affiché de ne pas limiter les développeurs.
+
+Le projet connaissait la conversion : `scUuidToDataForgeUuid` existe dans
+l'extracteur. Deux défauts s'y cachaient :
+
+- **l'inverse n'existait pas** — impossible de revenir à la forme publique ;
+- **la documentation affirmait que la fonction était sa propre inverse.** Elle ne
+  l'est pas. Qui s'y serait fié aurait obtenu un identifiant faux, bien formé et
+  donc silencieux.
+
+`dataForgeUuidToScUuid` est ajoutée et vérifiée : exacte sur le cas réel,
+aller-retour sur 256 identifiants.
+
+**À arbitrer étape 4** (surface d'API) : exposer la forme standard à côté de la
+nôtre — un ajout, donc sans rupture de contrat. C'est probablement le geste le
+plus rentable pour l'interopérabilité, Stelliverse compris.
+
 ### D7 — Le wiki listait 1 579 composants inachevés
 
 Second effet du correctif de libellés, et lui non plus n'était pas prévisible.

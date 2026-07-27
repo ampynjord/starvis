@@ -118,26 +118,59 @@ const ROLE_MAP: Record<string, string> = {
   '@item_shipfocus_lightfighter': 'Light Fighter',
 };
 
+/** Découpe un UUID en 16 octets, ou null si la forme n'est pas valide. */
+function uuidBytes(uuid: string): string[] | null {
+  const hex = uuid.replace(/-/g, '').toLowerCase();
+  if (!/^[0-9a-f]{32}$/.test(hex)) return null;
+  const bytes = hex.match(/../g);
+  return bytes?.length === 16 ? bytes : null;
+}
+
+const formatUuid = (b: string[]) =>
+  `${b.slice(0, 4).join('')}-${b.slice(4, 6).join('')}-${b.slice(6, 8).join('')}-${b.slice(8, 10).join('')}-${b.slice(10, 16).join('')}`;
+
 /**
- * Convert a "standard" Star Citizen UUID (as exposed by external sources such as
- * UEX or shop-inventory JSON) into the byte-reordered form stored as the DataForge
- * GUID in game.* tables (e.g. game.ships.uuid). The transform mirrors the layout
- * Star Citizen uses internally and is its own inverse domain — returns the input
- * unchanged when it is not a valid 32-hex UUID.
+ * Convertit un UUID Star Citizen « standard » — celui qu'exposent UEX, le wiki
+ * communautaire et les inventaires de boutique — vers la forme réordonnée
+ * stockée comme GUID DataForge dans les tables `game.*`.
+ *
+ * Les deux formes désignent le même objet : le Dragonfly Star Kitten est
+ * `d868dfb9-5bcd-4f7b-a40a-3aa5bbf7d705` chez les outils communautaires et
+ * `5bcd4f7b-dfb9-d868-05d7-f7bba53a0aa4` ici. C'est ce qui empêche aujourd'hui
+ * un tiers de joindre les données Starvis à celles des autres projets.
+ *
+ * Renvoie l'entrée inchangée si ce n'est pas un UUID hexadécimal de 32 signes.
  */
 export function scUuidToDataForgeUuid(uuid: string): string {
-  const hex = uuid.replace(/-/g, '').toLowerCase();
-  if (!/^[0-9a-f]{32}$/.test(hex)) return uuid;
-  const bytes = hex.match(/../g);
-  if (!bytes || bytes.length !== 16) return uuid;
-  const reordered = [
+  const bytes = uuidBytes(uuid);
+  if (!bytes) return uuid;
+  return formatUuid([
     ...bytes.slice(4, 8),
     ...bytes.slice(2, 4),
     ...bytes.slice(0, 2),
     ...bytes.slice(14, 16).reverse(),
     ...bytes.slice(8, 14).reverse(),
-  ];
-  return `${reordered.slice(0, 4).join('')}-${reordered.slice(4, 6).join('')}-${reordered.slice(6, 8).join('')}-${reordered.slice(8, 10).join('')}-${reordered.slice(10, 16).join('')}`;
+  ]);
+}
+
+/**
+ * L'inverse de `scUuidToDataForgeUuid`.
+ *
+ * Elle manquait, et la documentation de sa jumelle affirmait à tort que
+ * celle-ci était sa propre inverse : la réappliquer ne redonne pas l'UUID
+ * d'origine. Quiconque s'y serait fié pour revenir à la forme standard aurait
+ * obtenu un identifiant faux, sans erreur pour le signaler.
+ */
+export function dataForgeUuidToScUuid(uuid: string): string {
+  const bytes = uuidBytes(uuid);
+  if (!bytes) return uuid;
+  return formatUuid([
+    ...bytes.slice(6, 8),
+    ...bytes.slice(4, 6),
+    ...bytes.slice(0, 4),
+    ...bytes.slice(10, 16).reverse(),
+    ...bytes.slice(8, 10).reverse(),
+  ]);
 }
 
 /** Resolve SC localization keys to display strings */
