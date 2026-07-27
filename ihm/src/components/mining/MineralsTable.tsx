@@ -1,36 +1,30 @@
-﻿'use client';
+'use client';
 
 /**
- * MineralsLibraryPage — Complete mineral/ore reference
- * Shows mining properties, sell prices, crafting usage, and rock finder links.
+ * Tableau de référence des minerais : recherche, tri par colonne, sélection de
+ * ligne et panneau de détail.
+ *
+ * Extrait des deux copies qui coexistaient — la page minerais autonome et
+ * l'onglet minerais de la bibliothèque des marchandises — dont 95 % des lignes
+ * étaient identiques, jusqu'aux six fonctions de formatage. Toute correction
+ * devait donc être appliquée deux fois, ou ne l'était qu'une.
  */
-'use client';
 
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import {
-  ChevronDown,
-  ChevronUp,
-  ChevronsUpDown,
-  Crosshair,
-  FlaskConical,
-  Link as LinkIcon,
-  Search,
-  X,
-} from 'lucide-react';
+import { ChevronDown, ChevronUp, ChevronsUpDown, Crosshair, FlaskConical, Search, X } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
-import { api } from '@/services/api';
-import { useEnv } from '@/contexts/EnvContext';
-import { LoadingGrid } from '@/components/ui/LoadingGrid';
-import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { ScifiPanel } from '@/components/ui/ScifiPanel';
-import { PageHeader } from '@/components/ui/PageHeader';
-import { PageShell } from '@/components/ui/PageShell';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { GlowBadge } from '@/components/ui/GlowBadge';
-import type { MiningElement } from '@/types/api';
+import { LoadingGrid } from '@/components/ui/LoadingGrid';
+import { ScifiPanel } from '@/components/ui/ScifiPanel';
+import { useEnv } from '@/contexts/EnvContext';
 import { ORE_PRICES } from '@/data/mining-static';
+import { useDebounce } from '@/hooks/useDebounce';
+import { api } from '@/services/api';
+import type { MiningElement } from '@/types/api';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -76,7 +70,6 @@ function fmtNum(v: number | null | undefined, d = 2): string {
 
 type SortKey = 'name' | 'price' | 'instability' | 'resistance' | 'optimalWindow' | 'avgProb' | 'rocks';
 type SortDir = 'asc' | 'desc';
-
 function SortTh({
   label,
   sk,
@@ -200,14 +193,29 @@ function MineralDetail({ element }: { element: MiningElement }) {
   );
 }
 
-// ── Main ──────────────────────────────────────────────────────────────────────
+// ── Tableau ───────────────────────────────────────────────────────────────────
 
-export default function MineralsLibraryPage() {
+export interface MineralsTableStats {
+  total: number;
+  /** Minerais dont le prix de vente est connu. */
+  priceable: number;
+}
+
+export interface MineralsTableProps {
+  /**
+   * Entête propre à la page, rendu au-dessus du tableau. Reçoit les statistiques
+   * du jeu de données, que le composant est seul à connaître puisqu'il le charge.
+   */
+  header?: (stats: MineralsTableStats) => React.ReactNode;
+}
+
+export function MineralsTable({ header }: MineralsTableProps) {
   const { env } = useEnv();
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('price');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [selectedUuid, setSelectedUuid] = useState<string | null>(null);
+  const debouncedSearch = useDebounce(search, 250);
 
   const { data: minerals = [], isLoading, error } = useQuery({
     queryKey: ['minerals-library', env],
@@ -217,13 +225,16 @@ export default function MineralsLibraryPage() {
 
   const handleSort = (k: SortKey) => {
     if (k === sortKey) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
-    else { setSortKey(k); setSortDir('desc'); }
+    else {
+      setSortKey(k);
+      setSortDir('desc');
+    }
   };
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = debouncedSearch.trim().toLowerCase();
     return minerals.filter((m) => !q || (m.name ?? m.class_name ?? '').toLowerCase().includes(q));
-  }, [minerals, search]);
+  }, [minerals, debouncedSearch]);
 
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => {
@@ -247,38 +258,16 @@ export default function MineralsLibraryPage() {
   }, [filtered, sortKey, sortDir]);
 
   const selectedElement = useMemo(() => sorted.find((e) => e.uuid === selectedUuid) ?? null, [sorted, selectedUuid]);
-
   const priceableCount = useMemo(() => minerals.filter((m) => (lookupPrice(m) ?? 0) > 0).length, [minerals]);
 
   if (isLoading) return <LoadingGrid message="Loading minerals..." />;
   if (error) return <ErrorState error={error as Error} />;
   if (!minerals.length) return <EmptyState title="No minerals found" />;
 
+
   return (
-    <PageShell>
-      <PageHeader
-        title="Minerals Library"
-        count={minerals.length}
-        countLabel="minerals"
-        subtitle="Complete reference of all mineable elements — properties, sell prices, and mining data"
-      />
-
-      {/* Quick stats */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        <div className="sci-panel px-3 py-1.5 text-[10px] font-mono-sc text-slate-500 flex items-center gap-1.5">
-          <FlaskConical size={10} /> {priceableCount} with known price
-        </div>
-        <div className="sci-panel px-3 py-1.5 text-[10px] font-mono-sc text-slate-500 flex items-center gap-1.5">
-          <Crosshair size={10} /> Click a row to inspect
-        </div>
-        <Link
-          href="/mining-calculator"
-          className="sci-panel px-3 py-1.5 text-[10px] font-mono-sc text-cyan-500 hover:text-cyan-300 flex items-center gap-1.5 transition-colors border-cyan-900/40 hover:border-cyan-700"
-        >
-          <LinkIcon size={10} /> Open Mining Calculator
-        </Link>
-      </div>
-
+    <>
+      {header?.({ total: minerals.length, priceable: priceableCount })}
       {/* Table */}
       <ScifiPanel
         title="Mineral Reference"
@@ -375,6 +364,9 @@ export default function MineralsLibraryPage() {
           <MineralDetail element={selectedElement} />
         </div>
       )}
-    </PageShell>
+    </>
   );
 }
+
+export { lookupPrice, rarityLabel, rarityColor, dangerColor, fmtNum, fmtPct };
+export type { SortKey, SortDir };
