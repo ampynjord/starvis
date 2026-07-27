@@ -15,7 +15,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { PageShell } from '@/components/ui/PageShell';
 import { Pagination } from '@/components/ui/Pagination';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
-import { useDebounce } from '@/hooks/useDebounce';
+import { useEntityList } from '@/hooks/useEntityList';
 import { api } from '@/services/api';
 import type { CommLink } from '@/types/api';
 
@@ -168,10 +168,7 @@ function CommLinkCard({ entry }: { entry: CommLink }) {
 export default function CommLinksPage() {
   const searchParams = useSearchParams();
 
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState(searchParams?.get('search') ?? '');
   const [category, setCategory] = useState(searchParams?.get('category') ?? '');
-  const debouncedSearch = useDebounce(search, 350);
 
   const { data: categories } = useQuery({
     queryKey: ['commlinks.categories'],
@@ -179,10 +176,12 @@ export default function CommLinksPage() {
     staleTime: Number.POSITIVE_INFINITY,
   });
 
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['commlinks.list', { page, search: debouncedSearch, category }],
-    queryFn: () =>
-      api.commLinks.list({ search: debouncedSearch || undefined, category: category || undefined, page, limit: LIMIT }),
+  const { data, isLoading, error, refetch, search, updateSearch, goToPage, resetListState } = useEntityList<CommLink>({
+    key: 'commlinks.list',
+    filters: { category },
+    limit: LIMIT,
+    initialSearch: searchParams?.get('search') ?? '',
+    fetcher: ({ page, limit, search }) => api.commLinks.list({ search, category: category || undefined, page, limit }),
   });
 
   const entries = data?.data ?? [];
@@ -197,7 +196,7 @@ export default function CommLinksPage() {
     return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 10);
   }, [entries]);
 
-  const hasFilters = !!(debouncedSearch || category);
+  const hasFilters = !!(search || category);
 
   return (
     <PageShell>
@@ -207,10 +206,7 @@ export default function CommLinksPage() {
         countLabel="articles"
         search={search}
         searchPlaceholder="Search title or content..."
-        onSearch={(v) => {
-          setSearch(v);
-          setPage(1);
-        }}
+        onSearch={updateSearch}
       />
 
       {categories && categories.length > 0 && (
@@ -220,16 +216,14 @@ export default function CommLinksPage() {
             selected={category}
             onSelect={(value) => {
               setCategory(value);
-              setPage(1);
             }}
             className="mb-0"
           />
           {hasFilters && (
             <ListFilterResetButton
               onClick={() => {
-                setSearch('');
+                resetListState();
                 setCategory('');
-                setPage(1);
               }}
             />
           )}
@@ -281,7 +275,6 @@ export default function CommLinksPage() {
                       type="button"
                       onClick={() => {
                         setCategory(name);
-                        setPage(1);
                       }}
                       className="flex w-full items-center justify-between rounded-sm border border-slate-800 bg-slate-950/20 px-3 py-2 text-left transition-colors hover:border-cyan-700/60"
                     >
@@ -296,7 +289,7 @@ export default function CommLinksPage() {
 
           {(data?.pages ?? 0) > 1 && (
             <div className="mt-4">
-              <Pagination page={page} totalPages={data?.pages ?? 1} onPageChange={setPage} />
+              <Pagination page={data?.page ?? 1} totalPages={data?.pages ?? 1} onPageChange={goToPage} />
             </div>
           )}
         </>

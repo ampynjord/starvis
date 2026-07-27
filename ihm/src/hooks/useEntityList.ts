@@ -31,6 +31,8 @@ export interface UseEntityListOptions<T> {
    * Amorcer un état différent servirait silencieusement le mauvais contenu.
    */
   initialDataMatches?: boolean;
+  /** Recherche de départ, pour les pages dont l'URL porte un terme (`?search=`). */
+  initialSearch?: string;
   searchDelay?: number;
 }
 
@@ -66,10 +68,11 @@ export function useEntityList<T>({
   limit,
   initialData,
   initialDataMatches = false,
+  initialSearch = '',
   searchDelay = 350,
 }: UseEntityListOptions<T>): UseEntityListResult<T> {
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(initialSearch);
   const debouncedSearch = useDebounce(search, searchDelay);
 
   // Retour à la première page quand les filtres changent. Fait pendant le rendu

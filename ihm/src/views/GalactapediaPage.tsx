@@ -1,6 +1,5 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { BookOpen, Globe, Layers } from 'lucide-react';
 import Image from 'next/image';
@@ -15,7 +14,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { PageShell } from '@/components/ui/PageShell';
 import { Pagination } from '@/components/ui/Pagination';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
-import { useDebounce } from '@/hooks/useDebounce';
+import { useEntityList } from '@/hooks/useEntityList';
 import { api } from '@/services/api';
 import type { GalactapediaEntry } from '@/types/api';
 
@@ -143,16 +142,16 @@ function GalactapediaCard({ entry }: { entry: GalactapediaEntry }) {
 export default function GalactapediaPage() {
   const searchParams = useSearchParams();
 
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState(searchParams?.get('search') ?? '');
   const [category, setCategory] = useState(searchParams?.get('category') ?? '');
   const [letter, setLetter] = useState('');
-  const debouncedSearch = useDebounce(search, 350);
 
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['galactapedia.list', { page, search: debouncedSearch, category, letter }],
-    queryFn: () =>
-      api.galactapedia.list({ search: debouncedSearch || undefined, category: category || undefined, letter: letter || undefined, page, limit: LIMIT }),
+  const { data, isLoading, error, refetch, search, updateSearch, goToPage, resetListState } = useEntityList<GalactapediaEntry>({
+    key: 'galactapedia.list',
+    filters: { category, letter },
+    limit: LIMIT,
+    initialSearch: searchParams?.get('search') ?? '',
+    fetcher: ({ page, limit, search }) =>
+      api.galactapedia.list({ search, category: category || undefined, letter: letter || undefined, page, limit }),
   });
 
   const entries = data?.data ?? [];
@@ -175,13 +174,12 @@ export default function GalactapediaPage() {
     return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 10);
   }, [entries]);
 
-  const hasFilters = !!(debouncedSearch || category || letter);
+  const hasFilters = !!(search || category || letter);
 
   function resetAll() {
-    setSearch('');
+    resetListState();
     setCategory('');
     setLetter('');
-    setPage(1);
   }
 
   return (
@@ -192,17 +190,14 @@ export default function GalactapediaPage() {
         countLabel="articles"
         search={search}
         searchPlaceholder="Search lore entries..."
-        onSearch={(v) => {
-          setSearch(v);
-          setPage(1);
-        }}
+        onSearch={updateSearch}
       />
 
       {/* Alphabetical navigation */}
       <div className="flex flex-wrap items-center gap-0.5 border-b border-slate-800/60 pb-3">
         <button
           type="button"
-          onClick={() => { setLetter(''); setPage(1); }}
+          onClick={() => { setLetter(''); }}
           className={`rounded-sm px-2 py-1 font-mono-sc text-[10px] uppercase tracking-widest transition-colors ${!letter ? 'bg-purple-950/40 text-purple-300 border border-purple-700/50' : 'text-slate-600 hover:text-slate-300'}`}
         >
           All
@@ -211,7 +206,7 @@ export default function GalactapediaPage() {
           <button
             key={l}
             type="button"
-            onClick={() => { setLetter(l === letter ? '' : l); setPage(1); }}
+            onClick={() => { setLetter(l === letter ? '' : l); }}
             className={`rounded-sm px-1.5 py-1 font-mono-sc text-[10px] uppercase tracking-widest transition-colors ${l === letter ? 'bg-purple-950/40 text-purple-300 border border-purple-700/50' : 'text-slate-600 hover:text-purple-400'}`}
           >
             {l}
@@ -226,7 +221,6 @@ export default function GalactapediaPage() {
             selected={category}
             onSelect={(value) => {
               setCategory(value);
-              setPage(1);
             }}
             className="mb-0"
           />
@@ -246,7 +240,7 @@ export default function GalactapediaPage() {
         <>
           <div className="grid gap-4 xl:grid-cols-[1fr_280px]">
             <div className="space-y-4">
-              {featured && !letter && !category && !debouncedSearch && (
+              {featured && !letter && !category && !search && (
                 <FeaturedEntry entry={featured} />
               )}
 
@@ -261,7 +255,7 @@ export default function GalactapediaPage() {
                   )}
                 </div>
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-                  {(letter || category || debouncedSearch ? entries : library).map((entry, i) => (
+                  {(letter || category || search ? entries : library).map((entry, i) => (
                     <motion.div
                       key={entry.id}
                       initial={{ opacity: 0, y: 8 }}
@@ -288,7 +282,6 @@ export default function GalactapediaPage() {
                       type="button"
                       onClick={() => {
                         setCategory(name === category ? '' : name);
-                        setPage(1);
                       }}
                       className={`flex w-full items-center justify-between rounded-sm border px-3 py-2 text-left transition-colors ${name === category ? 'border-purple-700/60 bg-purple-950/20' : 'border-slate-800 bg-slate-950/20 hover:border-purple-700/60'}`}
                     >
@@ -303,7 +296,7 @@ export default function GalactapediaPage() {
 
           {(data?.pages ?? 0) > 1 && (
             <div className="mt-4">
-              <Pagination page={page} totalPages={data?.pages ?? 1} onPageChange={setPage} />
+              <Pagination page={data?.page ?? 1} totalPages={data?.pages ?? 1} onPageChange={goToPage} />
             </div>
           )}
         </>

@@ -76,6 +76,17 @@ describe('useEntityList', () => {
     await waitFor(() => expect(unmatched.result.current.items).toEqual(['réseau']));
   });
 
+  it('démarre sur la recherche fournie par l’URL', async () => {
+    const fetcher = vi.fn().mockResolvedValue(page(['a']));
+    const { result } = renderHook(
+      () => useEntityList({ key: 'commlinks.list', fetcher, limit: 30, initialSearch: 'idris' }),
+      { wrapper },
+    );
+
+    expect(result.current.search).toBe('idris');
+    await waitFor(() => expect(fetcher).toHaveBeenCalledWith({ page: 1, limit: 30, search: 'idris' }));
+  });
+
   it('remet la pagination à zéro lors d’une recherche', async () => {
     const fetcher = vi.fn().mockResolvedValue(page(['a']));
     const { result } = renderHook(() => useEntityList({ key: 'ships.list', fetcher, limit: 24 }), { wrapper });

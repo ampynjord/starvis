@@ -16,14 +16,14 @@ import { GlowBadge } from '@/components/ui/GlowBadge';
 import { EconomyNav } from '@/components/economy/EconomyNav';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PageShell } from '@/components/ui/PageShell';
-import { useListQueryState } from '@/hooks/useListQueryState';
+import { useEntityList } from '@/hooks/useEntityList';
+import type { Commodity } from '@/types/api';
 
 const LIMIT = 30;
 
 export default function CommoditiesPage() {
   const pathname = usePathname();
   const { env } = useEnv();
-  const { page, search, debouncedSearch, updateSearch, updatePageWithScroll, setPage } = useListQueryState();
   const [activeCategory, setActiveCategory] = useState('All');
 
   const { data: categories } = useQuery({
@@ -32,15 +32,18 @@ export default function CommoditiesPage() {
     staleTime: Infinity,
   });
 
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['commodities.list', env, { page, search: debouncedSearch, category: activeCategory }],
-    queryFn: () => api.commodities.list({
-      env,
-      page,
-      limit: LIMIT,
-      search: debouncedSearch || undefined,
-      category: activeCategory === 'All' ? undefined : activeCategory,
-    }),
+  const { data, isLoading, error, refetch, search, updateSearch, goToPage } = useEntityList<Commodity>({
+    key: 'commodities.list',
+    filters: { env, category: activeCategory },
+    limit: LIMIT,
+    fetcher: ({ page, limit, search }) =>
+      api.commodities.list({
+        env,
+        page,
+        limit,
+        search,
+        category: activeCategory === 'All' ? undefined : activeCategory,
+      }),
   });
 
   const isIndustrial = pathname?.startsWith('/industrial');
@@ -69,13 +72,13 @@ export default function CommoditiesPage() {
         {(categories ?? []).length > 0 && (
           <ListFilterSelect
             value={activeCategory === 'All' ? '' : activeCategory}
-            onChange={(value) => { setActiveCategory(value || 'All'); setPage(1); }}
+            onChange={(value) => { setActiveCategory(value || 'All'); }}
             allLabel="All categories"
             options={(categories ?? []).map((c) => ({ value: c.label, label: c.label, count: c.count }))}
           />
         )}
         {activeCategory !== 'All' && (
-          <ListFilterResetButton onClick={() => { setActiveCategory('All'); setPage(1); }} />
+          <ListFilterResetButton onClick={() => { setActiveCategory('All'); }} />
         )}
       </ListFilterBar>
 
@@ -105,7 +108,7 @@ export default function CommoditiesPage() {
                 </motion.div>
               ))}
             </div>
-            {data && <Pagination className="mt-6" page={data.page} totalPages={data.pages} onPageChange={updatePageWithScroll} />}
+            {data && <Pagination className="mt-6" page={data.page} totalPages={data.pages} onPageChange={goToPage} />}
           </>
         )}
     </PageShell>
