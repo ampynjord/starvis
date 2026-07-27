@@ -16,14 +16,17 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { useListQueryState } from '@/hooks/useListQueryState';
 import { ListFilterBar, ListFilterResetButton, ListFilterSelect } from '@/components/ui/ListFilters';
+import {
+  DEFAULT_SHIP_ORDER,
+  DEFAULT_SHIP_SORT,
+  resolveShipCategory,
+  SHIP_CATEGORIES,
+  SHIPS_LIST_LIMIT,
+} from '@/lib/ships-list';
+import type { PaginatedResponse, ShipListItem } from '@/types/api';
 
-const LIMIT = 24;
-
-const CATEGORIES = [
-  { value: 'ship',    label: 'Ships' },
-  { value: 'ground',  label: 'Ground Vehicles' },
-  { value: 'gravlev', label: 'Grav-Lev' },
-] as const;
+const LIMIT = SHIPS_LIST_LIMIT;
+const CATEGORIES = SHIP_CATEGORIES;
 
 const SORT_OPTIONS: { value: string; label: string; categories: string[] }[] = [
   { value: 'name',           label: 'Name',       categories: ['ship', 'ground', 'gravlev'] },
@@ -46,10 +49,15 @@ function formatStatusLabel(value: string): string {
   return STATUS_LABELS[value] ?? value.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
-export default function ShipsPage() {
+/**
+ * `initialList` est la première page déjà chargée par la page serveur. Elle n'est
+ * réutilisée que si l'état courant correspond exactement à ce qu'elle contient —
+ * sinon react-query refait la requête normalement.
+ */
+export default function ShipsPage({ initialList }: { initialList?: PaginatedResponse<ShipListItem> | null } = {}) {
   const { env } = useEnv();
   const searchParams = useSearchParams();
-  const initialCat = CATEGORIES.find(c => c.value === searchParams.get('cat'))?.value ?? 'ship';
+  const initialCat = resolveShipCategory(searchParams.get('cat'));
   const {
     page,
     search,
@@ -75,8 +83,25 @@ export default function ShipsPage() {
     staleTime: Infinity,
   });
 
+  // La page serveur ne charge que la première page LIVE, sans filtre ni
+  // recherche, pour la catégorie demandée. Hors de ce cas exact, on laisse
+  // react-query interroger l'API.
+  const matchesServerQuery =
+    env === 'live' &&
+    page === 1 &&
+    !debouncedSearch &&
+    !manufacturer &&
+    !status &&
+    !role &&
+    !career &&
+    !variantType &&
+    category === initialCat &&
+    sort === DEFAULT_SHIP_SORT &&
+    order === DEFAULT_SHIP_ORDER;
+
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['ships.list', env, { page, search: debouncedSearch, manufacturer, status, role, career, variantType, category, sort, order }],
+    initialData: matchesServerQuery ? (initialList ?? undefined) : undefined,
     queryFn: () => api.ships.list({
       env,
       page,

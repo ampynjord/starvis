@@ -5,7 +5,8 @@ export interface PaginatedResponse<T> {
   page: number;
   limit: number;
   pages: number;
-  count: number;
+  /** Nombre d'éléments de la page courante — absent sur les endpoints non JSend. */
+  count?: number;
 }
 
 // ─── Overview ─────────────────────────────────────────────────────────────────

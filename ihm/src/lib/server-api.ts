@@ -47,6 +47,13 @@ export async function serverGet<T>(
     });
     if (!res.ok) return null;
     const json = ((await res.json().catch(() => null)) as JsonObject | null) ?? {};
+    // Liste paginée au format JSend : la pagination vit sous `meta`. L'aplatir
+    // donne la même forme que les listes non JSend — sans quoi le déballage
+    // générique ci-dessous ne rendrait que le tableau, sans total ni pages.
+    const meta = json.meta as JsonObject | undefined;
+    if (Array.isArray(json.data) && meta && typeof meta.total === 'number') {
+      return { ...meta, data: json.data } as T;
+    }
     if ('success' in json && 'data' in json && typeof json.total !== 'number') return json.data as T;
     return json as T;
   } catch {
