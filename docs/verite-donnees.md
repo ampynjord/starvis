@@ -359,9 +359,28 @@ Trois choses en découlent :
   conservé dans `game_name`. Cela valide indépendamment le choix de coupe ;
 - il nomme les vaisseaux que `global.ini` laisse anonymes.
 
-**À faire** : un module d'enrichissement qui ne comble que les noms manquants,
-sans jamais écraser ce que le jeu fournit. Ce serait la troisième source du
-croisement, après le P4K et le Ship Matrix.
+**Fait (étape 3)** — `nameShipsFromCommunityWiki`, deuxième règle nommée de la
+couche. Elle interroge le wiki pour les seuls vaisseaux que ni RSI ni `global.ini`
+ne nomment, et n'écrase jamais une source primaire : une source tierce, si utile
+soit-elle, ne fait pas autorité contre le jeu — elle ne parle que là où il se
+tait.
+
+Trois garanties, parce qu'une dépendance réseau dans une extraction est un risque :
+
+- la réponse est **rejetée si son `class_name` diffère** de celui demandé — le
+  slug aurait mené ailleurs, et accepter renommerait un vaisseau avec le nom
+  d'un autre, silencieusement et durablement ;
+- après **trois échecs d'affilée**, la règle abandonne : un wiki hors ligne
+  coûterait sinon un délai d'attente par vaisseau ;
+- un échec ne modifie rien et n'interrompt pas l'extraction. Le pire cas est
+  l'état d'avant.
+
+Le décompte final distingue « nommés » et « inconnus ou injoignables » : sans
+cela, un wiki hors service produirait la même trace qu'un wiki qui ne connaît
+aucun de ces vaisseaux.
+
+Exemple de ce qu'elle comble : `ARGO_ATLS_GEO_Collector_Grad01`, que le jeu ne
+nomme pas, devient « ATLS Snowland Color ».
 
 187 pilotables sur 236 sont rattachés (79,2 %). Les 49 restants sont surtout des
 variantes et des véhicules de sol, que RSI ne référence pas individuellement.

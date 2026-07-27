@@ -45,6 +45,7 @@ import {
 import { captureExtractionSnapshot, cleanStaleGameData, restoreCtmUrls } from './extraction-state.js';
 import { LocalizationService } from './localization-service.js';
 import { RsiSyncService } from './rsi-sync-service.js';
+import { nameShipsFromCommunityWiki } from './sc-wiki-ship-names.js';
 import { nameShipsMissingFromShipMatrix } from './ship-naming.js';
 
 export type { ExtractionModule, GameEnv };
@@ -358,6 +359,14 @@ export class ExtractionService {
         // Ne touche que les vaisseaux sans entrée au Ship Matrix, dont le nom
         // interne remonte tel quel à l'affichage faute de nom commercial RSI.
         await nameShipsMissingFromShipMatrix(conn, env, this.locService, onProgress);
+        // Dernier recours pour les vaisseaux que ni RSI ni le jeu ne nomment.
+        // Source tierce, donc jamais prioritaire : elle ne parle que là où les
+        // deux précédentes se taisent, et un échec réseau ne change rien.
+        try {
+          await nameShipsFromCommunityWiki(conn, env, this.locService, onProgress);
+        } catch (e) {
+          onProgress?.(`Community wiki naming skipped: ${(e as Error).message}`);
+        }
         // Recompute ship market summaries from existing shop inventory data whenever
         // ships are re-extracted, even when the shops module is not in this run.
         if (!run('shops')) {
