@@ -215,20 +215,23 @@ async function auditEntities() {
   requireCoverage('items', items, 'type', 1);
   // Un libellé toléré : « CBD HAT 03 01 CFP Var2 », que l'étape 2 doit reprendre.
   requireHumanNames('items', items, 1);
-  // 9,9 % au relevé du 27/07 : vêtements et munitions, les familles que la
-  // localisation du jeu ne couvre pas.
-  requireLocalizedNames('items', items, 0.1);
+  // 9,9 % avant que les clés de localisation cessent d'être jetées, 0,5 % après.
+  // Le plafond descend avec le défaut : c'est ce qui empêche une régression de
+  // repasser inaperçue. Un seuil qui ne bouge jamais est un seuil que plus
+  // personne ne lit.
+  requireLocalizedNames('items', items, 0.01);
 
   const commodities = await getAll('/commodities', { env });
   requireCoverage('commodities', commodities, 'name', 1);
   requireHumanNames('commodities', commodities);
-  // Plafond à 100 % : les marchandises n'ont AUCUN libellé localisé, toutes sont
-  // fabriquées depuis l'identifiant. La plupart passent inaperçues parce que
-  // l'identifiant était déjà un mot (« Agricium »), mais le procédé produit aussi
-  // « Agriculturalsupplies » et « Agricium ORE ». Le contrôle ne peut donc rien
-  // bloquer ici — il rend le trou visible à chaque exécution, en attendant que
-  // l'étape 2 branche la localisation et fasse descendre ce plafond.
-  requireLocalizedNames('commodities', commodities, 1);
+  // 100 % avant correction, 76 % après — et ce reste n'est plus un défaut : le
+  // libellé résolu coïncide simplement avec l'identifiant, « Agricium » restant
+  // « Agricium ». La mesure ne sait pas distinguer les deux cas ; sa limite est
+  // écrite ici plutôt que masquée par un chiffre flatteur.
+  //
+  // Ce que le contrôle garde de vivant à ce niveau, c'est l'alerte si la part
+  // remontait vers 100 % — signe que la résolution aurait cessé d'opérer.
+  requireLocalizedNames('commodities', commodities, 0.8);
 
   return { flyable };
 }

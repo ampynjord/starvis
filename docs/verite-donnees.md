@@ -126,10 +126,39 @@ endroits**, chacun effaçant silencieusement un libellé manquant.
 | `extractor/src/extractors/shop-paint-extractor.ts` | 39 |
 | `extractor/src/extractors/game-insight-extractor.ts` | 70 |
 
-**À corriger étape 2** : un seul point de repli, qui **marque** ce qu'il fabrique
-plutôt que de le maquiller, puis brancher la localisation là où elle manque —
-marchandises d'abord. Un libellé absent vaut mieux qu'un libellé faux : il se
-compte.
+**Corrigé (étape 2).** Les clés ne sont plus jetées : `classifyNameValue` nomme
+les trois cas, et la résolution suit un ordre explicite — clé portée par
+l'enregistrement, puis recherche par `class_name`, puis mise en forme
+typographique qui n'invente rien.
+
+Mesuré après réextraction du 4.9.0 :
+
+| Entité | Avant | Après |
+|---|---|---|
+| Objets | 548 (9,9 %) | **30 (0,5 %)** |
+| Marchandises | 135 (100 %) | 103 (76,3 %) |
+
+Les 103 marchandises restantes ne sont plus un défaut : leur libellé **résolu**
+coïncide avec l'identifiant, « Agricium » restant « Agricium ». La mesure ne sait
+pas séparer les deux cas — c'est sa limite, énoncée plutôt que masquée. Ce que le
+plafond garde d'utile, c'est l'alerte si la part remontait vers 100 %, signe que
+la résolution aurait cessé de fonctionner.
+
+Les 30 objets résiduels sont des variantes de teinte, des éditions boutique et
+des assets d'éditeur (`customizer_pants`, `Mannequin_NoDraw_PMA_Shirt`,
+`behr_rifle_ballistic_01_sf01`). Le jeu ne les nomme pas, et certains n'ont
+probablement rien à faire dans un wiki : **à arbitrer à l'étape 2 bis**, sous
+l'angle « importer ce qui sert » plutôt que celui du libellé.
+
+> **Appliqué en production le 27/07/2026** par une extraction ciblée
+> (`--modules items,commodities`), via tunnel SSH sur le port 5433. Les plafonds
+> de l'audit ont été resserrés dans la foulée, une fois le code et les données
+> alignés — les descendre avant aurait fait échouer la CI sur un décalage qui ne
+> dit rien de la qualité.
+>
+> ```bash
+> npm run extract --workspace=@starvis/extractor -- --modules items,commodities --env live --prod-db
+> ```
 
 ### D3 — Les loadouts, deux problèmes en un
 
