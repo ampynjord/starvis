@@ -8,6 +8,33 @@ import type { DataForgeContext } from '../dataforge/dataforge-utils.js';
 import { classifyNameValue, resolveComponentName } from '../dataforge/dataforge-utils.js';
 import logger from '../logger.js';
 
+/**
+ * L'identifiant désigne-t-il un asset de développement, à ne pas importer ?
+ *
+ * Le filtre précédent testait des sous-chaînes nues : `lcName.includes('_temp')`
+ * écartait donc **`MISL_S02_CS_FSKI_Tempest`**, un missile bien réel monté sur
+ * 160 ports de vaisseaux, au motif que son nom commence par « temp ». Le rejet
+ * était silencieux — le composant n'existait simplement pas, et les loadouts qui
+ * le portent paraissaient incomplets.
+ *
+ * Les marqueurs sont donc ancrés sur des frontières de segment. Le schéma de
+ * nommage de CIG sépare par `_` : `_temp_` ou `_temp` en fin de nom désigne bien
+ * un provisoire, `_tempest` non.
+ *
+ * Le filtre de visibilité côté API utilisait déjà cette forme ancrée ; c'est
+ * l'extracteur qui avait la version naïve, et c'est lui qui décide de ce qui
+ * entre en base.
+ */
+export function isDevelopmentAsset(className: string): boolean {
+  const lc = className.toLowerCase();
+  return (
+    /(?:^|_)(?:temp|test|debug|template|temporary|placeholder|indestructible)(?:_|$)/.test(lc) ||
+    lc.includes('_npc_only') ||
+    lc.includes('contestedzonereward') ||
+    lc.startsWith('display_')
+  );
+}
+
 function mapAttachDefGrade(grade: unknown): string | null {
   if (typeof grade !== 'number' || grade < 1) return null;
   if (grade === 1) return 'A';
@@ -115,21 +142,7 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
       const className = r.name?.replace('EntityClassDefinition.', '') || '';
       if (!className) continue;
       const lcName = className.toLowerCase();
-      if (
-        lcName.includes('_test') ||
-        lcName.startsWith('test_') ||
-        lcName.includes('_debug') ||
-        lcName.includes('_template') ||
-        lcName.includes('_temp') ||
-        lcName.startsWith('temp_') ||
-        lcName.includes('_temporary') ||
-        lcName.includes('_indestructible') ||
-        lcName.includes('_npc_only') ||
-        lcName.includes('_placeholder') ||
-        lcName.includes('contestedzonereward') ||
-        lcName.startsWith('display_')
-      )
-        continue;
+      if (isDevelopmentAsset(lcName)) continue;
 
       // Skip FPS weapons (personal weapons, not ship components)
       if (type === 'WeaponGun') {
