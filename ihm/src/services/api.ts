@@ -100,6 +100,13 @@ async function get<T>(path: string, params?: Record<string, string | number | bo
   if (!res.ok) throw new Error(String(json.error ?? '') || `HTTP ${res.status}: ${res.statusText}`);
   // Paginated list: numeric 'total' AND array 'data' at top level → return full response
   if (typeof json.total === 'number' && Array.isArray(json.data)) return json as unknown as T;
+  // Liste paginée au format JSend : la pagination vit sous `meta` et non à la
+  // racine. On l'aplatit pour que l'appelant reçoive la même forme que ci-dessus,
+  // au lieu de tomber dans le déballage générique qui ne rendrait que le tableau.
+  const meta = json.meta as Record<string, unknown> | undefined;
+  if (Array.isArray(json.data) && meta && typeof meta.total === 'number') {
+    return { ...meta, data: json.data } as unknown as T;
+  }
   // Wrapped response: {success: true, data: T} → unwrap
   if ('success' in json && 'data' in json) return json.data as T;
   return json as unknown as T;
