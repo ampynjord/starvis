@@ -15,7 +15,7 @@ import { ErrorState } from "@/components/ui/ErrorState";
 import { GlowBadge } from "@/components/ui/GlowBadge";
 import { SmartTag } from '@/components/ui/SmartTag';
 import { generateItemTags } from '@/lib/smart-tags';
-import { useListQueryState } from "@/hooks/useListQueryState";
+import { useEntityList } from "@/hooks/useEntityList";
 import { ITEM_TYPE_LABELS } from "@/utils/constants";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { PageShell } from "@/components/ui/PageShell";
@@ -232,10 +232,6 @@ const GROUP_ALL_KEY: Record<string, string> = {
 export default function ItemsPage({ group }: ItemsPageProps = {}) {
 	const pathname = usePathname();
 	const { env } = useEnv();
-	const {
-		page, search, debouncedSearch,
-		updateSearch, updatePageWithScroll, resetListState, setPage,
-	} = useListQueryState();
 
 	// Derive taxonomy group from URL if not passed as prop
 	const resolvedGroup: TaxonomyGroup = group
@@ -283,33 +279,28 @@ export default function ItemsPage({ group }: ItemsPageProps = {}) {
 	const selectSlug = (slug: FpsSlug | "all") => {
 		setActiveSlug(slug);
 		setSubType("");
-		setPage(1);
 	};
 
 	const fpsSubTypeOptions = navigation?.fpsSubTypeOptions[activeSlug as FpsSlug] ?? [];
 
 	// Build query call
 	const groupAllKey = resolvedGroup ? (GROUP_ALL_KEY[resolvedGroup] ?? 'fps_all') : 'fps_all';
-	const queryKey = ["items.list", resolvedGroup, env, activeSlug, page, debouncedSearch, subType, manufacturer];
-
-	const { data, isLoading, error, refetch } = useQuery({
-		queryKey,
-		queryFn: () => {
-			const base = {
-				env,
-				page,
-				limit: LIMIT,
-				search: debouncedSearch || undefined,
-				sub_type: subType || undefined,
-				manufacturer: manufacturer || undefined,
-			};
-			// "all" on a grouped page → use the group's aggregate query
+	const {
+		data, isLoading, error, refetch,
+		search, debouncedSearch, updateSearch, goToPage, resetListState,
+	} = useEntityList<ItemListItem>({
+		key: "items.list",
+		filters: { group: resolvedGroup, env, slug: activeSlug, subType, manufacturer },
+		limit: LIMIT,
+		enabled: !!navigation,
+		fetcher: ({ page, limit, search }) => {
+			const base = { env, page, limit, search, sub_type: subType || undefined, manufacturer: manufacturer || undefined };
+			// "all" sur une page groupée -> requête agrégée du groupe
 			if (activeSlug === "all" || activeSlug === resolvedGroup) {
 				return api.items.list({ ...base, item_group: groupAllKey });
 			}
 			return api.items.category(activeSlug, base);
 		},
-		enabled: !!navigation,
 	});
 
 	const showAmmoInsights = resolvedGroup === "ammo";
@@ -376,7 +367,7 @@ export default function ItemsPage({ group }: ItemsPageProps = {}) {
 				{!isFiltersLoading && fpsSubTypeOptions.length > 0 && (
 					<ListFilterSelect
 						value={subType}
-						onChange={(value) => { setSubType(value); setPage(1); }}
+						onChange={(value) => { setSubType(value); }}
 						allLabel={resolvedGroup === "weapons" ? "All weapon types" : resolvedGroup === "armor" ? "All weights" : "All types"}
 						options={fpsSubTypeOptions.map((option) => ({ value: option.value, label: option.label }))}
 					/>
@@ -384,7 +375,7 @@ export default function ItemsPage({ group }: ItemsPageProps = {}) {
 				{!isFiltersLoading && (mfrData?.manufacturers ?? []).length > 0 && (
 					<ListFilterSelect
 						value={manufacturer}
-						onChange={(value) => { setManufacturer(value); setPage(1); }}
+						onChange={(value) => { setManufacturer(value); }}
 						allLabel="All manufacturers"
 						options={(mfrData?.manufacturers ?? []).map((m) => ({ value: m.code, label: m.name }))}
 					/>
@@ -479,7 +470,7 @@ export default function ItemsPage({ group }: ItemsPageProps = {}) {
 							className="mt-6"
 							page={data.page}
 							totalPages={data.pages}
-							onPageChange={updatePageWithScroll}
+							onPageChange={goToPage}
 						/>
 					)}
 				</>

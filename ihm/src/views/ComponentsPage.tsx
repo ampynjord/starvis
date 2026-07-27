@@ -11,7 +11,7 @@ import { Pagination } from "@/components/ui/Pagination";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { GlowBadge } from "@/components/ui/GlowBadge";
-import { useListQueryState } from "@/hooks/useListQueryState";
+import { useEntityList } from "@/hooks/useEntityList";
 import {
   COMPONENT_TYPE_COLORS,
   COMPONENT_TYPE_LABELS,
@@ -177,7 +177,6 @@ function ComponentMetricStrip({ comp }: { comp: ComponentListItem }) {
 
 export default function ComponentsPage() {
   const { env } = useEnv();
-  const { page, search, debouncedSearch, setPage, updateSearch, updatePageWithScroll } = useListQueryState();
 
   // Category tab and optional curated subcategory within that category.
   const [categoryIdx, setCategoryIdx] = useState(0);
@@ -215,37 +214,32 @@ export default function ComponentsPage() {
     setComponentClass("");
     setBespoke("");
     setManufacturer("");
-    setPage(1);
   }
 
   function handleSubcategorySelect(key: string) {
     setSelectedSubcategoryKey(key);
-    setPage(1);
   }
 
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: [
-      "components.list",
+  const { data, isLoading, error, refetch, search, updateSearch, goToPage } = useEntityList<ComponentListItem>({
+    key: "components.list",
+    filters: {
       env,
-      {
-        page,
-        search: debouncedSearch,
-        category: category.slug,
-        subcategory: selectedSubcategoryKey,
-        weaponDamageType,
-        size,
-        grade,
-        componentClass,
-        bespoke,
-        manufacturer,
-      },
-    ],
-    queryFn: () =>
+      category: category.slug,
+      subcategory: selectedSubcategoryKey,
+      weaponDamageType,
+      size,
+      grade,
+      componentClass,
+      bespoke,
+      manufacturer,
+    },
+    limit: LIMIT,
+    fetcher: ({ page, limit, search }) =>
       api.components.list({
         env,
         page,
-        limit: LIMIT,
-        search: debouncedSearch || undefined,
+        limit,
+        search,
         category: category.slug,
         types: selectedSubcategory?.types?.join(",") || undefined,
         sub_types: selectedSubcategory?.subTypes?.join(",") || undefined,
@@ -301,7 +295,6 @@ export default function ComponentsPage() {
           selected={weaponDamageType}
           onSelect={(value) => {
             setWeaponDamageType(value);
-            setPage(1);
           }}
           allLabel="All damage"
         />
@@ -312,7 +305,7 @@ export default function ComponentsPage() {
         {filterConfig.size && (filters?.sizes ?? []).length > 0 && (
           <ListFilterSelect
             value={size}
-            onChange={(value) => { setSize(value); setPage(1); }}
+            onChange={(value) => { setSize(value); }}
             allLabel="All sizes"
             options={[...new Set((filters?.sizes ?? []).map(Number))].sort((a, b) => a - b).map((s) => ({ value: String(s), label: `S${s}` }))}
           />
@@ -320,7 +313,7 @@ export default function ComponentsPage() {
         {filterConfig.grade && (filters?.grades?.length ?? 0) > 0 && (
           <ListFilterSelect
             value={grade}
-            onChange={(value) => { setGrade(value); setPage(1); }}
+            onChange={(value) => { setGrade(value); }}
             allLabel="All grades"
             options={(filters?.grades ?? []).map((item) => ({ value: item, label: item }))}
           />
@@ -328,7 +321,7 @@ export default function ComponentsPage() {
         {filterConfig.componentClass && COMPONENT_CLASS_FILTERS.length > 0 && (
           <ListFilterSelect
             value={componentClass}
-            onChange={(value) => { setComponentClass(value); setPage(1); }}
+            onChange={(value) => { setComponentClass(value); }}
             allLabel="All classes"
             options={[...new Map<string, { value: string; label?: string; count?: number }>([
               ...COMPONENT_CLASS_FILTERS.map((value) => [value, { value, label: value }] as const),
@@ -342,7 +335,7 @@ export default function ComponentsPage() {
         {filterConfig.manufacturer && (filters?.manufacturers?.length ?? 0) > 0 && (
           <ListFilterSelect
             value={manufacturer}
-            onChange={(value) => { setManufacturer(value); setPage(1); }}
+            onChange={(value) => { setManufacturer(value); }}
             allLabel="All manufacturers"
             options={(filters?.manufacturers ?? []).map((item) => ({ value: item.value, label: item.label ?? item.value }))}
           />
@@ -350,7 +343,7 @@ export default function ComponentsPage() {
         {filterConfig.bespoke && (
           <ListFilterSelect
             value={bespoke}
-            onChange={(value) => { setBespoke(value); setPage(1); }}
+            onChange={(value) => { setBespoke(value); }}
             allLabel="All fitment"
             options={[
               { value: "false", label: "Universal" },
@@ -458,7 +451,7 @@ export default function ComponentsPage() {
               className="mt-6"
               page={data.page}
               totalPages={data.pages}
-              onPageChange={updatePageWithScroll}
+              onPageChange={goToPage}
             />
           )}
         </>

@@ -32,7 +32,7 @@ import {
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import type { Mission } from '@/types/api';
+import type { Mission, MissionListResponse } from '@/types/api';
 import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -44,7 +44,7 @@ import { PageShell } from '@/components/ui/PageShell';
 import { Pagination } from '@/components/ui/Pagination';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { ListFilterBar, ListFilterResetButton, ListFilterSelect } from '@/components/ui/ListFilters';
-import { useDebounce } from '@/hooks/useDebounce';
+import { useEntityList } from '@/hooks/useEntityList';
 
 const LIMIT = 40;
 
@@ -425,8 +425,6 @@ export default function MissionsPage() {
   const searchParams = useSearchParams();
   const { env } = useEnv();
 
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState(searchParams?.get('search') ?? '');
   const [type, setType] = useState('');
   const [legal, setLegal] = useState('');
   const [faction, setFaction] = useState('');
@@ -436,7 +434,6 @@ export default function MissionsPage() {
   const [blueprintOnly, setBlueprintOnly] = useState(false);
   const [sortBy, setSortBy] = useState<'default' | 'reward_desc' | 'reward_asc' | 'danger_desc'>('default');
   const [selectedUuid, setSelectedUuid] = useState<string | null>(searchParams?.get('selected') ?? null);
-  const debouncedSearch = useDebounce(search, 350);
 
   const { data: types } = useQuery({
     queryKey: ['missions.types', env],
@@ -454,18 +451,20 @@ export default function MissionsPage() {
     staleTime: Number.POSITIVE_INFINITY,
   });
 
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: [
-      'missions.list',
-      env,
-      { page, search: debouncedSearch, type, legal, sharing, faction, category, availability, blueprintOnly, sortBy },
-    ],
-    queryFn: () =>
+  const {
+    data, isLoading, error, refetch,
+    search, updateSearch, goToPage, resetListState,
+  } = useEntityList<Mission, MissionListResponse>({
+    key: 'missions.list',
+    filters: { env, type, legal, sharing, faction, category, availability, blueprintOnly, sortBy },
+    limit: LIMIT,
+    initialSearch: searchParams?.get('search') ?? '',
+    fetcher: ({ page, limit, search }) =>
       api.missions.list({
         env,
         page,
-        limit: LIMIT,
-        search: debouncedSearch || undefined,
+        limit,
+        search,
         type: type || undefined,
         legal: legal || undefined,
         shared: sharing || undefined,
@@ -477,7 +476,7 @@ export default function MissionsPage() {
       }),
   });
 
-  const hasFilters = !!(type || debouncedSearch || legal || sharing || faction || category || availability || blueprintOnly);
+  const hasFilters = !!(type || search || legal || sharing || faction || category || availability || blueprintOnly);
 
   const { data: selectedMissionFallback } = useQuery({
     queryKey: ['missions.single', selectedUuid, env],
@@ -509,8 +508,8 @@ export default function MissionsPage() {
   }, [displayedMissions, selectedUuid]);
 
   const resetAll = () => {
-    setType(''); setSearch(''); setLegal(''); setFaction('');
-    setCategory(''); setAvailability(''); setSharing(''); setBlueprintOnly(false); setSortBy('default'); setPage(1);
+    setType(''); resetListState(); setLegal(''); setFaction('');
+    setCategory(''); setAvailability(''); setSharing(''); setBlueprintOnly(false); setSortBy('default');
   };
 
   return (
@@ -521,7 +520,7 @@ export default function MissionsPage() {
         countLabel="missions"
         search={search}
         searchPlaceholder="Search mission, giver, class name…"
-        onSearch={(v) => { setSearch(v); setPage(1); }}
+        onSearch={updateSearch}
       />
 
       {data && (
@@ -591,7 +590,6 @@ export default function MissionsPage() {
               type="button"
               onClick={() => {
                 setBlueprintOnly((v) => !v);
-                setPage(1);
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-sm border text-[10px] font-mono-sc transition-colors ${
                 blueprintOnly
@@ -615,7 +613,6 @@ export default function MissionsPage() {
                 type="button"
                 onClick={() => {
                   setSortBy(val);
-                  setPage(1);
                 }}
                 className={`px-2 py-1 rounded-sm text-[10px] font-mono-sc border transition-colors ${
                   sortBy === val
@@ -633,37 +630,37 @@ export default function MissionsPage() {
       <ListFilterBar>
         <ListFilterSelect
           value={type}
-          onChange={(v) => { setType(v); setPage(1); }}
+          onChange={(v) => { setType(v); }}
           options={(types ?? []).map((t) => ({ label: getTypeMeta(t).label, value: t }))}
           allLabel="All mission types"
         />
         <ListFilterSelect
           value={faction}
-          onChange={(v) => { setFaction(v); setPage(1); }}
+          onChange={(v) => { setFaction(v); }}
           options={(factions ?? []).map((f) => ({ label: f, value: f }))}
           allLabel="All factions"
         />
         <ListFilterSelect
           value={category}
-          onChange={(v) => { setCategory(v); setPage(1); }}
+          onChange={(v) => { setCategory(v); }}
           options={(categories ?? []).map((c) => ({ label: c, value: c }))}
           allLabel="All categories"
         />
         <ListFilterSelect
           value={legal}
-          onChange={(v) => { setLegal(v); setPage(1); }}
+          onChange={(v) => { setLegal(v); }}
           options={[{ label: 'Legal', value: 'true' }, { label: 'Illegal', value: 'false' }]}
           allLabel="All legality"
         />
         <ListFilterSelect
           value={sharing}
-          onChange={(v) => { setSharing(v); setPage(1); }}
+          onChange={(v) => { setSharing(v); }}
           options={[{ label: 'Group', value: 'true' }, { label: 'Solo', value: 'false' }]}
           allLabel="All play"
         />
         <ListFilterSelect
           value={availability}
-          onChange={(v) => { setAvailability(v); setPage(1); }}
+          onChange={(v) => { setAvailability(v); }}
           options={[{ label: 'Unique', value: 'unique' }, { label: 'Repeatable', value: 'repeatable' }]}
           allLabel="All recurrence"
         />
@@ -703,7 +700,7 @@ export default function MissionsPage() {
               </div>
               {(data?.pages ?? 0) > 1 && (
                 <div className="mt-4">
-                  <Pagination page={page} totalPages={data!.pages} onPageChange={setPage} />
+                  <Pagination page={data?.page ?? 1} totalPages={data!.pages} onPageChange={goToPage} />
                 </div>
               )}
             </>
