@@ -14,7 +14,7 @@ import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { Pagination } from '@/components/ui/Pagination';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { useListQueryState } from '@/hooks/useListQueryState';
+import { useEntityList } from '@/hooks/useEntityList';
 import { ListFilterBar, ListFilterResetButton, ListFilterSelect } from '@/components/ui/ListFilters';
 import {
   DEFAULT_SHIP_ORDER,
@@ -58,15 +58,6 @@ export default function ShipsPage({ initialList }: { initialList?: PaginatedResp
   const { env } = useEnv();
   const searchParams = useSearchParams();
   const initialCat = resolveShipCategory(searchParams.get('cat'));
-  const {
-    page,
-    search,
-    debouncedSearch,
-    setPage,
-    updateSearch,
-    updatePageWithScroll,
-    resetListState,
-  } = useListQueryState();
 
   const [category, setCategory] = useState<string>(initialCat);
   const [manufacturer, setManufacturer] = useState('');
@@ -83,13 +74,12 @@ export default function ShipsPage({ initialList }: { initialList?: PaginatedResp
     staleTime: Infinity,
   });
 
+  const listFilters = { env, manufacturer, status, role, career, variantType, category, sort, order };
+
   // La page serveur ne charge que la première page LIVE, sans filtre ni
-  // recherche, pour la catégorie demandée. Hors de ce cas exact, on laisse
-  // react-query interroger l'API.
+  // recherche, pour la catégorie demandée et le tri par défaut.
   const matchesServerQuery =
     env === 'live' &&
-    page === 1 &&
-    !debouncedSearch &&
     !manufacturer &&
     !status &&
     !role &&
@@ -99,26 +89,39 @@ export default function ShipsPage({ initialList }: { initialList?: PaginatedResp
     sort === DEFAULT_SHIP_SORT &&
     order === DEFAULT_SHIP_ORDER;
 
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['ships.list', env, { page, search: debouncedSearch, manufacturer, status, role, career, variantType, category, sort, order }],
-    initialData: matchesServerQuery ? (initialList ?? undefined) : undefined,
-    queryFn: () => api.ships.list({
-      env,
-      page,
-      limit: LIMIT,
-      search: debouncedSearch || undefined,
-      manufacturer: manufacturer || undefined,
-      status: status || undefined,
-      role: role || undefined,
-      career: career || undefined,
-      variant_type: variantType || undefined,
-      vehicle_category: category,
-      sort,
-      order,
-    }),
+  const {
+    data,
+    isLoading,
+    error,
+    refetch,
+    search,
+    updateSearch,
+    goToPage,
+    resetListState,
+  } = useEntityList<ShipListItem>({
+    key: 'ships.list',
+    filters: listFilters,
+    limit: LIMIT,
+    initialData: initialList,
+    initialDataMatches: matchesServerQuery,
+    fetcher: ({ page, limit, search }) =>
+      api.ships.list({
+        env,
+        page,
+        limit,
+        search,
+        manufacturer: manufacturer || undefined,
+        status: status || undefined,
+        role: role || undefined,
+        career: career || undefined,
+        variant_type: variantType || undefined,
+        vehicle_category: category,
+        sort,
+        order,
+      }),
   });
 
-  const hasFilters = !!(manufacturer || status || role || career || variantType || debouncedSearch);
+  const hasFilters = !!(manufacturer || status || role || career || variantType || search);
 
   const switchCategory = (val: string) => {
     setCategory(val);
@@ -173,7 +176,7 @@ export default function ShipsPage({ initialList }: { initialList?: PaginatedResp
         {filters && (filters.manufacturers ?? []).length > 0 && (
           <ListFilterSelect
             value={manufacturer}
-            onChange={(value) => { setManufacturer(value); setPage(1); }}
+            onChange={(value) => { setManufacturer(value); }}
             allLabel="All manufacturers"
             options={(filters.manufacturers ?? []).map((m) => ({ label: m.name, value: m.code }))}
           />
@@ -181,7 +184,7 @@ export default function ShipsPage({ initialList }: { initialList?: PaginatedResp
         {category === 'ship' && filters && (filters.statuses ?? []).length > 0 && (
           <ListFilterSelect
             value={status}
-            onChange={(value) => { setStatus(value); setPage(1); }}
+            onChange={(value) => { setStatus(value); }}
             allLabel="All statuses"
             options={(filters.statuses ?? []).map((s) => ({ label: formatStatusLabel(s.value), value: s.value, count: s.count }))}
           />
@@ -189,7 +192,7 @@ export default function ShipsPage({ initialList }: { initialList?: PaginatedResp
         {category === 'ship' && filters && filters.careers.length > 0 && (
           <ListFilterSelect
             value={career}
-            onChange={(value) => { setCareer(value); setPage(1); }}
+            onChange={(value) => { setCareer(value); }}
             allLabel="All careers"
             options={filters.careers.map((c) => ({ label: c, value: c }))}
           />
@@ -197,7 +200,7 @@ export default function ShipsPage({ initialList }: { initialList?: PaginatedResp
         {category === 'ship' && filters && filters.roles.length > 0 && (
           <ListFilterSelect
             value={role}
-            onChange={(value) => { setRole(value); setPage(1); }}
+            onChange={(value) => { setRole(value); }}
             allLabel="All roles"
             options={filters.roles.map((r) => ({ label: r, value: r }))}
           />
@@ -205,14 +208,14 @@ export default function ShipsPage({ initialList }: { initialList?: PaginatedResp
         {filters && filters.variant_types.length > 0 && (
           <ListFilterSelect
             value={variantType}
-            onChange={(value) => { setVariantType(value); setPage(1); }}
+            onChange={(value) => { setVariantType(value); }}
             allLabel="All types"
             options={filters.variant_types.map((vt) => ({ label: vt, value: vt }))}
           />
         )}
         <ListFilterSelect
           value={sort}
-          onChange={(value) => { setSort(value); setPage(1); }}
+          onChange={(value) => { setSort(value); }}
           allLabel="Sort"
           options={availableSorts.map((o) => ({ value: o.value, label: `Sort: ${o.label}` }))}
           showAllOption={false}
@@ -251,7 +254,7 @@ export default function ShipsPage({ initialList }: { initialList?: PaginatedResp
               className="mt-6"
               page={data.page}
               totalPages={data.pages}
-              onPageChange={updatePageWithScroll}
+              onPageChange={goToPage}
             />
           )}
         </>
