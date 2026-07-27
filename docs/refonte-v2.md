@@ -151,7 +151,7 @@ Chaque étape est déployable et laisse la production fonctionnelle.
 |---|---|---|
 | 1 | Audit de vérité des données (C1) | On ne construit pas sur du faux |
 | 2 | Contrat d'entité + libellés à l'extraction (C2) | Débloque l'IHM et l'API |
-| 3 | Croisement des sources tracé (C2) | Fiabilise avant d'exposer |
+| 3 | Croisement des sources tracé (C2) + noms de vaisseaux depuis le jeu | Les deux sont liés : voir [D5](verite-donnees.md) |
 | 4 | Surface d'API arrêtée, puis sortie du SQL brut (C4) | L'inverse serait à refaire |
 | 5 | IHM par intention, fiche par fiche (C5) | S'appuie sur 2 et 4 |
 | 6 | CLI modulaire (C3) | Indépendant, à intercaler librement |

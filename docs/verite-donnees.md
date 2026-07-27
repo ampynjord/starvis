@@ -157,6 +157,43 @@ déterministe pour que deux exécutions restent comparables.
 **À corriger étape 2/3** : distinguer le port structurel du port d'équipement à
 l'extraction, puis combler le croisement sur les seconds.
 
+### D5 — Les noms de vaisseaux ne viennent pas du jeu
+
+Découvert en corrigeant D2, et distinct de lui : `resolveShipName()` ne teste que
+la forme de clé `vehicle_Name_<Classe>`, alors que `global.ini` utilise ici
+`vehicle_Name<Classe>`, sans séparateur. Résultat : **elle résout 0 vaisseau sur
+273**. Les noms affichés viennent d'un autre chemin de nettoyage.
+
+Ce que le jeu nomme réellement, et que Starvis affiche autrement :
+
+| Affiché aujourd'hui | Nom du jeu |
+|---|---|
+| Scout | Khartu-al |
+| Reliant | Reliant Kore |
+| Gladius PIR | Gladius Pirate |
+| Hornet F7CM | F7C-M Super Hornet Mk I |
+| Dragonfly Pink | Dragonfly Star Kitten |
+| Prospector Collector Indust | Prospector Wikelo Work Special |
+| L21 Wolf | L-21 Wolf |
+| m50 | M50 Interceptor |
+
+En retirant le préfixe constructeur — qu'une colonne dédiée porte déjà —
+**75 libellés changeraient**, presque tous pour le mieux.
+
+**Mais ce renommage ne peut pas être fait seul.** Simulé contre la base :
+il ferait **perdre 9 rattachements au Ship Matrix**, parce que le croisement se
+fait par nom normalisé. Un vaisseau qui perd son lien peut être élagué — c'est
+exactement ce qui avait fait disparaître deux vaisseaux du 4.9.0 en juillet.
+
+La cause est visible dans `SM_TO_P4K_ALIASES` : **81 correspondances écrites à la
+main**, du type `'Khartu-Al' → 'Scout'` ou `'L-21 Wolf' → 'L21 Wolf'`. Cette
+table existe précisément parce que les noms n'ont jamais été résolus depuis le
+jeu. Corriger les noms rendrait la plupart de ces entrées inutiles — mais il faut
+défaire les deux ensemble.
+
+**Reporté à l'étape 3**, où le croisement devient explicite et tracé. Le faire
+avant reviendrait à réparer une moitié en cassant l'autre.
+
 ### D4 — Un pilotable sur cinq sans Ship Matrix
 
 187 pilotables sur 236 sont rattachés (79,2 %). Les 49 restants sont surtout des
