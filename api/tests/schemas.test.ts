@@ -58,8 +58,8 @@ describe('qEnv', () => {
     expect(qEnv.parse('live')).toBe('live');
   });
 
-  it('falls back to live for invalid value', () => {
-    expect(qEnv.parse('invalid')).toBe('live');
+  it('rejects an invalid value instead of silently serving live', () => {
+    expect(() => qEnv.parse('invalid')).toThrow();
   });
 
   it('picks first from array', () => {
@@ -81,20 +81,23 @@ describe('qInt', () => {
     expect(limit.parse('100')).toBe(100);
   });
 
-  it('defaults for non-numeric input', () => {
-    expect(page.parse('abc')).toBe(1);
+  it('rejects non-numeric input', () => {
+    expect(() => page.parse('abc')).toThrow();
+  });
+
+  it('treats an empty param as absent', () => {
     expect(limit.parse('')).toBe(50);
   });
 
-  it('clamps to min(1)', () => {
-    // negative → catch → default
-    expect(page.parse('-1')).toBe(1);
-    expect(page.parse('0')).toBe(1);
+  it('rejects values below the minimum', () => {
+    expect(() => page.parse('-1')).toThrow();
+    expect(() => page.parse('0')).toThrow();
   });
 
-  it('clamps to max when specified', () => {
-    // 300 exceeds max=200 → catch → default
-    expect(limit.parse('300')).toBe(50);
+  it('clamps to max instead of rejecting', () => {
+    // Dépasser le plafond relève de la politique de service, pas de l'erreur
+    // d'appel : on ramène au plafond plutôt que de casser l'intégration.
+    expect(limit.parse('300')).toBe(200);
   });
 
   it('handles array input (Express multi-value)', () => {

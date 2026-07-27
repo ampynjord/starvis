@@ -11,21 +11,30 @@ import { z } from 'zod';
 /** Coerce Express query param (string | string[] | undefined) → string | undefined */
 export const qStr = z.preprocess((v) => (Array.isArray(v) ? v[0] : v) || undefined, z.string().max(200).optional());
 
-/** Coerce env query param → validated GameEnv string, defaults to 'live' */
-export const qEnv = z.preprocess((v) => (Array.isArray(v) ? v[0] : v) || 'live', z.enum(['live', 'ptu', 'custom']).catch('live'));
+/**
+ * Coerce env query param → validated GameEnv string, defaults to 'live'.
+ *
+ * Pas de `.catch()` ici : un `env` invalide doit produire un 400, pas retomber
+ * silencieusement sur 'live'. Une faute de frappe renverrait sinon les données
+ * LIVE à un client qui a demandé PTU — une réponse fausse est pire qu'une erreur.
+ */
+export const qEnv = z.preprocess((v) => (Array.isArray(v) ? v[0] : v) || 'live', z.enum(['live', 'ptu', 'custom']));
 
 export const qInt = (def: number, max?: number) =>
   z.preprocess(
     (v) => {
       const s = Array.isArray(v) ? v[0] : v;
-      return s === undefined || s === '' ? undefined : s;
+      return s === undefined || s === '' ? def : s;
     },
+    // Une valeur non numérique est rejetée (400) : renvoyer la valeur par défaut
+    // masquerait une erreur d'appel. Un dépassement du plafond est en revanche
+    // ramené au plafond — c'est une politique de service, pas une faute du client,
+    // et cela évite de casser les intégrations qui demandent large.
     z.coerce
       .number()
       .int()
       .min(1)
-      .pipe(max ? z.number().max(max) : z.number())
-      .catch(def),
+      .transform((n) => (max ? Math.min(n, max) : n)),
   );
 
 // ── Route schemas ─────────────────────────────────────────

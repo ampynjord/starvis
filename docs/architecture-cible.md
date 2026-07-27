@@ -121,7 +121,12 @@ deviennent la source unique. `openapi.json` en est généré. Les types sont pub
 pour l'IHM **et** pour les consommateurs tiers — Stelliverse intègre des types,
 plus une documentation à recopier.
 
-Un seul format de réponse (JSend, déjà présent) sur toute la surface.
+Un seul format de réponse sur toute la surface. Migrer une convention vers
+l'autre romprait le contrat : `/api/v1` est consommé par des tiers, et la
+pagination vit en racine côté `{ success }` là où JSend la placerait sous `meta`.
+La transition passe donc par un **surensemble** — chaque réponse porte les deux
+discriminants (`status` et `success`), sans rien déplacer — et `success` sera
+retiré en v2, une fois les consommateurs migrés.
 
 ### D5 — Le cache suit la donnée, pas l'horloge
 

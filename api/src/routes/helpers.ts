@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { NextFunction, Request, RequestHandler, Response, Router } from 'express';
 import { ZodError } from 'zod';
+import { withStatusDiscriminators } from '../middleware/response-shape.js';
 import { arrayToCsv } from '../schemas.js';
 import type { GameDataService } from '../services/game-data-service.js';
 import type { ShipQueryService } from '../services/ship-query-service.js';
@@ -40,6 +41,9 @@ function setETag(res: Response, jsonStr: string): string {
 /** Serialize once, check ETag, and send — avoids double JSON.stringify.
  *  ETag is computed without volatile fields (meta.responseTime). */
 export function sendWithETag(req: Request, res: Response, payload: any): void {
+  // Ce chemin contourne res.json : la normalisation doit donc être appliquée ici
+  // aussi, avant le calcul de l'ETag pour qu'il reflète le corps réellement émis.
+  withStatusDiscriminators(payload, res.statusCode < 400);
   const { meta, ...stable } = payload;
   const replacer = (_key: string, value: unknown) => (typeof value === 'bigint' ? Number(value) : value);
   const stableStr = JSON.stringify(stable, replacer);

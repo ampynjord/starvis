@@ -24,6 +24,7 @@ import helmet from 'helmet';
 import swaggerUi from 'swagger-ui-express';
 import { requireExternalApiAccess } from './src/middleware/auth.js';
 import { prometheusMiddleware } from './src/middleware/prometheus.js';
+import { responseShapeMiddleware } from './src/middleware/response-shape.js';
 import { healthRouter } from './src/routes/health.js';
 import { createRoutes } from './src/routes/index.js';
 import { verifyAuthToken } from './src/services/auth-service.js';
@@ -65,6 +66,7 @@ app.use(compression());
 app.use(express.json({ limit: '1mb' }));
 
 app.use(prometheusMiddleware);
+app.use(responseShapeMiddleware);
 
 app.use('/health', healthRouter);
 
