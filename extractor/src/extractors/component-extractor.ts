@@ -5,7 +5,7 @@
  * Depends on DataForgeContext interface (no circular dependency with DataForgeService).
  */
 import type { DataForgeContext } from '../dataforge/dataforge-utils.js';
-import { resolveComponentName } from '../dataforge/dataforge-utils.js';
+import { classifyNameValue, resolveComponentName } from '../dataforge/dataforge-utils.js';
 import logger from '../logger.js';
 
 function mapAttachDefGrade(grade: unknown): string | null {
@@ -141,6 +141,8 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
         uuid: r.id,
         className,
         name: className.replace(/_/g, ' '),
+        /** Clé `@…` conservée pour que `global.ini` la résolve à la persistance. */
+        nameLocKey: null as string | null,
         type,
         p4kPath: r.fileName || null,
         rawJson: { record: r, data },
@@ -157,14 +159,13 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
           if (ad && typeof ad === 'object') {
             if (typeof ad.Size === 'number') comp.size = ad.Size;
             comp.grade = mapAttachDefGrade(ad.Grade);
-            const loc = ad.Localization;
-            if (loc?.Name && typeof loc.Name === 'string') {
-              if (!loc.Name.startsWith('LOC_') && !loc.Name.startsWith('@')) {
-                comp.name = loc.Name;
-              } else {
-                comp.name = resolveComponentName(className);
-              }
-            }
+            // Une clé de localisation n'est pas un libellé, mais elle mène au
+            // vrai : la remplacer d'emblée par le dérivé du `class_name`, comme
+            // ici auparavant, revenait à jeter la seule piste utilisable.
+            const attached = classifyNameValue(ad.Localization?.Name);
+            if (attached.display) comp.name = attached.display;
+            else if (attached.locKey) comp.nameLocKey ??= attached.locKey;
+            else if (ad.Localization?.Name) comp.name = resolveComponentName(className);
             if (typeof ad.Manufacturer === 'string' && ad.Manufacturer) {
               const mfgInfo = ctx.extractAllManufacturers().get(ad.Manufacturer);
               if (mfgInfo) {

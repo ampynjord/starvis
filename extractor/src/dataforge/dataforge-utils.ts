@@ -165,6 +165,26 @@ export function resolveLocKey(locKey: string, type: 'career' | 'role'): string {
 }
 
 /**
+ * DataForge livre trois sortes de valeurs dans les champs de nom, qu'il faut
+ * distinguer avant d'en faire quoi que ce soit :
+ *
+ * - un libellé affichable (« Arrowhead Sniper Rifle ») ;
+ * - une clé de localisation préfixée `@`, à résoudre via `global.ini` ;
+ * - un identifiant interne préfixé `LOC_`, qui n'est ni l'un ni l'autre.
+ *
+ * Le code les traitait par la négative — « si ça ne commence pas par `@` ni par
+ * `LOC_`, c'est un nom » — ce qui perdait silencieusement les clés, seule source
+ * du vrai libellé. Objets, marchandises et composants partagent cette fonction
+ * pour que le tri ne se remette pas à diverger d'un extracteur à l'autre.
+ */
+export function classifyNameValue(value: unknown): { display?: string; locKey?: string } {
+  if (typeof value !== 'string' || !value) return {};
+  if (value.startsWith('@')) return { locKey: value };
+  if (value.startsWith('LOC_')) return {};
+  return { display: value };
+}
+
+/**
  * Convert a component className like "KLWE_LaserRepeater_S1" to a readable
  * display name. Strips _SCItem suffix, manufacturer prefix, and converts to spaced words.
  */

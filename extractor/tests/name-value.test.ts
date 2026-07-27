@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { classifyNameValue } from '../src/extractors/item-extractor.js';
+import { classifyNameValue } from '../src/dataforge/dataforge-utils.js';
 
 /**
  * DataForge mélange trois sortes de valeurs dans les champs de nom. Les

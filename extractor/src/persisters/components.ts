@@ -14,7 +14,12 @@ export async function saveComponents(ctx: PersistContext): Promise<number> {
 
   if (loc.isLoaded) {
     for (const c of components) {
-      const resolved = loc.resolveOrFallback(c.className, c.name);
+      // La clé portée par l'enregistrement passe avant : c'est la seule source
+      // du nom voulu par le jeu. `resolveOrFallback` ne cherche que par
+      // `class_name`, ce qui laissait 3,6 % des composants avec un libellé
+      // fabriqué depuis leur identifiant.
+      const fromKey = c.nameLocKey ? loc.resolveKey(c.nameLocKey) : null;
+      const resolved = fromKey ?? loc.resolveOrFallback(c.className, c.name);
       if (resolved) c.name = resolved;
     }
     onProgress?.(`Localized ${components.length} component names`);

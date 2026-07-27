@@ -7,7 +7,7 @@
  *   - commodities[] → Tradeable goods (metals, minerals, gas, food, etc.)
  */
 import type { DataForgeContext } from '../dataforge/dataforge-utils.js';
-import { resolveComponentName } from '../dataforge/dataforge-utils.js';
+import { classifyNameValue, resolveComponentName } from '../dataforge/dataforge-utils.js';
 import logger from '../logger.js';
 
 function mapAttachDefGrade(grade: unknown): string | null {
@@ -61,24 +61,6 @@ interface CommodityRecord {
   symbol: string | null;
   occupancyScu: number | null;
   dataJson: Record<string, unknown> | null;
-}
-
-/**
- * DataForge livre trois sortes de valeurs dans les champs de nom, qu'il faut
- * distinguer avant d'en faire quoi que ce soit :
- *
- * - un libellé affichable (« Arrowhead Sniper Rifle ») ;
- * - une clé de localisation préfixée `@`, à résoudre via `global.ini` ;
- * - un identifiant interne préfixé `LOC_`, qui n'est ni l'un ni l'autre.
- *
- * Le code les traitait tous par la négative — « si ça ne commence pas par `@`
- * ni par `LOC_`, c'est un nom » — ce qui perdait silencieusement les clés.
- */
-export function classifyNameValue(value: unknown): { display?: string; locKey?: string } {
-  if (typeof value !== 'string' || !value) return {};
-  if (value.startsWith('@')) return { locKey: value };
-  if (value.startsWith('LOC_')) return {};
-  return { display: value };
 }
 
 /** Path patterns for FPS/personal items → item type classification */
