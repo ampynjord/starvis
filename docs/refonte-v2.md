@@ -61,9 +61,15 @@ Corollaires :
 
 ## 4. Les six chantiers
 
-### C1 — Vérité des données (préalable à tout)
+### C1 — Vérité des données (préalable à tout) — *fait*
 
 Rien ne sert de redessiner au-dessus de données fausses.
+
+> Réalisé le 27/07/2026 : `quality/data-truth-audit.mjs`, branché en CI après
+> déploiement. Les mesures et les quatre défauts qu'il a mis au jour sont
+> consignés dans [verite-donnees.md](verite-donnees.md) — dont le principal :
+> les libellés manquants ne sont pas absents mais **fabriqués depuis le
+> `class_name`**, ce qui les rendait invisibles à tout contrôle naïf.
 
 - **Un audit par entité** : complétude (champs obligatoires présents), cohérence
   (unités, ordres de grandeur), et **confrontation aux sources** — un vaisseau

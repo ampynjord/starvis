@@ -576,3 +576,13 @@ jobs:
         env:
           STARVIS_AUDIT_API_KEY: ${{ secrets.STARVIS_AUDIT_API_KEY }}
         run: npm run quality:audit:data:prod
+
+      # L'audit ci-dessus vérifie que les endpoints répondent et ont la bonne
+      # forme ; celui-ci porte sur le fond — complétude, vraisemblance et
+      # rattachement aux sources sur la population entière. Il tourne après
+      # déploiement plutôt qu'à chaque poussée : il interroge la production et
+      # dure quelques minutes.
+      - name: Audit production data truth
+        env:
+          STARVIS_AUDIT_API_KEY: ${{ secrets.STARVIS_AUDIT_API_KEY }}
+        run: npm run quality:audit:truth:prod

@@ -30,6 +30,40 @@ The audit checks:
 - placeholder-like text values;
 - a representative global search.
 
+## Data truth audit
+
+The data audit above checks that endpoints respond and that a sample looks
+usable. The truth audit checks the **whole population** instead: completeness,
+plausibility, label quality and cross-source linkage.
+
+```bash
+npm run quality:audit:truth
+npm run quality:audit:truth:prod
+```
+
+It runs after deployment rather than on every push — it queries the live API and
+takes about two minutes.
+
+Thresholds are **derived from a real measurement** (27/07/2026, patch 4.9.0) and
+set just below the observed state, so they catch a regression without failing on
+the existing data. Raising them as defects get fixed is the point; a floor that
+never moves is a floor nobody reads. See
+[`docs/verite-donnees.md`](../docs/verite-donnees.md) for what the current
+numbers are and which defects they revealed.
+
+Two distinctions matter, because getting them wrong turns the audit into noise:
+
+- **Concept ships vs flyable ships.** A concept exists only in the RSI Ship
+  Matrix and has no flight data by nature. Flight-data floors apply to flyable
+  ships only.
+- **Equipment ports vs structural ports.** Half of the unresolved loadout nodes
+  are cockpit furniture (seats, screens, wheels) that never had a component to
+  carry. Only equipment ports are held to a resolution floor.
+
+The most valuable check is `requireLocalizedNames`: when game localization is
+missing, extraction falls back to a de-underscored `class_name`, which passes any
+underscore-based check while still being a workshop name in the UI.
+
 ## Static data coverage audit
 
 The static data audit checks the extracted database directly and can optionally inspect the local P4K/DataForge source.
