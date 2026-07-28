@@ -70,9 +70,10 @@ premier affichage lent.
 
 **Cache**
 - Redis a **un seul consommateur** (`ship-matrix-service`) ; 8 des 10 TTL déclarés
-  sont morts ; `cacheInvalidatePattern` n'est **appelé nulle part** → aucune
-  stratégie d'invalidation, uniquement l'expiration. Après une extraction, le
-  ship-matrix reste périmé jusqu'à 2 h.
+  sont morts. *L'invalidation est désormais versionnée* : la clé porte
+  l'empreinte de la dernière extraction, si bien qu'une extraction rend les
+  anciennes clés inatteignables sans que personne ait à les effacer. Le
+  ship-matrix ne reste plus périmé jusqu'à 2 h.
 - Le vrai cache est HTTP (`sendWithETag`, 106 usages) mais le payload est
   **recalculé en base à chaque revalidation**.
 

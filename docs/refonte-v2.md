@@ -147,16 +147,32 @@ Rien ne sert de redessiner au-dessus de données fausses.
 
 Chaque étape est déployable et laisse la production fonctionnelle.
 
-| # | Étape | Pourquoi à ce rang |
-|---|---|---|
-| 1 | Audit de vérité des données (C1) | On ne construit pas sur du faux |
-| 2 | Contrat d'entité + libellés à l'extraction (C2) | Débloque l'IHM et l'API |
-| 3 | Croisement des sources tracé (C2) + noms de vaisseaux depuis le jeu | Les deux sont liés : voir [D5](verite-donnees.md) |
-| 4 | Surface d'API arrêtée, puis sortie du SQL brut (C4) | L'inverse serait à refaire |
-| 5 | IHM par intention, fiche par fiche (C5) | S'appuie sur 2 et 4 |
-| 6 | CLI modulaire (C3) | Indépendant, à intercaler librement |
-| 7 | CI étagée et retour arrière (C6) | Accompagne, ne bloque pas |
-| 8 | Cache versionné, god files (phases 5 et 6) | Dette résiduelle |
+| # | Étape | État | Pourquoi à ce rang |
+|---|---|---|---|
+| 1 | Audit de vérité des données (C1) | **fait** | On ne construit pas sur du faux |
+| 2 | Contrat d'entité + libellés à l'extraction (C2) | **fait**, sauf [D9](verite-donnees.md) | Débloque l'IHM et l'API |
+| 3 | Croisement des sources tracé (C2) + noms de vaisseaux depuis le jeu | **fait** | Les deux sont liés : voir [D5](verite-donnees.md) |
+| 4 | Surface d'API arrêtée, puis sortie du SQL brut (C4) | **fait** pour les 10 entités publiques ; `rsi-website` et `game-data` restent en SQL brut | L'inverse serait à refaire |
+| 5 | IHM par intention, fiche par fiche (C5) | première itération faite | S'appuie sur 2 et 4 |
+| 6 | CLI modulaire (C3) | `plan` / `verify` faits, warning `pg` corrigé | Indépendant, à intercaler librement |
+| 7 | CI étagée et retour arrière (C6) | retour arrière et restauration éprouvée faits ; l'étagement existait déjà | Accompagne, ne bloque pas |
+| 8 | Cache versionné, god files (phases 5 et 6) | cache versionné fait ; god files intacts | Dette résiduelle |
+
+Ce qui reste, par ordre de valeur décroissante :
+
+1. **Libellés de boutiques** ([D9](verite-donnees.md)) — 24 libellés sur 136
+   affichent un nom de fichier. La correction demande la table des franchises du
+   P4K, donc une extraction.
+2. **`rsi-website-service` et `game-data-service`** — 40 requêtes brutes sans
+   contrat déclaré. Ce sont les deux derniers services à ne pas dire ce qu'ils
+   servent.
+3. **God files** — `StarmapGalaxy` 2 246 l., `dataforge-service` 2 048 l.,
+   `chat-service` 1 139 l. Aucun défaut connu ne s'y rattache : c'est du confort
+   de lecture, pas une correction.
+4. **`idle_in_transaction_session_timeout`** sur le serveur de production. Une
+   extraction interrompue y laisse une transaction ouverte qui bloque la
+   suivante ; le gestionnaire de signal ne couvre pas la terminaison forcée.
+   C'est un réglage de production, il vous revient.
 
 ## 6. Suggestions ajoutées
 
