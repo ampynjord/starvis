@@ -473,6 +473,11 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: build
+    # Meme groupe que le workflow de retour arriere : les deux touchent la meme
+    # production, et se croiser laisserait les services desaccordes.
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
     environment:
       name: production
       url: https://starvis.ampynjord.bzh

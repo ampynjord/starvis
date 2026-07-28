@@ -1,0 +1,164 @@
+# Retour arrière de la production vers un commit déjà déployé.
+#
+# Le déploiement épingle les images à `:latest` dans `.env.prod`, si bien que
+# revenir en arrière demandait jusqu'ici de repousser un commit — c'est-à-dire
+# de refaire un tour complet de CI, quinze minutes, pendant que la production
+# reste cassée.
+#
+# Chaque build pousse aussi un tag `sha-<commit>`. Ce workflow s'en sert :
+# Compose donne la priorité aux variables du shell sur celles de `--env-file`,
+# donc il suffit d'exporter `API_IMAGE` & consorts pour désigner une autre
+# version, sans réécrire le moindre fichier sur le serveur.
+#
+# **Le schéma de base n'est pas ramené en arrière.** Les migrations sont
+# appliquées en avant uniquement (`migrate:deploy`) : ce retour arrière est sûr
+# tant que la version visée sait lire le schéma courant. Une migration
+# destructive doit se défaire à la main, avec une restauration de sauvegarde.
+name: Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "Commit à redéployer (SHA complet ou court, tel que taggé sha-<commit>)"
+        required: true
+        type: string
+      reason:
+        description: "Pourquoi — figure dans le journal de déploiement"
+        required: false
+        type: string
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/ampynjord/starvis
+
+jobs:
+  rollback:
+    name: Rollback production
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://starvis.ampynjord.bzh
+    steps:
+      - name: Normaliser et vérifier le SHA
+        id: target
+        run: |
+          set -e
+          raw="${{ inputs.sha }}"
+          sha="$(printf '%s' "$raw" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')"
+          case "$sha" in
+            sha-*) sha="${sha#sha-}" ;;
+          esac
+          if ! printf '%s' "$sha" | grep -qE '^[0-9a-f]{7,40}$'; then
+            echo "SHA invalide : '$raw'"
+            exit 1
+          fi
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "Cible : sha-$sha"
+
+      - name: Confirmer que les trois images existent
+        run: |
+          set -e
+          echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ampynjord --password-stdin
+          missing=0
+          for service in api ihm bot; do
+            ref="${{ env.IMAGE_PREFIX }}-$service:sha-${{ steps.target.outputs.sha }}"
+            if docker manifest inspect "$ref" > /dev/null 2>&1; then
+              echo "présente : $ref"
+            else
+              echo "ABSENTE  : $ref"
+              missing=1
+            fi
+          done
+          # Verifie avant de toucher la production : un retour arriere qui
+          # echoue a mi-chemin laisserait des services desaccordes entre eux.
+          if [ "$missing" -ne 0 ]; then
+            echo "Une image au moins manque pour ce commit — rien n'a été touché."
+            exit 1
+          fi
+
+      - name: Redéployer via SSH
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: debian
+          port: 2222
+          key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 20m
+          script: |
+            set -e
+            cd /home/debian/starvis
+
+            TAG="sha-${{ steps.target.outputs.sha }}"
+            echo "==> Retour arrière vers ${TAG} — ${{ inputs.reason || 'sans motif indiqué' }}"
+
+            echo "==> Code au commit visé..."
+            git remote set-url origin https://ampynjord:${{ secrets.GHCR_PAT }}@github.com/ampynjord/starvis.git
+            git fetch origin
+            git reset --hard ${{ steps.target.outputs.sha }}
+            git clean -fd
+            git remote set-url origin https://github.com/ampynjord/starvis.git
+
+            echo "==> Login GHCR..."
+            echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ampynjord --password-stdin
+
+            # Les variables du shell priment sur `.env.prod`, qui epingle
+            # `:latest`. Rien n'est reecrit sur le serveur : le prochain
+            # deploiement normal repartira de `latest` sans avoir a defaire quoi
+            # que ce soit ici.
+            export API_IMAGE="ghcr.io/ampynjord/starvis-api:${TAG}"
+            export IHM_IMAGE="ghcr.io/ampynjord/starvis-ihm:${TAG}"
+            export BOT_IMAGE="ghcr.io/ampynjord/starvis-bot:${TAG}"
+
+            compose() {
+              docker compose -f docker-compose.prod.yml --env-file .env.prod "$@"
+            }
+
+            echo "==> Valider la composition..."
+            compose config --quiet
+
+            echo "==> Récupérer les images visées..."
+            compose pull api ihm bot
+
+            wait_for_health() {
+              container="$1"
+              label="$2"
+              attempts="${3:-24}"
+              for i in $(seq 1 "$attempts"); do
+                health="$(docker inspect --format='{{.State.Health.Status}}' "$container" 2>/dev/null || echo missing)"
+                if [ "$health" = "healthy" ]; then
+                  return 0
+                fi
+                echo "Waiting for ${label} health... ${health}"
+                sleep 5
+              done
+              echo "${label} health check FAILED"
+              docker logs --tail=200 "$container" || true
+              return 1
+            }
+
+            echo "==> Redémarrage progressif..."
+            if ! compose up -d --remove-orphans api; then
+              docker logs --tail=200 starvis-api || true
+              exit 1
+            fi
+            wait_for_health starvis-api API
+
+            if ! compose up -d --remove-orphans ihm bot; then
+              docker logs --tail=200 starvis-ihm || true
+              docker logs --tail=200 starvis-bot || true
+              exit 1
+            fi
+            wait_for_health starvis-ihm IHM
+
+            echo "==> Tests de fumée..."
+            docker exec starvis-api sh -c 'wget -qO- "http://127.0.0.1:${PORT:-3000}/health/live" >/dev/null'
+            docker exec starvis-api sh -c 'wget -qO- "http://127.0.0.1:${PORT:-3000}/health/ready" >/dev/null'
+            docker exec starvis-ihm wget -qO- "http://127.0.0.1:${PORT:-8080}/" >/dev/null
+
+            echo "==> Production sur ${TAG}."
+            echo "Le schema de base n'a pas ete ramene en arriere."
