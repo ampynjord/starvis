@@ -416,11 +416,43 @@ function auditCrossSource(flyable) {
   if (rate < 0.75) fail(`croisement Ship Matrix : ${(rate * 100).toFixed(1)}% sous le plancher 75%`);
 }
 
+/**
+ * Les libellés de boutiques sont fabriqués en titre-casant le nom de fichier
+ * entier, segments techniques compris : « Ship Weapon HDShowcase Lorville »,
+ * « Trauma Center Day06 ». Le contrôle porte sur les jetons qu'aucun nom
+ * commercial ne contient — un numéro de journée de développement, un nombre nu,
+ * un code constructeur à quatre lettres.
+ *
+ * Le seuil n'est pas zéro : le défaut est connu, mesuré, et sa correction
+ * demande la table des franchises du P4K. Le plancher empêche qu'il s'aggrave
+ * en attendant.
+ */
+async function auditShopLabels() {
+  const shops = await getAll('/shops', { env }).catch(() => []);
+  if (shops.length === 0) {
+    fact('boutiques : aucune servie, contrôle des libellés ignoré');
+    return;
+  }
+
+  const TECHNICAL_TOKEN =
+    /\b(?:day\s*\d+|\d{1,2}|hdshowcase|reststop|truckstop|expohall|shipweap|aegs|anvl|drak|krig|cnou|tmbl|argo|banu|espr|orig|misc|aopoa|xnaa|umbr|rsi)\b/i;
+  const suspicious = shops.filter((shop) => TECHNICAL_TOKEN.test(String(shop.name ?? '')));
+  const ratio = suspicious.length / shops.length;
+
+  fact(`boutiques : ${suspicious.length}/${shops.length} libellé(s) portant un jeton technique (${(ratio * 100).toFixed(1)}%)`);
+  if (ratio > 0.2) {
+    fail(`boutiques : ${(ratio * 100).toFixed(1)}% de libellés techniques au-dessus du plafond 20%`, {
+      exemples: suspicious.slice(0, 5).map((shop) => shop.name),
+    });
+  }
+}
+
 async function main() {
   console.log(`Audit de vérité — ${baseUrl} (env ${env})\n`);
   const { flyable } = await auditEntities();
   await auditLoadouts(flyable);
   auditCrossSource(flyable);
+  await auditShopLabels();
 
   for (const f of facts) console.log(`  ${f}`);
   console.log(`\nConstats : ${facts.length}`);

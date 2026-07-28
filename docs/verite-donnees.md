@@ -417,6 +417,40 @@ variantes et des véhicules de sol, que RSI ne référence pas individuellement.
 C'est en partie légitime — mais c'est aussi ce qui avait fait supprimer en
 silence deux vaisseaux du 4.9.0 avant le correctif « standalone ».
 
+### D9 — Les boutiques affichent leur nom de fichier
+
+Le libellé d'une boutique est fabriqué en titre-casant le nom de fichier entier,
+segments techniques compris :
+
+| Fichier | Libellé servi |
+|---|---|
+| `inventory_shipweap_hdshowcase_lorville` | Ship Weapon HDShowcase Lorville |
+| `inventory_admin_truckstop_base_d` | Admin Admin Truckstop Base D |
+| `inventory_casabaoutlet_food_area18` | Casaba Outlet Food Area18 |
+
+Sur 136 boutiques, 69 portent au moins un segment intermédiaire dans leur nom de
+fichier — codes constructeurs (`aegs`, `drak`), marqueurs de version (`small`,
+`full`, `base`), numéros de journée de développement (`day06`). 24 produisent un
+libellé visiblement technique, mesuré par l'audit.
+
+**Le segment n'est pas fiable comme catégorie non plus.** Quatre boutiques
+nommées « … Food … » vendent exclusivement du vêtement, et leur `shop_type` dit
+`clothing` : c'est le type qui a raison, le nom qui ment. Deux autres —
+« Cubby Blast Food Area18 », « Live Fire Weapons Food Port Olisar » — sont
+typées `weapons` et vendent 96 articles de vêtement chacune : là, c'est le type
+qui se trompe.
+
+Le mot ne peut pas être retiré au jugé : `inventory_skuttersfood_grimhex` porte
+« Food » dans le nom même de la franchise, et `inventory_market_bar_food_levski`
+doit garder son « Bar ». La correction passe par la table des franchises du P4K,
+qui donne le nom commercial — comme `vehicle_Name…` l'a donné pour les vaisseaux
+en [D5](#d5--24-vaisseaux-affichent-un-nom-datelier). Elle demande donc une
+extraction, pas une réécriture de chaîne.
+
+En attendant, l'audit mesure la proportion de libellés techniques et la plafonne
+à 20 % — elle est de 17,6 % aujourd'hui. Le défaut ne peut plus s'aggraver sans
+être vu.
+
 ## 6. Ce que l'audit ne fait pas encore
 
 Honnêtement listé, pour ne pas confondre couverture et confiance :
