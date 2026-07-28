@@ -27,6 +27,19 @@ function createMockPrisma(responses: Array<any[] | Error> = []): PrismaClient {
   return { $queryRawUnsafe } as unknown as PrismaClient;
 }
 
+/**
+ * Doublure pour les services migrés vers l'accès typé.
+ *
+ * `createMockPrisma` ne sait imiter que `$queryRawUnsafe` ; un service qui
+ * interroge `prisma.commodity` y trouve `undefined`. Plutôt que d'ajouter tous
+ * les modèles à la doublure existante, celle-ci prend exactement les délégués
+ * dont le test a besoin — ce qui rend visible, à la lecture, quels services ont
+ * déjà quitté le SQL brut.
+ */
+function createMockPrismaModel(delegates: Record<string, unknown>): PrismaClient {
+  return delegates as unknown as PrismaClient;
+}
+
 /** Create a plain row object */
 function row(data: Record<string, unknown>) {
   return { ...data };
@@ -877,7 +890,17 @@ describe('ShipQueryService manufacturers', () => {
 describe('CommodityQueryService', () => {
   describe('getCommodityTypes', () => {
     it('returns type counts array', async () => {
-      const prisma = createMockPrisma([[row({ type: 'RawMaterial', count: 20 }), row({ type: 'Gas', count: 5 })]]);
+      // Ce service est passé à l'accès typé : il interroge le modèle, plus le
+      // SQL brut. La doublure suit — c'est justement ce que le test doit
+      // signaler quand un chemin d'accès change.
+      const prisma = createMockPrismaModel({
+        commodity: {
+          groupBy: async () => [
+            { type: 'RawMaterial', _count: { _all: 20 } },
+            { type: 'Gas', _count: { _all: 5 } },
+          ],
+        },
+      });
       const svc = new CommodityQueryService(createGetClient(prisma));
       const result = await svc.getCommodityTypes();
       expect(result.types).toHaveLength(2);

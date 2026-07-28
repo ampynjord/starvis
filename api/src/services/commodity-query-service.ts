@@ -35,6 +35,57 @@ function buildCommodityCategories(rows: { type: string; count: number }[]): { la
   return [{ label: 'All', types: [], count: rows.reduce((sum, row) => sum + row.count, 0) }, ...categories];
 }
 
+/**
+ * Traduit un enregistrement Prisma vers le contrat public.
+ *
+ * Prisma rend les champs en `camelCase` — le modèle les déclare ainsi, avec
+ * `@map` vers les colonnes. L'API, elle, sert du `snake_case` depuis toujours et
+ * est consommée par des tiers. Rendre l'objet Prisma tel quel romprait le
+ * contrat sans qu'aucun test unitaire ne le voie : les champs seraient présents,
+ * simplement sous d'autres noms.
+ *
+ * **L'ordre des clés est délibéré.** Il reproduit celui des colonnes de la table,
+ * seul ordre dans lequel `SELECT *` les renvoyait. Ce n'est pas de la
+ * cosmétique : c'est ce qui permet de comparer les sorties avant et après octet
+ * à octet, et donc de prouver que la migration n'a rien changé de visible.
+ *
+ * `normalized_name` et `canonical_commodity_key` sont volontairement absents :
+ * `stripInternal` les retirait déjà, ils ne font pas partie du contrat.
+ */
+function toPublicCommodity(record: {
+  uuid: string;
+  env: string;
+  className: string;
+  name: string;
+  type: string;
+  subType: string | null;
+  symbol: string | null;
+  // Le `Decimal` de Prisma, décrit par ce qu'on en attend plutôt que par son
+  // type nominal : cette fonction n'a besoin que de sa représentation textuelle.
+  occupancyScu: { toString(): string } | null;
+  dataJson: unknown;
+  createdAt: Date;
+  updatedAt: Date;
+}): Row {
+  return {
+    uuid: record.uuid,
+    env: record.env,
+    class_name: record.className,
+    name: record.name,
+    type: record.type,
+    sub_type: record.subType,
+    symbol: record.symbol,
+    // Le pilote renvoyait cette colonne `numeric` sous forme de chaîne ; Prisma
+    // en fait un `Decimal`. Sans cette conversion, la valeur sortirait comme un
+    // objet — divergence invisible aujourd'hui, où aucune marchandise n'en porte,
+    // et certaine dès la première.
+    occupancy_scu: record.occupancyScu === null ? null : record.occupancyScu.toString(),
+    data_json: record.dataJson,
+    created_at: record.createdAt,
+    updated_at: record.updatedAt,
+  };
+}
+
 export class CommodityQueryService {
   constructor(private getClient: (env: string) => PrismaClient) {}
 
@@ -95,17 +146,19 @@ export class CommodityQueryService {
 
   async getCommodityByUuid(uuid: string, env = 'live'): Promise<Row | null> {
     const prisma = this.getClient(env);
-    const rows = await prisma.$queryRawUnsafe<Row[]>(toPostgres(`SELECT * FROM game.commodities WHERE uuid = ? AND env = ?`), uuid, env);
-    return rows[0] ? stripInternal(rows[0]) : null;
+    const record = await prisma.commodity.findUnique({ where: { uuid_env: { uuid, env } } });
+    return record ? stripInternal(toPublicCommodity(record)) : null;
   }
 
   async getCommodityTypes(env = 'live'): Promise<{ types: { type: string; count: number }[] }> {
     const prisma = this.getClient(env);
-    const rows = await prisma.$queryRawUnsafe<Row[]>(
-      toPostgres(`SELECT type, COUNT(*) as count FROM game.commodities WHERE env = ? GROUP BY type ORDER BY count DESC`),
-      env,
-    );
-    return { types: rows.map((r) => ({ type: String(r.type), count: Number(r.count) })) };
+    const groups = await prisma.commodity.groupBy({
+      by: ['type'],
+      where: { env },
+      _count: { _all: true },
+      orderBy: { _count: { type: 'desc' } },
+    });
+    return { types: groups.map((g) => ({ type: String(g.type), count: Number(g._count._all) })) };
   }
 
   async getCommodityCategories(env = 'live'): Promise<{ categories: { label: string; types: string[]; count: number }[] }> {
@@ -115,13 +168,15 @@ export class CommodityQueryService {
 
   async getCommodityFilters(env = 'live'): Promise<FiltersResult> {
     const prisma = this.getClient(env);
-    const rows = await prisma.$queryRawUnsafe<Row[]>(
-      toPostgres(`SELECT type as value, COUNT(*) as count FROM game.commodities WHERE env = ? GROUP BY type ORDER BY type`),
-      env,
-    );
+    const groups = await prisma.commodity.groupBy({
+      by: ['type'],
+      where: { env },
+      _count: { _all: true },
+      orderBy: { type: 'asc' },
+    });
     return {
       filters: {
-        type: rows.map((r) => ({ value: String(r.value), label: String(r.value), count: Number(r.count) })),
+        type: groups.map((g) => ({ value: String(g.type), label: String(g.type), count: Number(g._count._all) })),
       },
     };
   }
