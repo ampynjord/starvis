@@ -100,14 +100,27 @@ export default function CommodityDetailPage({ initialCommodity }: { initialCommo
 
   const buyLocations = (prices ?? []).filter((p) => p.buy_price != null && p.buy_price > 0);
   const sellLocations = (prices ?? []).filter((p) => p.sell_price != null && p.sell_price > 0);
-  const bestBuy = buyLocations.reduce<CommodityPrice | null>((best, p) => {
-    if (best == null || p.buy_price! > best.buy_price!) return p;
-    return best;
-  }, null);
-  const bestSell = sellLocations.reduce<CommodityPrice | null>((best, p) => {
-    if (best == null || p.sell_price! < best.sell_price!) return p;
-    return best;
-  }, null);
+
+  // `buy_price` est ce qu'on paie pour acquérir, `sell_price` ce qu'on encaisse
+  // en revendant — la recherche de routes de l'API le confirme, elle n'accepte
+  // une route que si `sell_price > buy_price`.
+  //
+  // Le meilleur endroit où acheter est donc le **moins cher**, et le meilleur
+  // endroit où vendre le **mieux payé**. Les deux comparaisons étaient inversées
+  // et présentaient au commerçant exactement les pires prix, sous les libellés
+  // « Best buy » et « Best sell ».
+  const bestBuy = buyLocations.reduce<CommodityPrice | null>((best, p) => (best == null || p.buy_price! < best.buy_price! ? p : best), null);
+  const bestSell = sellLocations.reduce<CommodityPrice | null>(
+    (best, p) => (best == null || p.sell_price! > best.sell_price! ? p : best),
+    null,
+  );
+
+  // Le calcul que le commerçant vient chercher, dans la fiche plutôt qu'à côté.
+  // Une marge n'a de sens que si les deux extrémités existent et qu'elle est
+  // positive : afficher une route perdante serait pire que ne rien afficher.
+  const margin = bestBuy && bestSell ? bestSell.sell_price! - bestBuy.buy_price! : null;
+  const marginPct = margin != null && bestBuy!.buy_price! > 0 ? (margin / bestBuy!.buy_price!) * 100 : null;
+  const profitableRoute = margin != null && margin > 0 ? { buy: bestBuy!, sell: bestSell!, margin, marginPct } : null;
 
   const typeInitials = (commodity.type ?? 'COM').slice(0, 3).toUpperCase();
 
@@ -199,6 +212,40 @@ export default function CommodityDetailPage({ initialCommodity }: { initialCommo
         </div>
       )}
 
+      {/* Meilleure route — le calcul dans la fiche, pas dans un outil à côté */}
+      {profitableRoute && (
+        <ScifiPanel title="Best Route" subtitle="Cheapest purchase → highest payout" actions={<Package size={14} className="text-cyan-700" />}>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-stretch">
+            <div className="sci-panel px-4 py-3">
+              <p className="text-[9px] font-mono-sc uppercase tracking-widest text-slate-600 mb-1">Buy at</p>
+              <p className="text-sm font-rajdhani font-semibold text-slate-200 truncate">{profitableRoute.buy.shop_name}</p>
+              <p className="text-xs text-slate-600 truncate">
+                {[profitableRoute.buy.city, profitableRoute.buy.planet_moon, profitableRoute.buy.system].filter(Boolean).join(' · ') || '—'}
+              </p>
+              <p className="mt-2 text-sm font-mono-sc text-green-400">{fCredits(profitableRoute.buy.buy_price!)}</p>
+            </div>
+
+            <div className="sci-panel px-4 py-3">
+              <p className="text-[9px] font-mono-sc uppercase tracking-widest text-slate-600 mb-1">Sell at</p>
+              <p className="text-sm font-rajdhani font-semibold text-slate-200 truncate">{profitableRoute.sell.shop_name}</p>
+              <p className="text-xs text-slate-600 truncate">
+                {[profitableRoute.sell.city, profitableRoute.sell.planet_moon, profitableRoute.sell.system].filter(Boolean).join(' · ') ||
+                  '—'}
+              </p>
+              <p className="mt-2 text-sm font-mono-sc text-amber-400">{fCredits(profitableRoute.sell.sell_price!)}</p>
+            </div>
+
+            <div className="sci-panel px-4 py-3 flex flex-col justify-center">
+              <p className="text-[9px] font-mono-sc uppercase tracking-widest text-slate-600 mb-1">Margin per unit</p>
+              <p className="text-xl font-orbitron font-black text-cyan-300 tabular-nums">{fCredits(profitableRoute.margin)}</p>
+              {profitableRoute.marginPct != null && (
+                <p className="text-xs font-mono-sc text-slate-500">+{profitableRoute.marginPct.toFixed(1)}%</p>
+              )}
+            </div>
+          </div>
+        </ScifiPanel>
+      )}
+
       {/* Locations grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
 
@@ -210,7 +257,8 @@ export default function CommodityDetailPage({ initialCommodity }: { initialCommo
             actions={<TrendingUp size={14} className="text-green-700" />}
           >
             <div className="space-y-1 max-h-96 overflow-y-auto">
-              {buyLocations.sort((a, b) => (b.buy_price ?? 0) - (a.buy_price ?? 0)).map((p) => (
+              {/* Le moins cher d'abord : c'est celui-là qu'on cherche pour acheter. */}
+              {[...buyLocations].sort((a, b) => (a.buy_price ?? 0) - (b.buy_price ?? 0)).map((p) => (
                 <PriceRow key={`buy-${p.id}`} price={{ ...p, sell_price: null }} />
               ))}
             </div>
@@ -225,7 +273,8 @@ export default function CommodityDetailPage({ initialCommodity }: { initialCommo
             actions={<MapPin size={14} className="text-amber-700" />}
           >
             <div className="space-y-1 max-h-96 overflow-y-auto">
-              {sellLocations.sort((a, b) => (a.sell_price ?? 0) - (b.sell_price ?? 0)).map((p) => (
+              {/* Le mieux payé d'abord. */}
+              {[...sellLocations].sort((a, b) => (b.sell_price ?? 0) - (a.sell_price ?? 0)).map((p) => (
                 <PriceRow key={`sell-${p.id}`} price={{ ...p, buy_price: null }} />
               ))}
             </div>
