@@ -166,6 +166,57 @@ function requirePlausible(entity, rows, field, { min, max, zeroIsMissing = false
 }
 
 /**
+ * La statistique sans laquelle un composant ne se choisit pas.
+ *
+ * Un refroidisseur sans taux de refroidissement, une centrale sans puissance :
+ * la fiche affiche un nom, un type, une taille, et rien de ce qui permet de
+ * décider. C'est une donnée manquante qu'aucun contrôle de complétude
+ * générique ne voyait, parce que la colonne existe pour tous les composants et
+ * n'a de sens que pour une famille.
+ *
+ * Relevé du 28/07 : douze familles sur quatorze sont à 99–100 %, et deux à zéro.
+ * Le plancher est donc posé haut, avec deux exceptions nommées et datées plutôt
+ * qu'un seuil bas qui les couvrirait en silence.
+ */
+const DEFINING_STAT = [
+  { type: 'Shield', field: 'shield_hp', floor: 0.95 },
+  { type: 'QuantumDrive', field: 'qd_speed', floor: 0.95 },
+  { type: 'Thruster', field: 'thruster_max_thrust', floor: 0.95 },
+  { type: 'Radar', field: 'radar_range', floor: 0.95 },
+  { type: 'FuelTank', field: 'fuel_capacity', floor: 0.95 },
+  { type: 'FuelIntake', field: 'fuel_intake_rate', floor: 0.95 },
+  { type: 'Countermeasure', field: 'cm_ammo_count', floor: 0.95 },
+  { type: 'MiningLaser', field: 'mining_speed', floor: 0.95 },
+  // 65 % : les armes à faisceau portent `weapon_beam_dps` et non `weapon_dps`.
+  // Le plancher tient compte de cette famille, il ne la masque pas.
+  { type: 'WeaponGun', field: 'weapon_dps', floor: 0.6 },
+  // Ces deux-là sont à zéro. Le plancher ne bloque rien, mais le décompte
+  // paraît à chaque exécution — c'est ce qui manquait pour qu'on le sache.
+  { type: 'Cooler', field: 'cooling_rate', floor: 0 },
+  { type: 'PowerPlant', field: 'power_output', floor: 0 },
+];
+
+/**
+ * En dessous de ce seuil, la famille est trop petite pour qu'un pourcentage
+ * veuille dire quelque chose.
+ *
+ * Les prises de carburant visibles ne sont que cinq, dont trois portent leur
+ * débit. Un plancher à 95 % y échouerait pour un seul manquant, ce qui ferait
+ * rougir la CI sans rien apprendre. Le décompte reste affiché — c'est le
+ * jugement qui est suspendu, pas la mesure.
+ */
+const MIN_FAMILY_FOR_FLOOR = 10;
+
+function requireDefiningStats(components) {
+  for (const { type, field, floor } of DEFINING_STAT) {
+    const family = components.filter((c) => c.type === type);
+    if (!family.length) continue;
+    const applied = family.length >= MIN_FAMILY_FOR_FLOOR ? floor : 0;
+    requireCoverage(`components ${type}`, family, field, applied, { zeroIsMissing: true });
+  }
+}
+
+/**
  * Vaisseaux — deux populations, deux exigences.
  *
  * Un vaisseau « concept » n'existe qu'au Ship Matrix RSI : annoncé, vendu,
@@ -211,6 +262,7 @@ async function auditEntities() {
   // près du constat, il céderait au premier composant ajouté.
   requireLocalizedNames('components', components, 0.03);
   requirePlausible('components', components, 'size', { min: 0, max: 12 });
+  requireDefiningStats(components);
 
   const items = await getAll('/items', { env });
   requireCoverage('items', items, 'name', 1);

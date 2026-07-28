@@ -21,6 +21,7 @@ import { ErrorState } from "@/components/ui/ErrorState";
 import { SmartTag } from "@/components/ui/SmartTag";
 import { generateComponentTags } from "@/lib/smart-tags";
 import { PriceAvailabilityPanel } from "@/components/economy/PriceAvailabilityPanel";
+import { PeerComparison } from "@/components/component/PeerComparison";
 import { COMPONENT_TYPE_COLORS } from "@/utils/constants";
 import { getComponentMetricGroups, type ComponentMetricGroup } from "@/utils/componentMetrics";
 import type { Component } from "@/types/api";
@@ -382,6 +383,9 @@ export default function ComponentDetailPage({ initialComponent }: { initialCompo
 			)}
 
 			<ComponentMetricPanels groups={componentMetricGroups} />
+
+			{/* Le calcul dans la fiche : situer le composant plutôt que l'énoncer. */}
+			<PeerComparison component={comp} env={env} />
 
 			<PriceAvailabilityPanel rows={buyLocs} />
 
