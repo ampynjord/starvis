@@ -16,6 +16,7 @@ import { ErrorState } from "@/components/ui/ErrorState";
 import { SmartTag } from "@/components/ui/SmartTag";
 import { generateItemTags } from "@/lib/smart-tags";
 import { PriceAvailabilityPanel } from "@/components/economy/PriceAvailabilityPanel";
+import { ItemPeerComparison } from "@/components/item/ItemPeerComparison";
 import type { Item } from '@/types/api';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -386,6 +387,9 @@ export default function ItemDetailPage({ initialItem }: { initialItem?: Item | n
               </div>
             </ScifiPanel>
           )}
+
+          {/* Le calcul dans la fiche : situer l'objet plutôt que l'énoncer. */}
+          <ItemPeerComparison item={item} env={env} />
 
           <PriceAvailabilityPanel rows={buyLocs} />
         </div>
