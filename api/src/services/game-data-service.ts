@@ -10,7 +10,7 @@
  */
 import type { PrismaLike as PrismaClient } from '@starvis/db';
 import { CommodityQueryService } from './commodity-query-service.js';
-import { ComponentQueryService } from './component-query-service.js';
+import { COMPONENT_VISIBLE_WHERE, ComponentQueryService } from './component-query-service.js';
 import { CorrelationService } from './correlation-service.js';
 import { CraftingService } from './crafting-service.js';
 import { ItemQueryService } from './item-query-service.js';
@@ -106,7 +106,7 @@ export class GameDataService {
         toPostgres(`SELECT c.uuid, c.class_name, c.name, c.type, c.sub_type, c.size, c.grade, c.manufacturer_code,
                 m.name as manufacturer_name
          FROM game.components c LEFT JOIN game.manufacturers m ON c.manufacturer_code = m.code
-         WHERE c.env = ? AND (c.name ILIKE ? OR c.class_name ILIKE ?)
+         WHERE c.env = ? AND ${COMPONENT_VISIBLE_WHERE} AND (c.name ILIKE ? OR c.class_name ILIKE ?)
          ORDER BY c.name LIMIT ${cap}`),
         env,
         t,

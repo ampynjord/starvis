@@ -1,6 +1,8 @@
 ﻿'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { IntentAnswer } from '@/components/search/IntentAnswer';
+import { parseIntent } from '@/lib/intent';
 import { ChevronRight, Search } from 'lucide-react';
 import { useState } from 'react';
 import Link from 'next/link';
@@ -46,6 +48,7 @@ export default function SearchResultsPage() {
   const [query, setQuery] = useState(initialQuery);
   const debouncedQuery = useDebounce(query, 300);
   const [activeTab, setActiveTab] = useState<Tab>('all');
+  const intent = parseIntent(debouncedQuery);
 
   const { data: results, isLoading } = useQuery({
     queryKey: ['search.full', debouncedQuery, env],
@@ -113,6 +116,10 @@ export default function SearchResultsPage() {
           );
         })}
       </div>
+
+      {/* Réponse directe quand la saisie portait une question — les résultats
+          ordinaires restent affichés en dessous. */}
+      {intent && <IntentAnswer intent={intent} env={env} />}
 
       {/* Results */}
       {isLoading && debouncedQuery.length >= 2 ? (

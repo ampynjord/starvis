@@ -95,7 +95,20 @@ const COMPONENT_DAMAGE_TYPE_EXPR = `CASE
   ELSE c.weapon_damage_type
 END`;
 
-const COMPONENT_VISIBLE_WHERE = `NOT (
+/**
+ * Écarte les composants inachevés du catalogue public.
+ *
+ * Le jeu marque son contenu non fini d'un libellé `<= PLACEHOLDER =>` : 1 579
+ * composants sur 3 271 en portent un. Ils existent en base — on ne les invente
+ * pas, on ne les cache pas non plus — mais ils n'ont rien à faire dans un
+ * catalogue destiné aux joueurs.
+ *
+ * **Exporté parce que la visibilité doit être la même partout.** La recherche
+ * unifiée interrogeait la table sans ce filtre et laissait donc remonter ce que
+ * la liste masquait : chercher « gladius » rendait cinq `<= PLACEHOLDER =>`
+ * parmi les résultats.
+ */
+export const COMPONENT_VISIBLE_WHERE = `NOT (
   c.class_name ~* '(^temp_|_temp(_|$)|_temporary|_template|_test|^test_|_debug|_placeholder)'
   OR c.name ~* '(^temp\\s|\\stemp\\s|temporary|template|placeholder)'
 )`;
