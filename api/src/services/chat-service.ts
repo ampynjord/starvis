@@ -835,7 +835,7 @@ export class ChatService {
           const elements = await this.gameDataService.mining.getAllElements(env);
           const query = ((args.query as string | undefined) ?? '').toLowerCase();
           const filtered = query
-            ? elements.filter((e: Record<string, unknown>) =>
+            ? elements.filter((e) =>
                 String(e.name ?? '')
                   .toLowerCase()
                   .includes(query),

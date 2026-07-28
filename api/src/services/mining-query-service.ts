@@ -2,6 +2,7 @@
  * MiningQueryService — Mineral elements and rock compositions from P4K DataForge
  */
 import type { PrismaLike as PrismaClient } from '@starvis/db';
+import type { PublicMiningElement } from './mining/mining-types.js';
 import { convertBigIntToNumber, type Row, toPostgres } from './shared.js';
 
 export class MiningQueryService {
@@ -9,9 +10,9 @@ export class MiningQueryService {
 
   // ── Elements ──────────────────────────────────────────────
 
-  async getAllElements(env = 'live'): Promise<Row[]> {
+  async getAllElements(env = 'live'): Promise<PublicMiningElement[]> {
     const prisma = this.getClient(env);
-    const rows = await prisma.$queryRawUnsafe<Row[]>(
+    const rows = await prisma.$queryRawUnsafe<PublicMiningElement[]>(
       toPostgres(`SELECT e.uuid, e.class_name, e.name, e.commodity_uuid,
               e.instability, e.resistance,
               e.optimal_window_midpoint, e.optimal_window_thinness, e.optimal_window_midpoint_rand,

@@ -4,6 +4,7 @@
 import type { PrismaLike as PrismaClient } from '@starvis/db';
 import { formatEnumLabel } from '../normalizers/labels.js';
 import { type FiltersResult, type PaginatedResult, type Row, toPostgres } from './shared.js';
+import type { PublicShop } from './shops/shop-types.js';
 
 function normalizeShopRow(row: Row): Row {
   return {
@@ -24,7 +25,7 @@ export class ShopService {
     type?: string;
     shop_type?: string;
     search?: string;
-  }): Promise<PaginatedResult> {
+  }): Promise<PaginatedResult<PublicShop>> {
     const env = opts.env ?? 'live';
     const prisma = this.getClient(env);
     const where: string[] = ['env = ?'];
@@ -62,7 +63,7 @@ export class ShopService {
       ...params,
     );
 
-    return { data: rows.map(normalizeShopRow), total, page, limit, pages: Math.ceil(total / limit) };
+    return { data: rows.map(normalizeShopRow) as PublicShop[], total, page, limit, pages: Math.ceil(total / limit) };
   }
 
   async getShopFilters(env = 'live'): Promise<FiltersResult> {
@@ -85,7 +86,7 @@ export class ShopService {
     };
   }
 
-  async getShopById(shopId: number, env = 'live'): Promise<Row | null> {
+  async getShopById(shopId: number, env = 'live'): Promise<PublicShop | null> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
       toPostgres(`SELECT id, name, class_name, shop_type, location_uuid, location, planet_moon, city, system,
@@ -96,10 +97,10 @@ export class ShopService {
       env,
       shopId,
     );
-    return rows[0] ? normalizeShopRow(rows[0]) : null;
+    return rows[0] ? (normalizeShopRow(rows[0]) as PublicShop) : null;
   }
 
-  async getShopsByLocation(locationUuid: string, env = 'live'): Promise<Row[]> {
+  async getShopsByLocation(locationUuid: string, env = 'live'): Promise<PublicShop[]> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
       toPostgres(`SELECT id, name, class_name, shop_type, location_uuid, location, planet_moon, city, system,
@@ -120,7 +121,7 @@ export class ShopService {
       env,
       locationUuid,
     );
-    return rows.map(normalizeShopRow);
+    return rows.map(normalizeShopRow) as PublicShop[];
   }
 
   async getShopInventory(shopId: number, env = 'live'): Promise<Row[]> {

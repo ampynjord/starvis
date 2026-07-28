@@ -223,6 +223,28 @@ async function auditEntities() {
   // personne ne lit.
   requireLocalizedNames('items', items, 0.01);
 
+  // Les missions n'étaient pas couvertes, et c'est ce qui a laissé sept de leurs
+  // colonnes vides passer inaperçues — `location_system`, `location_planet`,
+  // `location_name`, `required_reputation`, `reputation_reward`, `base_xp` et
+  // `blueprint_reward_uuid` sont nulles pour les 473 missions. Elles existent au
+  // schéma, sortent dans le contrat, et l'extraction ne les remplit pas.
+  //
+  // Les planchers sont posés sur l'existant : ils gardent ce qui marche et
+  // rendent visible, à chaque exécution, ce qui ne marche pas.
+  const missions = await getAll('/missions', { env });
+  requireCoverage('missions', missions, 'title', 1);
+  requireCoverage('missions', missions, 'mission_type', 1);
+  requireHumanNames('missions', missions);
+  // 3 % aujourd'hui — 15 missions sur 473. Le plancher constate plutôt qu'il
+  // n'exige : le relever suppose de combler l'extraction, pas de resserrer le
+  // seuil.
+  requireCoverage('missions', missions, 'description', 0.02);
+  // Ces trois-là sont à zéro. Un plancher nul ne bloque rien, mais le décompte
+  // paraît à chaque exécution — c'est ce qui manquait pour qu'on le sache.
+  requireCoverage('missions', missions, 'location_name', 0);
+  requireCoverage('missions', missions, 'base_xp', 0);
+  requireCoverage('missions', missions, 'reputation_reward', 0);
+
   const commodities = await getAll('/commodities', { env });
   requireCoverage('commodities', commodities, 'name', 1);
   requireHumanNames('commodities', commodities);

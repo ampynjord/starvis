@@ -34,7 +34,7 @@ export function mountPaintRoutes(router: Router, deps: RouteDependencies): void 
         data: result.data,
         meta: { source: 'Game Data', responseTime: `${Date.now() - t}ms` },
       };
-      if (req.query.format === 'csv') return void sendCsvOrJson(req, res, result.data as Record<string, unknown>[], payload);
+      if (req.query.format === 'csv') return void sendCsvOrJson(req, res, result.data, payload);
       sendWithETag(req, res, payload);
     }),
   );

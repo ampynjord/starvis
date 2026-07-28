@@ -3,6 +3,7 @@
  */
 import type { PrismaLike as PrismaClient } from '@starvis/db';
 import { annotateWithAffiliation } from '../data/location-affiliations.js';
+import type { PublicLocation } from './locations/location-types.js';
 import {
   convertBigIntToNumber,
   type FiltersResult,
@@ -55,7 +56,7 @@ export class LocationQueryService {
     order?: string;
     page?: number;
     limit?: number;
-  }): Promise<PaginatedResult> {
+  }): Promise<PaginatedResult<PublicLocation>> {
     const env = filters?.env ?? 'live';
     const prisma = this.getClient(env);
     const where: string[] = ['l.env = ?'];
@@ -121,10 +122,10 @@ export class LocationQueryService {
     const countSql = `SELECT COUNT(*) as total FROM game.locations l${w}`;
 
     const result = await paginate(prisma, baseSql, countSql, params, filters || {}, LOCATION_SORT, 'l');
-    return { ...result, data: result.data.map(annotateWithAffiliation) };
+    return { ...result, data: result.data.map(annotateWithAffiliation) as PublicLocation[] };
   }
 
-  async getLocation(uuid: string, env = 'live'): Promise<Row | null> {
+  async getLocation(uuid: string, env = 'live'): Promise<PublicLocation | null> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
       toPostgres(`SELECT l.uuid, l.class_name, l.name, l.type, l.system_code, l.parent_uuid,
@@ -162,7 +163,7 @@ export class LocationQueryService {
       uuid,
     );
     if (!rows.length) return null;
-    return annotateWithAffiliation(convertBigIntToNumber(stripInternal(rows[0])));
+    return annotateWithAffiliation(convertBigIntToNumber(stripInternal(rows[0]))) as PublicLocation;
   }
 
   async getAll(env = 'live'): Promise<Row[]> {

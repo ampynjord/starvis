@@ -23,8 +23,7 @@ export function mountShopRoutes(router: Router, deps: RouteDependencies): void {
     asyncHandler(async (req, res) => {
       const filters = ShopQuery.parse(req.query);
       const result = await gameDataService!.shops.getShops(filters);
-      if (req.query.format === 'csv')
-        return void sendCsvOrJson(req, res, result.data as Record<string, unknown>[], { success: true, ...result });
+      if (req.query.format === 'csv') return void sendCsvOrJson(req, res, result.data, { success: true, ...result });
       sendWithETag(req, res, { success: true, ...result });
     }),
   );

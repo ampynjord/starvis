@@ -2,6 +2,7 @@
  * PaintQueryService — Global listing of ship paints/liveries
  */
 import type { PrismaLike as PrismaClient } from '@starvis/db';
+import type { PublicPaint } from './paints/paint-types.js';
 import type { FiltersResult, PaginatedResult, Row } from './shared.js';
 import { toPostgres } from './shared.js';
 
@@ -37,7 +38,13 @@ const PAINT_MARKET_JOIN = `LEFT JOIN (
 export class PaintQueryService {
   constructor(private getClient: (env: string) => PrismaClient) {}
 
-  async getAllPaints(opts: { env?: string; search?: string; ship_uuid?: string; page?: number; limit?: number }): Promise<PaginatedResult> {
+  async getAllPaints(opts: {
+    env?: string;
+    search?: string;
+    ship_uuid?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<PaginatedResult<PublicPaint>> {
     const env = opts.env ?? 'live';
     const prisma = this.getClient(env);
     const where: string[] = ['sp.env = ?'];
@@ -72,7 +79,7 @@ export class PaintQueryService {
     const offset = (page - 1) * limit;
 
     const sql = `${baseSql} ORDER BY s.name, sp.paint_name LIMIT ${Number(limit)} OFFSET ${Number(offset)}`;
-    const rows = await prisma.$queryRawUnsafe<Row[]>(toPostgres(sql), ...params);
+    const rows = await prisma.$queryRawUnsafe<PublicPaint[]>(toPostgres(sql), ...params);
     return { data: rows, total, page, limit, pages: Math.ceil(total / limit) };
   }
 
