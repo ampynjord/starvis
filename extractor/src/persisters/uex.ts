@@ -76,21 +76,46 @@ function resolveEntityUuid(
   return entityName ? (map.byName.get(normalizeName(entityName)) ?? null) : null;
 }
 
+type EntityMap = { byName: Map<string, string>; dataForgeUuids: Set<string> };
+type EntityCandidate = { kind: 'commodity' | 'item' | 'component'; map: EntityMap };
+
+/**
+ * Une ligne de prix UEX, rapprochee de l'entite qu'elle designe.
+ *
+ * UEX ne separe pas les composants des objets : sa ressource `components` a
+ * disparu (404, avale par un `.catch`), et ses prix de composants sont servis
+ * parmi les `items_prices_all`. On confronte donc chaque ligne aux tables dans
+ * l'ordre donne, et le genre retenu est celui qui a repondu — 424 noms
+ * orphelins correspondaient exactement a un composant.
+ *
+ * Le premier candidat porte le genre declare par la ressource : c'est sous ce
+ * nom-la qu'UEX ecrit son identifiant et son libelle.
+ */
 function economyRow(
   env: GameEnv,
   resource: string,
-  kind: 'commodity' | 'item' | 'component',
+  candidates: EntityCandidate[],
   row: UexGenericMarketPrice,
-  entityMap: { byName: Map<string, string>; dataForgeUuids: Set<string> },
 ): (string | number | null | boolean)[] {
-  const entityName = firstText(row, [`${kind}_name`, 'name', 'name_full', 'item_name', 'commodity_name', 'component_name']);
-  const entityUuid = resolveEntityUuid(row, kind, entityName, entityMap);
+  const declaredKind = candidates[0].kind;
+  const entityName = firstText(row, [`${declaredKind}_name`, 'name', 'name_full', 'item_name', 'commodity_name', 'component_name']);
+
+  let kind = declaredKind;
+  let entityUuid: string | null = null;
+  for (const candidate of candidates) {
+    const resolved = resolveEntityUuid(row, candidate.kind, entityName, candidate.map);
+    if (resolved) {
+      entityUuid = resolved;
+      kind = candidate.kind;
+      break;
+    }
+  }
   const buy = firstNumber(row, ['price_buy', 'price_buy_avg', 'price_min']);
   const sell = firstNumber(row, ['price_sell', 'price_sell_avg', 'price_max']);
   const avg = firstNumber(row, ['price_average', 'price_avg']);
   const price = firstNumber(row, ['price']) ?? buy ?? sell ?? avg;
   const terminalId = firstNumber(row, ['id_terminal', 'terminal_id']);
-  const entityId = firstNumber(row, [`id_${kind}`, 'id_item', 'id_commodity', 'id_component']);
+  const entityId = firstNumber(row, [`id_${declaredKind}`, 'id_item', 'id_commodity', 'id_component']);
   const priceKind = buy != null && sell != null ? 'spread' : buy != null ? 'buy' : sell != null ? 'sell' : 'price';
 
   return [
@@ -312,12 +337,31 @@ export async function saveUexMarket(conn: PoolClient, env: GameEnv, onProgress?:
   const itemMap = await buildEntityMap(conn, 'items', env);
   const componentMap = await buildEntityMap(conn, 'components', env);
 
-  await conn.query('DELETE FROM game.uex_market_prices WHERE env = $1', [env]);
   const economyRows = [
-    ...economy.commodities.map((row) => economyRow(env, 'commodities_prices_all', 'commodity', row, commodityMap)),
-    ...economy.items.map((row) => economyRow(env, 'items_prices_all', 'item', row, itemMap)),
-    ...economy.components.map((row) => economyRow(env, 'components', 'component', row, componentMap)),
+    ...economy.commodities.map((row) => economyRow(env, 'commodities_prices_all', [{ kind: 'commodity', map: commodityMap }], row)),
+    // Les composants apres les objets : un nom qui existe des deux cotes reste
+    // un objet, ce qu'il etait avant cette retombee.
+    ...economy.items.map((row) =>
+      economyRow(
+        env,
+        'items_prices_all',
+        [
+          { kind: 'item', map: itemMap },
+          { kind: 'component', map: componentMap },
+        ],
+        row,
+      ),
+    ),
   ];
+
+  // On n'efface qu'une fois qu'on a de quoi remplacer. Les recuperations UEX
+  // sont enveloppees d'un `.catch` qui rend une liste vide : sans cette garde,
+  // une panne chez eux effacait tous les prix du marche et n'inserait rien.
+  if (economyRows.length === 0) {
+    onProgress?.('UEX: aucune ligne de marche recue, les prix existants sont conserves');
+  } else {
+    await conn.query('DELETE FROM game.uex_market_prices WHERE env = $1', [env]);
+  }
   const economyPrices = await batchUpsert(
     conn,
     `INSERT INTO game.uex_market_prices

@@ -91,7 +91,6 @@ export interface UexGenericMarketPrice {
 export interface UexEconomyMarketSnapshot {
   commodities: UexGenericMarketPrice[];
   items: UexGenericMarketPrice[];
-  components: UexGenericMarketPrice[];
 }
 
 async function fetchUex<T>(resource: string): Promise<T[]> {
@@ -141,12 +140,21 @@ export async function fetchUexVehicleMarket(onProgress?: (msg: string) => void):
 
 export async function fetchUexEconomyMarket(onProgress?: (msg: string) => void): Promise<UexEconomyMarketSnapshot> {
   onProgress?.('UEX: fetching commodity/item/component prices...');
-  const [commodities, items, components] = await Promise.all([
-    fetchUex<UexGenericMarketPrice>('commodities_prices_all').catch(() => []),
-    fetchUex<UexGenericMarketPrice>('items_prices_all').catch(() => []),
-    fetchUex<UexGenericMarketPrice>('components').catch(() => []),
+  // La ressource `components` n'existe plus — elle repond 404, et le `.catch`
+  // l'avalait en silence depuis. Chez UEX les composants sont des « items » :
+  // leurs prix arrivent dans `items_prices_all`, et c'est le persister qui les
+  // rapproche de `game.components`.
+  const [commodities, items] = await Promise.all([
+    fetchUex<UexGenericMarketPrice>('commodities_prices_all').catch((error) => {
+      onProgress?.(`UEX: commodities_prices_all indisponible — ${(error as Error).message}`);
+      return [] as UexGenericMarketPrice[];
+    }),
+    fetchUex<UexGenericMarketPrice>('items_prices_all').catch((error) => {
+      onProgress?.(`UEX: items_prices_all indisponible — ${(error as Error).message}`);
+      return [] as UexGenericMarketPrice[];
+    }),
   ]);
 
-  onProgress?.(`UEX: ${commodities.length} commodity, ${items.length} item, ${components.length} component price rows`);
-  return { commodities, items, components };
+  onProgress?.(`UEX: ${commodities.length} commodity, ${items.length} item price rows`);
+  return { commodities, items };
 }
