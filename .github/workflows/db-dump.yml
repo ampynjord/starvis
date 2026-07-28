@@ -2,6 +2,11 @@ name: DB Dump (prod → artifact)
 
 on:
   workflow_dispatch:
+  # Une sauvegarde jamais restaurée n'est pas une sauvegarde : c'est un fichier
+  # dont on espère qu'il en est une. Le rendez-vous hebdomadaire vérifie qu'elle
+  # se relit, dans un PostgreSQL jetable, sans jamais toucher la production.
+  schedule:
+    - cron: "17 4 * * 1"
 
 jobs:
   dump:
@@ -18,7 +23,11 @@ jobs:
           script: |
             PGUSER=$(docker exec starvis-postgres printenv POSTGRES_USER)
             PGDB=$(docker exec starvis-postgres printenv POSTGRES_DB)
-            docker exec starvis-postgres pg_dump -U "$PGUSER" "$PGDB" | gzip > /tmp/starvis_dump.sql.gz
+            # --no-owner --no-acl : la sauvegarde doit pouvoir se relire ailleurs
+            # que sur la machine qui l'a produite. Les propriétaires et les
+            # droits y sont propres au serveur ; les exiger ferait échouer toute
+            # restauration de secours sur une instance neuve.
+            docker exec starvis-postgres pg_dump --no-owner --no-acl -U "$PGUSER" "$PGDB" | gzip > /tmp/starvis_dump.sql.gz
             echo "Dump ready at /tmp/starvis_dump.sql.gz"
 
       - name: Download dump via SCP
@@ -38,3 +47,84 @@ jobs:
           name: starvis-db-dump
           path: starvis_dump.sql.gz
           retention-days: 1
+
+  verify-restore:
+    name: Restore the dump and check it
+    runs-on: ubuntu-latest
+    needs: dump
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: restore_user
+          POSTGRES_PASSWORD: restore_password
+          POSTGRES_DB: starvis_restore
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U restore_user"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - name: Download the dump
+        uses: actions/download-artifact@v4
+        with:
+          name: starvis-db-dump
+
+      - name: Install psql
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Restore into a throwaway instance
+        env:
+          PGPASSWORD: restore_password
+        run: |
+          set -euo pipefail
+          echo "Taille du dump : $(du -h starvis_dump.sql.gz | cut -f1)"
+          # ON_ERROR_STOP : une restauration qui rejoue la moitié des ordres et
+          # se termine sans broncher est exactement ce qu'on cherche à exclure.
+          gunzip -c starvis_dump.sql.gz \
+            | psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -U restore_user -d starvis_restore -q
+
+      - name: Check the restored content
+        env:
+          PGPASSWORD: restore_password
+        run: |
+          set -euo pipefail
+          q() { psql -tAX -h 127.0.0.1 -U restore_user -d starvis_restore -c "$1"; }
+
+          schemas="$(q "SELECT string_agg(nspname, ' ' ORDER BY nspname) FROM pg_namespace WHERE nspname IN ('game','rsi','meta')")"
+          echo "Schémas restaurés : ${schemas}"
+          for expected in game rsi meta; do
+            case " ${schemas} " in
+              *" ${expected} "*) ;;
+              *) echo "Schéma manquant : ${expected}"; exit 1 ;;
+            esac
+          done
+
+          # Des planchers volontairement bas : ils prouvent que la sauvegarde
+          # contient des données, pas qu'elles sont justes — la justesse est
+          # l'affaire de l'audit de vérité, qui interroge l'API en production.
+          failures=0
+          check() {
+            table="$1"; floor="$2"
+            actual="$(q "SELECT count(*) FROM ${table}")"
+            if [ "${actual}" -lt "${floor}" ]; then
+              echo "ÉCHEC ${table} : ${actual} ligne(s), plancher ${floor}"
+              failures=$((failures + 1))
+            else
+              echo "ok    ${table} : ${actual} ligne(s)"
+            fi
+          }
+          check game.ships 100
+          check game.components 500
+          check game.items 500
+          check game.locations 100
+          check game.commodities 20
+          check meta.extraction_log 1
+
+          if [ "${failures}" -ne 0 ]; then
+            echo "La sauvegarde se relit mais ${failures} table(s) sont sous leur plancher."
+            exit 1
+          fi
+          echo "Sauvegarde restaurée et peuplée."
