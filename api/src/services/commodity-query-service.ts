@@ -2,7 +2,7 @@
  * CommodityQueryService — Tradeable/mineable goods (metals, minerals, gas, food, etc.)
  */
 import type { PrismaLike as PrismaClient } from '@starvis/db';
-import { type FiltersResult, type PaginatedResult, paginate, type Row, stripInternal } from './shared.js';
+import { type FiltersResult, type PaginatedResult, paginate, stripInternal } from './shared.js';
 
 const COMMODITY_SORT = new Set(['name', 'class_name', 'type', 'sub_type', 'symbol', 'occupancy_scu']);
 const COMMODITY_CATEGORY_DEFS: Array<{ label: string; regex: RegExp }> = [
@@ -36,6 +36,32 @@ function buildCommodityCategories(rows: { type: string; count: number }[]): { la
 }
 
 /**
+ * Une marchandise telle que l'API la sert.
+ *
+ * C'est le contrat, écrit une fois. Les noms sont en `snake_case` parce que
+ * c'est ce que les consommateurs reçoivent depuis toujours — pas parce que
+ * Prisma ou PostgreSQL l'imposent.
+ *
+ * `sc_uuid` est ajouté par `stripInternal` sur tout le trafic sortant, d'où son
+ * caractère optionnel ici : la sérialisation ne le produit pas elle-même.
+ */
+export interface PublicCommodity {
+  uuid: string;
+  env: string;
+  class_name: string;
+  name: string;
+  type: string;
+  sub_type: string | null;
+  symbol: string | null;
+  /** Colonne `numeric`, rendue en chaîne comme le faisait le pilote. */
+  occupancy_scu: string | null;
+  data_json: unknown;
+  created_at: Date;
+  updated_at: Date;
+  sc_uuid?: string;
+}
+
+/**
  * Traduit un enregistrement Prisma vers le contrat public.
  *
  * Prisma rend les champs en `camelCase` — le modèle les déclare ainsi, avec
@@ -66,7 +92,7 @@ function toPublicCommodity(record: {
   dataJson: unknown;
   createdAt: Date;
   updatedAt: Date;
-}): Row {
+}): PublicCommodity {
   return {
     uuid: record.uuid,
     env: record.env,
@@ -99,7 +125,7 @@ export class CommodityQueryService {
     order?: string;
     page?: number;
     limit?: number;
-  }): Promise<PaginatedResult> {
+  }): Promise<PaginatedResult<PublicCommodity>> {
     const env = filters?.env ?? 'live';
     const prisma = this.getClient(env);
     const where: string[] = ['c.env = ?'];
@@ -141,13 +167,13 @@ export class CommodityQueryService {
     const baseSql = `SELECT c.* FROM game.commodities c${w}`;
     const countSql = `SELECT COUNT(*) as total FROM game.commodities c${w}`;
 
-    return paginate(prisma, baseSql, countSql, params, filters || {}, COMMODITY_SORT, 'c');
+    return paginate<PublicCommodity>(prisma, baseSql, countSql, params, filters || {}, COMMODITY_SORT, 'c');
   }
 
-  async getCommodityByUuid(uuid: string, env = 'live'): Promise<Row | null> {
+  async getCommodityByUuid(uuid: string, env = 'live'): Promise<PublicCommodity | null> {
     const prisma = this.getClient(env);
     const record = await prisma.commodity.findUnique({ where: { uuid_env: { uuid, env } } });
-    return record ? stripInternal(toPublicCommodity(record)) : null;
+    return record ? (stripInternal(toPublicCommodity(record)) as PublicCommodity) : null;
   }
 
   async getCommodityTypes(env = 'live'): Promise<{ types: { type: string; count: number }[] }> {

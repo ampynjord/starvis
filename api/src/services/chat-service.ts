@@ -889,8 +889,9 @@ export class ChatService {
             page: 1,
           });
           if (!comms.data.length) return { error: `Commodity "${args.name}" not found` };
-          const comm = comms.data[0] as Record<string, unknown>;
-          const prices = await this.gameDataService.trade.getCommodityPrices(comm.uuid as string, env);
+          // Plus de cast : la forme de la marchandise est déclarée par le service.
+          const comm = comms.data[0];
+          const prices = await this.gameDataService.trade.getCommodityPrices(comm.uuid, env);
           return {
             commodity: comm.name,
             occupancy_scu: comm.occupancy_scu,

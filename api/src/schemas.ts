@@ -197,15 +197,26 @@ export const CommodityQuery = z
 
 // ── Pure helpers ──────────────────────────────────────────
 
-export function arrayToCsv(data: Record<string, unknown>[]): string {
+/**
+ * `readonly object[]` plutôt que `Record<string, unknown>[]` : la fonction
+ * n'énumère que les clés du premier élément, ce qu'une interface permet aussi
+ * bien qu'un dictionnaire ouvert. L'ancienne signature obligeait les entités à
+ * forme déclarée — celles dont on sait le plus — à être forcées vers un type
+ * plus vague pour être exportées.
+ */
+export function arrayToCsv(data: readonly object[]): string {
   if (!data.length) return '';
   const headers = Object.keys(data[0]);
   const lines = [headers.join(',')];
   for (const row of data) {
+    // L'indexation par chaîne demande un type indexable ; la vue locale le dit
+    // sans obliger les appelants à déclarer leurs entités comme des
+    // dictionnaires ouverts.
+    const fields = row as Record<string, unknown>;
     lines.push(
       headers
         .map((h) => {
-          const val = row[h];
+          const val = fields[h];
           if (val === null || val === undefined) return '';
           const str = typeof val === 'object' ? JSON.stringify(val) : String(val);
           return str.includes(',') || str.includes('"') || str.includes('\n') ? `"${str.replace(/"/g, '""')}"` : str;

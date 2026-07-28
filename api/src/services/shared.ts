@@ -6,12 +6,26 @@ import { dataForgeUuidToScUuid } from '../utils/sc-uuid.js';
 
 // ── Types ─────────────────────────────────────────────────
 
-/** A single row returned by Prisma raw queries */
+/**
+ * Une ligne renvoyée par une requête brute, dont on ne sait rien.
+ *
+ * C'est le type de retour de 195 appels `$queryRawUnsafe` : aucune garantie sur
+ * les colonnes présentes, aucune sur leur type, aucune erreur de compilation
+ * quand une colonne disparaît du schéma. Il reste le défaut, mais chaque requête
+ * peut désormais déclarer mieux.
+ */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Row = Record<string, any>;
 
-export interface PaginatedResult {
-  data: Row[];
+/**
+ * Le paramètre de type propage la connaissance jusqu'aux appelants.
+ *
+ * Il vaut `Row` par défaut, donc rien ne change pour les services qui n'ont pas
+ * encore déclaré la forme de leurs lignes ; ceux qui la déclarent la voient
+ * remonter jusqu'à la route, sans conversion ni cast.
+ */
+export interface PaginatedResult<T = Row> {
+  data: T[];
   total: number;
   page: number;
   limit: number;
@@ -143,7 +157,17 @@ export function toPostgres(sql: string): string {
 
 // ── Pagination helper ─────────────────────────────────────
 
-export async function paginate(
+/**
+ * Le paramètre `T` décrit la forme des lignes que `baseSql` renvoie.
+ *
+ * C'est une **affirmation de l'appelant**, pas une vérification : TypeScript
+ * croit sur parole ce qu'on lui déclare d'une requête écrite en chaîne de
+ * caractères. Elle vaut mieux que `Record<string, any>` — elle documente
+ * l'intention et casse à la compilation quand un appelant lit une colonne
+ * absente de la déclaration — mais elle ne remplace pas une vérification contre
+ * le schéma. Ne déclarer que ce qu'on a lu dans le `SELECT`.
+ */
+export async function paginate<T = Row>(
   prisma: PrismaClient,
   baseSql: string,
   countSql: string,
@@ -153,7 +177,7 @@ export async function paginate(
   alias: string,
   /** Optional map of dot-notation sort keys (e.g. "game_data.scm_speed") to SQL expressions */
   jsonSortMap?: Record<string, string>,
-): Promise<PaginatedResult> {
+): Promise<PaginatedResult<T>> {
   const countRows = await prisma.$queryRawUnsafe<Row[]>(toPostgres(countSql), ...params);
   const total = countRows[0]?.total ?? countRows[0]?.count ?? 0;
 
@@ -173,5 +197,14 @@ export async function paginate(
 
   const sql = `${baseSql} ORDER BY ${orderExpr} LIMIT ${Number(limit)} OFFSET ${Number(offset)}`;
   const rows = await prisma.$queryRawUnsafe<Row[]>(toPostgres(sql), ...params);
-  return { data: rows.map(stripInternal), total: Number(total), page, limit, pages: Math.ceil(Number(total) / limit) };
+  // `stripInternal` retire des colonnes et en ajoute une : le résultat n'est
+  // plus exactement `T`. Le cast est assumé ici, à l'unique endroit où la
+  // transformation est connue, plutôt que dilué chez chaque appelant.
+  return {
+    data: rows.map(stripInternal) as T[],
+    total: Number(total),
+    page,
+    limit,
+    pages: Math.ceil(Number(total) / limit),
+  };
 }

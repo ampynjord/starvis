@@ -86,7 +86,15 @@ export function sendDataWithETag<T>(req: Request, res: Response, data: T, count?
   sendWithETag(req, res, payload);
 }
 
-export function sendCsvOrJson(req: Request, res: Response, data: Record<string, unknown>[], jsonPayload: unknown): void {
+/**
+ * `data` accepte tout objet, pas seulement un dictionnaire ouvert.
+ *
+ * La signature exigeait `Record<string, unknown>[]`, ce qui obligeait chaque
+ * appelant à forcer le type — et rendait le cast obligatoire précisément pour
+ * les entités dont la forme est déclarée, alors que ce sont celles dont on sait
+ * le plus. `arrayToCsv` ne fait qu'énumérer les clés : une interface lui suffit.
+ */
+export function sendCsvOrJson(req: Request, res: Response, data: readonly object[], jsonPayload: unknown): void {
   if (req.query.format === 'csv') {
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', 'attachment; filename=export.csv');
