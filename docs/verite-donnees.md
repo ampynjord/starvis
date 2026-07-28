@@ -451,6 +451,41 @@ En attendant, l'audit mesure la proportion de libellés techniques et la plafonn
 à 20 % — elle est de 17,6 % aujourd'hui. Le défaut ne peut plus s'aggraver sans
 être vu.
 
+**Ce que la table du jeu donne, et ce qu'elle ne donne pas.** `ShopFranchise`
+existe dans le DataForge : 37 enregistrements, 36 résolus en nom commercial
+(« Cordry's », « Trade & Development Division », « Dumper's Depot »). Le code qui
+la lisait cherchait un champ `name` là où le jeu écrit `localizedName` — la carte
+se construisait, journalisait ses 37 entrées, et n'en portait aucune clé. Corrigé
+depuis ; sept boutiques issues des prefabs ont retrouvé leur nom.
+
+**Elle ne couvre pas le reste.** Sur 136 boutiques, 31 seulement ont une
+franchise connue du jeu. Les 105 autres viennent des fichiers d'inventaire, dont
+le segment de franchise n'a pas d'équivalent exact dans `ShopFranchise` — souvent
+à une lettre près :
+
+| Nom de fichier | Franchise du jeu |
+|---|---|
+| `livefirewepons` | `livefireweapons` |
+| `vantagerentals` | `vantage` |
+| `regalluxuryrentals` | `regal` |
+| `shubininterstellar` | `shubin` |
+| `teachsshipshop` | `teachs` |
+
+Les rapprocher demande un appariement approximatif, donc un arbitrage : le
+rapprochement le plus proche pour « Aparelli New Babbage » est « Casaba Outlet »,
+et rien ne dit si c'est une enseigne du même groupe ou une fausse piste.
+
+**Et le nom seul ne suffirait pas.** Quatre boutiques « Cubby Blast » coexistent
+à des lieux différents ; remplacer le libellé par le seul nom de franchise les
+rendrait indiscernables dans une liste. Le lieu est déjà une colonne à part, mais
+la page qui liste les boutiques d'un lieu, elle, n'a plus rien pour les
+distinguer — deux « Tammany and Sons » y figurent, séparées aujourd'hui par le
+seul segment `food` du nom de fichier.
+
+La suite tient donc en deux décisions, pas en un correctif : quel appariement
+approximatif on accepte, et ce qui distingue deux boutiques d'une même enseigne
+au même endroit.
+
 ## 6. Ce que l'audit ne fait pas encore
 
 Honnêtement listé, pour ne pas confondre couverture et confiance :
@@ -460,7 +495,9 @@ Honnêtement listé, pour ne pas confondre couverture et confiance :
   Le plan le prévoit ; il demande d'abord de savoir laquelle fait foi.
 - **Pas de traçabilité.** Une valeur ne dit pas encore d'où elle vient ni quand
   elle a été extraite. C'est la condition pour arbitrer une divergence.
-- **Entités non couvertes** : lieux, missions, Galactapedia, comm-links.
+- **Entités non couvertes** : lieux, Galactapedia, comm-links. Les boutiques ne
+  le sont que par leurs libellés ([D9](#d9--les-boutiques-affichent-leur-nom-de-fichier)),
+  pas par leurs prix ni leurs stocks.
 - **Les erreurs réseau sont retentées trois fois**, 5xx compris. C'est
   volontaire : un audit qui rougit pour une coupure passagère plutôt que pour la
   qualité des données finit par être ignoré. Le premier essai contre la
