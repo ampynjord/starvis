@@ -59,7 +59,7 @@ export interface ShopExtractRecord {
 
 // ── Franchise resolution from DataForge ──────────────────────────────────────
 
-function buildFranchiseMap(ctx: DataForgeContext): Map<string, { locKey: string; name: string | null }> {
+export function buildFranchiseMap(ctx: DataForgeContext): Map<string, { locKey: string; name: string | null }> {
   const result = new Map<string, { locKey: string; name: string | null }>();
   const dfData = ctx.getDfData();
   if (!dfData) return result;
@@ -84,7 +84,12 @@ function buildFranchiseMap(ctx: DataForgeContext): Map<string, { locKey: string;
         .toLowerCase();
       if (!slug) continue;
 
-      const locKey = typeof data.name === 'string' ? data.name : null;
+      // Le champ s'appelle `localizedName`, pas `name`. Lire `name` rendait une
+      // carte de 37 franchises dont aucune ne portait de cle : les noms
+      // commerciaux du jeu n'ont jamais servi, et la decoupe
+      // franchise/lieu — qui se sert de cette carte comme dictionnaire de
+      // prefixes connus — retombait toujours sur le premier segment.
+      const locKey = typeof data.localizedName === 'string' ? data.localizedName : null;
       result.set(slug, { locKey: locKey ?? '', name: null });
     } catch {
       // Skip
