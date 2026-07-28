@@ -6771,6 +6771,43 @@
         }
       }
     },
+    "/api/v1/market/offers/{uuid}": {
+      "get": {
+        "tags": ["Economy"],
+        "summary": "Where to buy or sell an entity, across every source",
+        "description": "Offers for one entity — item, component, commodity or ship alike. Merges what the P4K describes (shop inventories, with stock) and what players report through UEX (terminal prices). Sorted by ascending buy price; `best_buy` and `best_sell` are computed so a consumer does not have to. A `location_uuid` is present only on P4K offers: UEX terminals are not tied to our locations.",
+        "operationId": "getMarketOffers",
+        "parameters": [
+          {
+            "name": "uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/env"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Offers, best buy and best sell for the entity"
+          }
+        }
+      }
+    },
     "/api/v1/mining/elements/{uuid}": {
       "get": {
         "tags": ["Mining"],

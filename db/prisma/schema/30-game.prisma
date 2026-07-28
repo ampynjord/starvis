@@ -1113,3 +1113,28 @@ model GameInventoryContainer {
   @@map("inventory_containers")
   @@schema("game")
 }
+
+/// Où acheter quoi, toutes sources confondues.
+///
+/// Vue, non table : les prix vivent dans `shop_inventory` et `uex_market_prices`,
+/// et les dupliquer les ferait diverger. La vue répond en une requête à « où
+/// acheter cet objet, ce composant, cette marchandise », ce qui demandait
+/// jusqu'ici de savoir laquelle des deux tables interroger.
+view MarketOffer {
+  env          String    @db.VarChar(10)
+  entityUuid   String    @map("entity_uuid") @db.VarChar(36)
+  source       String
+  shopId       Int?      @map("shop_id")
+  outletName   String?   @map("outlet_name")
+  locationUuid String?   @map("location_uuid") @db.VarChar(36)
+  locationName String?   @map("location_name")
+  priceBuy     Decimal?  @map("price_buy") @db.Decimal(14, 2)
+  priceSell    Decimal?  @map("price_sell") @db.Decimal(14, 2)
+  stockCurrent Int?      @map("stock_current")
+  stockMax     Int?      @map("stock_max")
+  observedAt   DateTime? @map("observed_at")
+
+  @@unique([env, entityUuid, source, shopId, outletName])
+  @@map("market_offers")
+  @@schema("game")
+}

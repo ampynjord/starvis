@@ -13,7 +13,7 @@
 generator client {
   provider        = "prisma-client-js"
   output          = "../../generated/client"
-  previewFeatures = ["postgresqlExtensions"]
+  previewFeatures = ["postgresqlExtensions", "views"]
 }
 
 datasource db {
