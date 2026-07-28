@@ -3,6 +3,7 @@
  */
 import type { PrismaLike as PrismaClient } from '@starvis/db';
 import { getGameComponentCategory } from './component-taxonomy.js';
+import type { PublicComponent } from './components/component-types.js';
 import {
   convertBigIntToNumber,
   type FiltersResult,
@@ -103,7 +104,7 @@ const IS_BESPOKE_EXPR = `(COALESCE(c.is_bespoke, FALSE)
   OR c.class_name ~* '(^|_)(bespoke|custom)(_|$)'
   OR c.name ~* '(^|\\s)(bespoke|custom)(\\s|$)')`;
 
-function withGameComponentCategory<T extends Row>(row: T): T {
+function withGameComponentCategory<T extends { type?: unknown }>(row: T): T & { game_component_category: string } {
   return { ...row, game_component_category: getGameComponentCategory(String(row.type || '')) };
 }
 
@@ -173,7 +174,7 @@ export class ComponentQueryService {
     order?: string;
     page?: number;
     limit?: number;
-  }): Promise<PaginatedResult> {
+  }): Promise<PaginatedResult<PublicComponent>> {
     const env = filters?.env ?? 'live';
     const prisma = this.getClient(env);
     const where: string[] = ['c.env = ?', COMPONENT_VISIBLE_WHERE];
@@ -264,7 +265,7 @@ export class ComponentQueryService {
     const countSql = `SELECT COUNT(*) as total FROM game.components c${w}`;
 
     const result = await paginate(prisma, baseSql, countSql, params, filters || {}, COMP_SORT, 'c');
-    return { ...result, data: result.data.map(withGameComponentCategory) };
+    return { ...result, data: result.data.map(withGameComponentCategory) as PublicComponent[] };
   }
 
   private async getAllPaintComponents(filters?: {
@@ -276,7 +277,7 @@ export class ComponentQueryService {
     order?: string;
     page?: number;
     limit?: number;
-  }): Promise<PaginatedResult> {
+  }): Promise<PaginatedResult<PublicComponent>> {
     const env = filters?.env ?? 'live';
     const prisma = this.getClient(env);
     const where: string[] = ['sp.env = ?'];
@@ -343,7 +344,7 @@ export class ComponentQueryService {
       ...params,
     );
     return {
-      data: rows.map(withGameComponentCategory),
+      data: rows.map(withGameComponentCategory) as PublicComponent[],
       total,
       page,
       limit,
@@ -351,7 +352,7 @@ export class ComponentQueryService {
     };
   }
 
-  async getComponentByUuid(uuid: string, env = 'live'): Promise<Row | null> {
+  async getComponentByUuid(uuid: string, env = 'live'): Promise<PublicComponent | null> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
       toPostgres(
@@ -360,10 +361,10 @@ export class ComponentQueryService {
       uuid,
       env,
     );
-    return rows[0] ? withGameComponentCategory(stripInternal(rows[0])) : null;
+    return rows[0] ? (withGameComponentCategory(stripInternal(rows[0])) as PublicComponent) : null;
   }
 
-  async getComponentByClassName(className: string, env = 'live'): Promise<Row | null> {
+  async getComponentByClassName(className: string, env = 'live'): Promise<PublicComponent | null> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
       toPostgres(
@@ -372,10 +373,10 @@ export class ComponentQueryService {
       className,
       env,
     );
-    return rows[0] ? withGameComponentCategory(stripInternal(rows[0])) : null;
+    return rows[0] ? (withGameComponentCategory(stripInternal(rows[0])) as PublicComponent) : null;
   }
 
-  async resolveComponent(id: string, env = 'live'): Promise<Row | null> {
+  async resolveComponent(id: string, env = 'live'): Promise<PublicComponent | null> {
     return id.length === 36 ? await this.getComponentByUuid(id, env) : await this.getComponentByClassName(id, env);
   }
 
