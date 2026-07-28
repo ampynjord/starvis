@@ -28,13 +28,15 @@ const redisStub = {
   quit: vi.fn(async () => 'OK'),
 };
 
-class RedisStub {
-  constructor() {
-    return redisStub as never;
-  }
-}
+// Une fonction plutot qu'une classe : un constructeur de classe qui retourne
+// une valeur est refuse par le lint. Une fonction ordinaire appelee avec `new`
+// rend bien l'objet qu'elle retourne — une flechee, elle, n'est pas
+// constructible du tout.
+const makeRedis = vi.fn(function RedisStub() {
+  return redisStub;
+});
 
-vi.mock('ioredis', () => ({ default: RedisStub, Redis: RedisStub }));
+vi.mock('ioredis', () => ({ default: makeRedis, Redis: makeRedis }));
 
 const { buildCacheKey, cacheGet, cacheSet, getDataVersion, setDataVersionResolver } = await import('../src/services/redis.js');
 
