@@ -22,6 +22,13 @@ describe('extractor CLI options', () => {
     expect(parseCliOptions(['--quiet']).logLevel).toBe('silent');
   });
 
+  it('expose plan et verify, absents par defaut', () => {
+    const defaults = parseCliOptions([]);
+    expect([defaults.plan, defaults.verify]).toEqual([false, false]);
+    expect(parseCliOptions(['--plan']).plan).toBe(true);
+    expect(parseCliOptions(['--verify']).verify).toBe(true);
+  });
+
   it('validates integer options', () => {
     expect(parseCliOptions(['--concurrency', '4']).ctmConcurrency).toBe(4);
     expect(parseCliOptions(['--ctm-concurrency', '3']).ctmConcurrency).toBe(3);

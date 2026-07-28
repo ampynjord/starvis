@@ -94,3 +94,51 @@ export const P4K_MODULES = new Set<ExtractionModule>(
 export const NETWORK_MODULES = new Set<ExtractionModule>(
   MODULE_REGISTRY.filter((module) => module.runtime === 'network').map((module) => module.id),
 );
+
+/**
+ * Ce qu'une extraction efface avant d'ecrire.
+ *
+ * Ces lignes etaient jusqu'ici une suite de `DELETE` dans `cleanStaleGameData`.
+ * Un mode `plan` fidele ne peut pas relire du code imperatif : il lui faut un
+ * fait. Le nettoyage execute desormais cette table, et le plan l'affiche — les
+ * deux ne peuvent plus diverger, puisqu'ils lisent la meme chose.
+ *
+ * **L'ordre est celui des dependances de cles etrangeres**, pas un ordre
+ * alphabetique : les tables filles precedent leurs parents. Le reordonner
+ * casserait le nettoyage.
+ */
+export interface ModuleDeletion {
+  /** La suppression a lieu des qu'un seul de ces modules est selectionne. */
+  readonly modules: readonly ExtractionModule[];
+  readonly table: string;
+  /** Les tables filles portent l'env de leur parent, sous un autre nom. */
+  readonly envColumn: string;
+}
+
+export const MODULE_DELETIONS: readonly ModuleDeletion[] = [
+  { modules: ['ships'], table: 'game.ship_modules', envColumn: 'env' },
+  { modules: ['ships'], table: 'game.ship_loadouts', envColumn: 'env' },
+  { modules: ['ships'], table: 'game.ships', envColumn: 'env' },
+  { modules: ['components'], table: 'game.components', envColumn: 'env' },
+  { modules: ['items', 'commodities'], table: 'game.items', envColumn: 'env' },
+  { modules: ['items', 'commodities'], table: 'game.commodities', envColumn: 'env' },
+  { modules: ['mining'], table: 'game.mining_composition_parts', envColumn: 'composition_env' },
+  { modules: ['mining'], table: 'game.mining_compositions', envColumn: 'env' },
+  { modules: ['mining'], table: 'game.mining_elements', envColumn: 'env' },
+  { modules: ['missions'], table: 'game.mission_blueprint_rewards', envColumn: 'mission_env' },
+  { modules: ['missions'], table: 'game.missions', envColumn: 'env' },
+  { modules: ['crafting'], table: 'game.crafting_ingredients', envColumn: 'recipe_env' },
+  { modules: ['crafting'], table: 'game.crafting_slot_modifiers', envColumn: 'recipe_env' },
+  { modules: ['crafting'], table: 'game.crafting_recipes', envColumn: 'env' },
+  { modules: ['locations'], table: 'game.locations', envColumn: 'env' },
+  { modules: ['game-insights'], table: 'game.blueprint_rewards', envColumn: 'env' },
+  { modules: ['game-insights'], table: 'game.loot_table_entries', envColumn: 'env' },
+  { modules: ['game-insights'], table: 'game.loot_tables', envColumn: 'env' },
+  { modules: ['game-insights'], table: 'game.loot_archetypes', envColumn: 'env' },
+  { modules: ['game-insights'], table: 'game.reputation_scopes', envColumn: 'env' },
+  { modules: ['game-insights'], table: 'game.reputation_standings', envColumn: 'env' },
+  { modules: ['game-insights'], table: 'game.factions', envColumn: 'env' },
+  { modules: ['game-insights'], table: 'game.ammo', envColumn: 'env' },
+  { modules: ['game-insights'], table: 'game.inventory_containers', envColumn: 'env' },
+  { modules: ['game-insights'], table: 'game.game_insights', envColumn: 'env' },
+] as const;

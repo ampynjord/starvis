@@ -199,9 +199,12 @@ cliente importée.
 - **Erreur d'hydratation** : présente en CI **avant** le recentrage (vérifié sur le
   dernier run vert antérieur). Non bloquante, à traiter en phase 2 — le passage au
   rendu serveur en supprimera probablement la cause.
-- **Warning `pg`** : les persisters de l'extracteur déclenchent
-  « client.query() while already executing », qui deviendra une erreur dure en
-  `pg@9`. À corriger avant la montée de version.
+- **Warning `pg`** : *corrigé.* Un seul site le déclenchait — trois
+  `buildEntityMap` en `Promise.all` sur un même client, dans le persister UEX.
+  `pg` sérialisait déjà ces requêtes : le parallélisme était illusoire, seul
+  l'avertissement était réel. Reproduit puis vérifié éteint (parallèle → un
+  avertissement, séquentiel → aucun). La montée en `pg@9` n'est plus bloquée par
+  ce point.
 - **TypeScript 7** : bloqué par un crash du build worker de Next 16
   (`The "id" argument must be of type string`). Monorepo figé sur 6.0.3, règle
   `ignore` posée dans la configuration des dépendances.

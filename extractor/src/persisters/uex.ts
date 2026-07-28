@@ -304,11 +304,13 @@ export async function saveUexMarket(conn: PoolClient, env: GameEnv, onProgress?:
     priceRows,
   );
 
-  const [commodityMap, itemMap, componentMap] = await Promise.all([
-    buildEntityMap(conn, 'commodities', env),
-    buildEntityMap(conn, 'items', env),
-    buildEntityMap(conn, 'components', env),
-  ]);
+  // Sequentiel, et non `Promise.all` : les trois requetes partagent un seul
+  // client. `pg` les serialise deja en interne, en signalant « client.query()
+  // while already executing » — le parallelisme n'existait donc pas, seul le
+  // warning etait reel. Il devient une erreur dure en pg@9.
+  const commodityMap = await buildEntityMap(conn, 'commodities', env);
+  const itemMap = await buildEntityMap(conn, 'items', env);
+  const componentMap = await buildEntityMap(conn, 'components', env);
 
   await conn.query('DELETE FROM game.uex_market_prices WHERE env = $1', [env]);
   const economyRows = [

@@ -1,5 +1,5 @@
 import type { PoolClient } from 'pg';
-import type { ExtractionModule, GameEnv } from '../module-registry.js';
+import { type ExtractionModule, type GameEnv, MODULE_DELETIONS } from '../module-registry.js';
 
 export type ModuleRunner = (moduleName: ExtractionModule) => boolean;
 
@@ -51,47 +51,22 @@ export async function captureExtractionSnapshot(conn: PoolClient, env: GameEnv):
 export async function cleanStaleGameData(conn: PoolClient, env: GameEnv, run: ModuleRunner): Promise<SavedCtmUrl[]> {
   let savedCtmUrls: SavedCtmUrl[] = [];
 
+  // Les URL de modele 3D viennent d'un scraping lent et ne sont pas dans le
+  // P4K : elles se releveraient perdues a chaque extraction de vaisseaux. On
+  // les met de cote avant la suppression, `restoreCtmUrls` les repose apres.
   if (run('ships')) {
     const { rows: ctmRows } = await conn.query<any>('SELECT class_name, ctm_url FROM game.ships WHERE ctm_url IS NOT NULL AND env = $1', [
       env,
     ]);
     savedCtmUrls = ctmRows.map((row: any) => ({ className: row.class_name, ctmUrl: row.ctm_url }));
-    await conn.query('DELETE FROM game.ship_modules WHERE env = $1', [env]);
-    await conn.query('DELETE FROM game.ship_loadouts WHERE env = $1', [env]);
-    await conn.query('DELETE FROM game.ships WHERE env = $1', [env]);
   }
 
-  if (run('components')) await conn.query('DELETE FROM game.components WHERE env = $1', [env]);
-  if (run('items') || run('commodities')) {
-    await conn.query('DELETE FROM game.items WHERE env = $1', [env]);
-    await conn.query('DELETE FROM game.commodities WHERE env = $1', [env]);
-  }
-  if (run('mining')) {
-    await conn.query('DELETE FROM game.mining_composition_parts WHERE composition_env = $1', [env]);
-    await conn.query('DELETE FROM game.mining_compositions WHERE env = $1', [env]);
-    await conn.query('DELETE FROM game.mining_elements WHERE env = $1', [env]);
-  }
-  if (run('missions')) {
-    await conn.query('DELETE FROM game.mission_blueprint_rewards WHERE mission_env = $1', [env]);
-    await conn.query('DELETE FROM game.missions WHERE env = $1', [env]);
-  }
-  if (run('crafting')) {
-    await conn.query('DELETE FROM game.crafting_ingredients WHERE recipe_env = $1', [env]);
-    await conn.query('DELETE FROM game.crafting_slot_modifiers WHERE recipe_env = $1', [env]);
-    await conn.query('DELETE FROM game.crafting_recipes WHERE env = $1', [env]);
-  }
-  if (run('locations')) await conn.query('DELETE FROM game.locations WHERE env = $1', [env]);
-  if (run('game-insights')) {
-    await conn.query('DELETE FROM game.blueprint_rewards WHERE env = $1', [env]);
-    await conn.query('DELETE FROM game.loot_table_entries WHERE env = $1', [env]);
-    await conn.query('DELETE FROM game.loot_tables WHERE env = $1', [env]);
-    await conn.query('DELETE FROM game.loot_archetypes WHERE env = $1', [env]);
-    await conn.query('DELETE FROM game.reputation_scopes WHERE env = $1', [env]);
-    await conn.query('DELETE FROM game.reputation_standings WHERE env = $1', [env]);
-    await conn.query('DELETE FROM game.factions WHERE env = $1', [env]);
-    await conn.query('DELETE FROM game.ammo WHERE env = $1', [env]);
-    await conn.query('DELETE FROM game.inventory_containers WHERE env = $1', [env]);
-    await conn.query('DELETE FROM game.game_insights WHERE env = $1', [env]);
+  // Suit `MODULE_DELETIONS` dans l'ordre, qui est celui des dependances de cles
+  // etrangeres. C'est la meme table que lit `--plan` : ce qui est annonce est
+  // donc exactement ce qui est efface.
+  for (const deletion of MODULE_DELETIONS) {
+    if (!deletion.modules.some(run)) continue;
+    await conn.query(`DELETE FROM ${deletion.table} WHERE ${deletion.envColumn} = $1`, [env]);
   }
 
   return savedCtmUrls;

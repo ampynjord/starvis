@@ -78,7 +78,11 @@ function resolvePgConfig(): { pgConfig: PoolConfig; dbLabel: string } {
 
 export function resolveRuntimeOptions(options: ExtractorCliOptions, logger: Logger): RuntimeOptions {
   const modules = options.modules.has('all') ? new Set<ExtractionModule | 'all'>(['all']) : options.modules;
-  const requiresP4k = !isP4kFree(modules);
+  // `--plan` et `--verify` ne lisent que la base. Exiger le P4K les rendrait
+  // inutilisables la ou ils servent le plus : un serveur ou une CI, ou le jeu
+  // n'est pas installe.
+  const readOnly = options.plan || options.verify;
+  const requiresP4k = !readOnly && !isP4kFree(modules);
   const requiresGameDb = needsGameDb(modules);
   const requiresRsiDb = needsRsiDb(modules);
   const requiresDb = requiresGameDb || requiresRsiDb;

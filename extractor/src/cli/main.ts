@@ -5,6 +5,7 @@ import { Pool } from 'pg';
 import { DataForgeService } from '../dataforge/dataforge-service.js';
 import logger, { configureLogger } from '../logger.js';
 import { ExtractionService } from '../services/extraction-service.js';
+import { buildExtractionPlan, reportExtractionPlan, reportVerification, verifyExtraction } from './module-contract.js';
 import { formatModules, VALID_MODULES } from './modules.js';
 import { getEnvFileFromArgv, parseCliOptions } from './options.js';
 import { resolveRuntimeOptions } from './resolve.js';
@@ -46,6 +47,29 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
       p4k: runtime.requiresP4k ? runtime.p4kPath : 'not required',
       db: runtime.requiresDb ? runtime.dbLabel : 'not required',
     });
+    return;
+  }
+
+  // Le plan ne lit que la base : ouvrir le P4K couterait une minute pour une
+  // reponse qui n'en depend pas.
+  if (cli.plan || cli.verify) {
+    if (!runtime.requiresDb) {
+      cliLogger.info("Les modules choisis n'ecrivent pas en base : rien a planifier ni a verifier.");
+      return;
+    }
+    const readPool = new Pool(runtime.pgConfig);
+    try {
+      if (cli.plan) {
+        reportExtractionPlan(await buildExtractionPlan(readPool, runtime.env, runtime.modules), cliLogger);
+      } else {
+        const result = await verifyExtraction(readPool, runtime.env, runtime.modules);
+        reportVerification(result, cliLogger);
+        // Sortie non nulle : `verify` doit pouvoir arreter un deploiement.
+        if (!result.ok) process.exitCode = 1;
+      }
+    } finally {
+      await readPool.end();
+    }
     return;
   }
 

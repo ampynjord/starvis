@@ -26,6 +26,8 @@ export interface RawCliOptions {
   color?: boolean;
   listModules?: boolean;
   checkConfig?: boolean;
+  plan?: boolean;
+  verify?: boolean;
 }
 
 export interface ExtractorCliOptions {
@@ -46,6 +48,8 @@ export interface ExtractorCliOptions {
   color: boolean;
   listModules: boolean;
   checkConfig: boolean;
+  plan: boolean;
+  verify: boolean;
 }
 
 function parseEnv(value: string): (typeof GAME_ENVS)[number] {
@@ -108,6 +112,8 @@ export function buildProgram(version: string): Command {
     .option('--no-color', 'disable colored text logs')
     .option('--list-modules', 'print available modules and exit')
     .option('--check-config', 'validate CLI, P4K and database configuration without extracting')
+    .option('--plan', 'report what an extraction would delete and rewrite, without writing')
+    .option('--verify', 'check that every table the selected modules rewrite is populated (exit 1 otherwise)')
     .addHelpText(
       'after',
       `
@@ -134,6 +140,8 @@ Examples:
   npx tsx extract.ts --modules ship-galleries --gallery-delay-ms 10000
   npx tsx extract.ts --list-modules
   npx tsx extract.ts --check-config --modules ctm
+  npx tsx extract.ts --plan --modules ships,components
+  npx tsx extract.ts --verify --modules ships
   npx tsx extract.ts --dry-run`,
     );
 }
@@ -170,5 +178,7 @@ export function parseCliOptions(argv: string[], version = '0.0.0'): ExtractorCli
     color: raw.color ?? true,
     listModules: !!raw.listModules,
     checkConfig: !!raw.checkConfig,
+    plan: !!raw.plan,
+    verify: !!raw.verify,
   };
 }
