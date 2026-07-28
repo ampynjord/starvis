@@ -246,6 +246,59 @@ export class ExtractionService {
         /* ignore — if the connection is broken we'll find out on the next real query */
       }
     }, EXTRACTOR_DEFAULTS.keepaliveIntervalMs);
+
+    // Arrêt du processus : annuler explicitement avant de partir.
+    //
+    // Un Ctrl+C ou un `kill` coupe l'exécution avant le `finally`, et la session
+    // reste « idle in transaction » côté serveur, verrous compris. L'extraction
+    // suivante attend alors indéfiniment sur `DELETE FROM game.ship_modules` —
+    // sans rien dire, puisqu'elle attend légitimement un verrou. Diagnostiqué à
+    // travers `pg_stat_activity` après avoir interrompu une extraction de
+    // production ; le blocage a duré jusqu'à ce que la session orpheline soit
+    // terminée à la main.
+    //
+    // Le keepalive aggravait le cas : il maintenait la session vivante, donc les
+    // verrous avec elle, là où une connexion morte aurait fini par être libérée.
+    let signalHandled = false;
+    const onFatalSignal = (signal: NodeJS.Signals) => {
+      // 128 + numéro du signal, convention des interpréteurs de commandes.
+      const code = signal === 'SIGINT' ? 130 : 143;
+      if (signalHandled) {
+        // Le signal a déjà été traité et l'annulation traîne : le second appui
+        // sort sans attendre. Sans cela, un ROLLBACK bloqué sur le réseau
+        // rendrait le processus insensible au Ctrl+C, puisque le gestionnaire a
+        // consommé le signal.
+        process.exit(code);
+      }
+      signalHandled = true;
+      clearInterval(keepaliveTimer);
+      logger.warn(`${signal} received — rolling back the extraction transaction`, { module: 'cli' });
+
+      // Filet de sécurité : sortir de toute façon si l'annulation n'aboutit pas.
+      const giveUp = setTimeout(() => {
+        logger.warn('Rollback did not complete in time — exiting anyway', { module: 'cli' });
+        process.exit(code);
+      }, EXTRACTOR_DEFAULTS.rollbackOnSignalTimeoutMs);
+      giveUp.unref();
+
+      conn
+        .query('ROLLBACK')
+        .catch(() => {
+          /* la connexion est peut-être déjà morte : rien de plus à faire */
+        })
+        .finally(() => {
+          clearTimeout(giveUp);
+          conn.release();
+          process.exit(code);
+        });
+    };
+    process.once('SIGINT', onFatalSignal);
+    process.once('SIGTERM', onFatalSignal);
+    const releaseOnSignal = () => {
+      process.off('SIGINT', onFatalSignal);
+      process.off('SIGTERM', onFatalSignal);
+    };
+
     // Shared context for all domain persisters (df is null-asserted — persisters
     // that use it only run for P4K modules, never for ctm-only runs)
     const ctx: PersistContext = { conn, env, df: this.dfService as DataForgeService, loc: this.locService, onProgress };
@@ -479,6 +532,7 @@ export class ExtractionService {
       throw e;
     } finally {
       clearInterval(keepaliveTimer);
+      releaseOnSignal?.();
       conn.release();
     }
 

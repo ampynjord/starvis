@@ -17,6 +17,13 @@ export const EXTRACTOR_DEFAULTS = {
   pgPoolMax: 5,
   batchSize: 50,
   keepaliveIntervalMs: 10_000,
+  /**
+   * Délai laissé à l'annulation de transaction après un signal d'arrêt.
+   *
+   * Assez long pour qu'un ROLLBACK traverse un tunnel SSH lent, assez court pour
+   * qu'un Ctrl+C reste une interruption et non une attente.
+   */
+  rollbackOnSignalTimeoutMs: 10_000,
   sanityDropThreshold: 0.5,
   galleryDelayMs: 6000,
   galleryRetries: 4,
