@@ -22,6 +22,7 @@ import {
   orderConsumableEntries,
   type WeaponAttachmentModifier,
 } from './items/item-helpers.js';
+import type { PublicItem, PublicItemListed } from './items/item-types.js';
 import {
   convertBigIntToNumber,
   type FiltersResult,
@@ -68,7 +69,7 @@ export class ItemQueryService {
     return { data: convertBigIntToNumber(rows), total, page, limit: safeLimit, pages: Math.ceil(total / safeLimit) };
   }
 
-  private normalizeItemRow(row: Row): Row {
+  private normalizeItemRow<T extends { name?: unknown }>(row: T): T & { display_name: string } {
     const name = String(row.name ?? '');
     return {
       ...row,
@@ -90,7 +91,7 @@ export class ItemQueryService {
     order?: string;
     page?: number;
     limit?: number;
-  }): Promise<PaginatedResult> {
+  }): Promise<PaginatedResult<PublicItemListed>> {
     const env = filters?.env ?? 'live';
     const prisma = this.getClient(env);
     const where: string[] = ['i.env = ?'];
@@ -170,7 +171,7 @@ export class ItemQueryService {
     const baseSql = `SELECT i.*, m.name as manufacturer_name, ${itemMarketAggregateSelect()} FROM game.items i LEFT JOIN game.manufacturers m ON i.manufacturer_code = m.code ${ITEM_MARKET_JOIN}${w}`;
     const countSql = `SELECT COUNT(*) as total FROM game.items i${w}`;
 
-    const result = await paginate(prisma, baseSql, countSql, params, filters || {}, ITEM_SORT, 'i', ITEM_JSON_SORT_MAP);
+    const result = await paginate<PublicItemListed>(prisma, baseSql, countSql, params, filters || {}, ITEM_SORT, 'i', ITEM_JSON_SORT_MAP);
     return {
       ...result,
       data: result.data.map((row) => this.normalizeItemRow(row)),
@@ -213,31 +214,31 @@ export class ItemQueryService {
       });
   }
 
-  async getItemByUuid(uuid: string, env = 'live'): Promise<Row | null> {
+  async getItemByUuid(uuid: string, env = 'live'): Promise<PublicItem | null> {
     const prisma = this.getClient(env);
-    const rows = await prisma.$queryRawUnsafe<Row[]>(
+    const rows = await prisma.$queryRawUnsafe<PublicItem[]>(
       toPostgres(
         `SELECT i.*, m.name as manufacturer_name FROM game.items i LEFT JOIN game.manufacturers m ON i.manufacturer_code = m.code WHERE i.uuid = ? AND i.env = ?`,
       ),
       uuid,
       env,
     );
-    return rows[0] ? this.normalizeItemRow(stripInternal(rows[0])) : null;
+    return rows[0] ? (this.normalizeItemRow(stripInternal(rows[0])) as PublicItem) : null;
   }
 
-  async getItemByClassName(className: string, env = 'live'): Promise<Row | null> {
+  async getItemByClassName(className: string, env = 'live'): Promise<PublicItem | null> {
     const prisma = this.getClient(env);
-    const rows = await prisma.$queryRawUnsafe<Row[]>(
+    const rows = await prisma.$queryRawUnsafe<PublicItem[]>(
       toPostgres(
         `SELECT i.*, m.name as manufacturer_name FROM game.items i LEFT JOIN game.manufacturers m ON i.manufacturer_code = m.code WHERE i.class_name = ? AND i.env = ?`,
       ),
       className,
       env,
     );
-    return rows[0] ? this.normalizeItemRow(stripInternal(rows[0])) : null;
+    return rows[0] ? (this.normalizeItemRow(stripInternal(rows[0])) as PublicItem) : null;
   }
 
-  async resolveItem(id: string, env = 'live'): Promise<Row | null> {
+  async resolveItem(id: string, env = 'live'): Promise<PublicItem | null> {
     return id.length === 36 ? this.getItemByUuid(id, env) : this.getItemByClassName(id, env);
   }
 

@@ -220,9 +220,11 @@ export function mountItemRoutes(router: Router, deps: RouteDependencies): void {
       const t = Date.now();
       const filters = ItemQuery.parse(req.query) as Record<string, unknown>;
       const result = await gameDataService!.items.getAllItems(filters);
-      let outputData = result.data as Record<string, unknown>[];
+      let outputData: object[] = result.data;
       if (filters.view === 'compact') {
-        outputData = outputData.map((item) => compactObject(item, ['uuid', 'name', 'type', 'sub_type', 'manufacturer', 'size', 'price']));
+        outputData = result.data.map((item) =>
+          compactObject(item as unknown as Record<string, unknown>, ['uuid', 'name', 'type', 'sub_type', 'manufacturer', 'size', 'price']),
+        );
       }
 
       const payload = success(outputData, {
@@ -234,7 +236,7 @@ export function mountItemRoutes(router: Router, deps: RouteDependencies): void {
         source: 'Game Data',
         responseTime: `${Date.now() - t}ms`,
       });
-      if (req.query.format === 'csv') return void sendCsvOrJson(req, res, result.data as Record<string, unknown>[], payload);
+      if (req.query.format === 'csv') return void sendCsvOrJson(req, res, result.data, payload);
       sendWithETag(req, res, payload);
     }),
   );
@@ -257,9 +259,11 @@ export function mountItemRoutes(router: Router, deps: RouteDependencies): void {
         exclude_sub_types: def.excludeSubTypes?.join(','),
       });
 
-      let outputData = result.data as Record<string, unknown>[];
+      let outputData: object[] = result.data;
       if (base.view === 'compact') {
-        outputData = outputData.map((item) => compactObject(item, ['uuid', 'name', 'type', 'sub_type', 'manufacturer', 'size', 'price']));
+        outputData = result.data.map((item) =>
+          compactObject(item as unknown as Record<string, unknown>, ['uuid', 'name', 'type', 'sub_type', 'manufacturer', 'size', 'price']),
+        );
       }
 
       const payload = success(outputData, {
@@ -272,7 +276,7 @@ export function mountItemRoutes(router: Router, deps: RouteDependencies): void {
         source: 'Game Data',
         responseTime: `${Date.now() - t}ms`,
       });
-      if (req.query.format === 'csv') return void sendCsvOrJson(req, res, result.data as Record<string, unknown>[], payload);
+      if (req.query.format === 'csv') return void sendCsvOrJson(req, res, result.data, payload);
       sendWithETag(req, res, payload);
     }),
   );
