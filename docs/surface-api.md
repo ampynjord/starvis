@@ -64,8 +64,56 @@ Ce qui est arrêté à la place :
 ## 4. Ce que cela débloque
 
 La sortie du SQL brut peut commencer, service par service, sur une surface
-stable. L'ordre reste : ce qui est le plus appelé d'abord, parce que c'est là que
-le typage rapporte le plus et que la régression se verrait le plus vite.
+stable. 195 appels `$queryRawUnsafe` dans 19 services sur 28, avec
+`Row = Record<string, any>` pour type de retour — aucune garantie exploitable
+aujourd'hui.
 
-195 appels `$queryRawUnsafe` dans 19 services sur 28, avec `Row = Record<string,
-any>` pour type de retour — aucune garantie exploitable aujourd'hui.
+## 5. Deux obstacles à lever d'abord
+
+Reconnaissance faite sur `commodity-query-service`, choisi comme cobaye pour sa
+taille : 3 requêtes brutes, 128 lignes, une entité réelle du wiki. Ce n'est pas
+le refactor mécanique qu'on imagine.
+
+### Le type partagé interdit l'accès typé
+
+`PrismaLike`, dont dépendent tous les services, n'expose que trois méthodes :
+
+```ts
+export interface PrismaLike {
+  $queryRawUnsafe<T>(query: string, ...values: unknown[]): Promise<T>;
+  $executeRawUnsafe(query: string, ...values: unknown[]): Promise<number>;
+  $disconnect(): Promise<void>;
+}
+```
+
+Aucun accès aux modèles. L'objet réellement passé **est** un `PrismaClient`
+complet — seul le typage le restreint. Sortir du SQL brut suppose donc d'abord
+d'élargir ce type, ce qui touche toute la couche service d'un coup. C'est un
+préalable transversal, pas un détail de mise en œuvre.
+
+### Le format de sortie est en snake_case, Prisma parle camelCase
+
+L'API publique sert `class_name`, `sub_type`, `occupancy_scu`. Prisma rendrait
+`className`, `subType`, `occupancyScu` — le modèle est déclaré en camelCase avec
+`@map` vers les colonnes.
+
+**Une migration naïve romprait donc le contrat pour tous les consommateurs.**
+C'est exactement le genre de rupture qui ne se voit pas en test unitaire et se
+découvre chez les tiers.
+
+Il faut une sérialisation explicite vers le contrat public. Deux points de
+vigilance relevés sur les données actuelles :
+
+- `occupancy_scu` est un `Decimal?`. Aucune marchandise n'en porte aujourd'hui,
+  donc le risque est théorique — mais un `Decimal` Prisma ne se sérialise pas
+  comme un numérique brut, et ce sera un piège dès qu'une valeur apparaîtra.
+- `data_json` et les dates se comportent identiquement des deux côtés : objet
+  analysé et `Date`. Rien à faire pour eux.
+
+### Comment le vérifier
+
+La méthode qui a servi pour l'écriture par lots vaut ici : capturer la sortie
+complète de l'API avant migration — liste triée, filtrée par type, par
+catégorie, recherche, fiche, types, filtres — puis comparer octet à octet après.
+Une égalité stricte est la seule preuve acceptable qu'un changement interne n'a
+pas fui jusqu'au contrat.
