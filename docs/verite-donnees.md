@@ -486,6 +486,71 @@ La suite tient donc en deux décisions, pas en un correctif : quel appariement
 approximatif on accepte, et ce qui distingue deux boutiques d'une même enseigne
 au même endroit.
 
+### D10 — Près d'une boutique sur deux n'est pas un endroit où l'on va
+
+Le P4K reste la source principale : c'est lui qui dit ce que le jeu contient. Il
+ne dit pas, en revanche, ce que le jeu *utilise* — il conserve ce qui a été
+retiré, les gabarits et le contenu d'événement au même rang que le reste.
+
+Sur les 136 boutiques servies, **74 sont rattachées à un lieu et 62 ne le sont
+pas** :
+
+| Famille | Nombre | Ce que c'est |
+|---|---|---|
+| Gabarits d'inventaire | 20 | « Admin Small Base A », « Landing Services Rs Full 0001 », « Cry Astro Dummy » — ce qu'on trouve dans n'importe quel avant-poste, pas une boutique précise |
+| Ventes anniversaire 2018-2019 | 19 | Les stands de l'IAE, présents une semaine par an |
+| Port Olisar | 13 | Un lieu réel, retiré de l'univers après la 3.20 |
+| Génériques de rest stop | 10 | L'inventaire partagé par tous les rest stops |
+
+**La séparation se lit sur une colonne, sans heuristique** : `location_uuid` est
+nul pour exactement ces 62. Aucune expression régulière sur les noms n'est
+nécessaire, et le critère ne peut donc pas dériver quand les libellés changent.
+
+#### Ce que chaque source sait dire
+
+Le croisement n'est pas un arbitrage entre concurrents : chacune répond à une
+question que les autres ne posent pas.
+
+- **P4K** — ce que le jeu contient. Exhaustif, et c'est justement pourquoi il
+  contient aussi ce qui ne sert plus.
+- **RSI** — ce que l'éditeur publie : Ship Matrix, carte stellaire, Galactapedia,
+  comm-links, images, CTM. Du complément et du contexte, pas un état du monde.
+  Sa carte ne compte que 967 entrées dont 30 pour Stanton, liste des systèmes non
+  implémentés (Sol, Terra), **contient Port Olisar** et ignore Levski comme
+  GrimHEX. Ce n'est pas un oracle de vivacité, c'est une carte de lore.
+- **UEX** — ce que les joueurs atteignent. Ses terminaux sont relevés en jeu :
+  leur présence est un indice de vivacité qu'aucune des deux autres ne fournit.
+
+Sur les 587 terminaux distincts d'UEX :
+
+| Lieu | Terminaux UEX | Lecture |
+|---|---|---|
+| Levski | 17 | fréquenté |
+| Grim HEX | 6 | fréquenté |
+| Lorville | 5 | fréquenté |
+| Port Olisar | 0 | plus atteint |
+
+UEX n'arbitre pas contre le P4K : il complète. Une absence chez lui n'efface pas
+une donnée, elle la qualifie.
+
+Le cas de Levski montre pourquoi ce croisement vaut mieux qu'une liste tenue à la
+main : elle a été **retirée en 3.12.1 puis rendue en 4.4** avec le système Nyx.
+Une liste de lieux morts écrite de mémoire l'aurait condamnée à tort, et il
+aurait fallu penser à la corriger. Un indice qui suit le jeu s'adapte tout seul à
+la mise à jour suivante.
+
+#### Ce qui n'est pas fait
+
+Rien n'est supprimé. Ces définitions viennent du P4K, donc de la source
+principale, et les gabarits portent une information réelle — ce qu'on trouve dans
+un avant-poste quelconque. Ce qu'il faut trancher n'est pas technique : faut-il
+servir « ce que vend un rest stop » comme une boutique parmi les autres, ou comme
+un autre genre d'objet ?
+
+En attendant, l'audit mesure la part non rattachée — 45,6 % — et la plafonne à
+55 %. Le champ `location_uuid` documente ce que son absence veut dire, pour qu'un
+consommateur tiers puisse filtrer en connaissance de cause.
+
 ## 6. Ce que l'audit ne fait pas encore
 
 Honnêtement listé, pour ne pas confondre couverture et confiance :

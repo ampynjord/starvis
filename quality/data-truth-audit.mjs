@@ -434,6 +434,24 @@ async function auditShopLabels() {
     return;
   }
 
+  // Une boutique sans lieu rattaché n'est pas un endroit où l'on va : ce sont
+  // les gabarits d'inventaire, les boutiques des ventes anniversaire 2018-2019,
+  // et celles de Port Olisar — un lieu retiré de l'univers après la 3.20, qu'UEX
+  // n'a plus jamais vu parmi ses 587 terminaux.
+  //
+  // La mesure ne juge pas : ces définitions viennent bien du jeu. Elle dit
+  // seulement quelle part de ce qu'on sert ne correspond à aucun lieu visitable,
+  // pour qu'on ne la confonde pas avec le reste.
+  const detached = shops.filter((shop) => shop.location_uuid == null);
+  const detachedRatio = detached.length / shops.length;
+  fact(
+    `boutiques : ${detached.length}/${shops.length} sans lieu rattaché (${(detachedRatio * 100).toFixed(1)}%) — gabarits, événements, lieux retirés`,
+  );
+  if (detachedRatio > 0.55) {
+    fail(`boutiques : ${(detachedRatio * 100).toFixed(1)}% sans lieu rattaché, au-dessus du plafond 55%`, {
+      exemples: detached.slice(0, 5).map((shop) => shop.name),
+    });
+  }
   const TECHNICAL_TOKEN =
     /\b(?:day\s*\d+|\d{1,2}|hdshowcase|reststop|truckstop|expohall|shipweap|aegs|anvl|drak|krig|cnou|tmbl|argo|banu|espr|orig|misc|aopoa|xnaa|umbr|rsi)\b/i;
   const suspicious = shops.filter((shop) => TECHNICAL_TOKEN.test(String(shop.name ?? '')));
