@@ -168,7 +168,7 @@ function makeGameDataService() {
       getSummary: fn({}),
       getCorrelations: fn([]),
     },
-    unifiedSearch: fn({ ships: [], components: [], items: [], commodities: [], missions: [], recipes: [] }),
+    unifiedSearch: fn({ ships: [], components: [], items: [], commodities: [], missions: [], recipes: [], locations: [] }),
     getObjectDetail: fn(null),
     getChangelogSummary: fn([]),
     getChangelog: fn({ data: [], total: 0, page: 1, limit: 20, pages: 0 }),
@@ -858,6 +858,8 @@ describe('GET /api/v1/crafting/resources', () => {
 
 // ── Search ────────────────────────────────────────────────
 
+const SEARCH_CATEGORIES = ['commodities', 'components', 'items', 'locations', 'missions', 'recipes', 'ships'];
+
 describe('GET /api/v1/search', () => {
   it('returns 400 when search param is missing', async () => {
     const res = await request(app).get('/api/v1/search');
@@ -868,6 +870,10 @@ describe('GET /api/v1/search', () => {
     const res = await request(app).get('/api/v1/search?search=aurora');
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
+    // Le test s'intitulait « all categories » sans en verifier aucune : ajouter
+    // une categorie au service cassait la route par une lecture de undefined,
+    // et l'echec ne disait pas laquelle manquait.
+    expect(Object.keys(res.body.data).sort()).toEqual(SEARCH_CATEGORIES);
   });
 });
 
@@ -876,6 +882,7 @@ describe('GET /api/v1/search/:query', () => {
     const res = await request(app).get('/api/v1/search/aurora');
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
+    expect(Object.keys(res.body.data).sort()).toEqual(SEARCH_CATEGORIES);
   });
 });
 

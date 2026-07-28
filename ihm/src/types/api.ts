@@ -1350,6 +1350,7 @@ export interface SearchResult {
   commodities: SearchResultEntity[];
   missions: SearchResultEntity[];
   recipes: SearchResultEntity[];
+  locations: SearchResultEntity[];
 }
 
 // ─── Hardpoints ───────────────────────────────────────────────────────────────
@@ -1523,6 +1524,13 @@ export interface Location {
   description?: string | null;
   is_scannable: boolean;
   hide_in_starmap: boolean;
+  /**
+   * Appartenance politique, déduite du `class_name` par l'API.
+   *
+   * Servie depuis un moment, jamais déclarée ici : la fiche qui l'affiche l'a
+   * révélé.
+   */
+  affiliation?: string | null;
 }
 
 export interface LocationTreeNode extends Location {

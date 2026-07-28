@@ -16,7 +16,7 @@ import { PageShell } from '@/components/ui/PageShell';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { useDebounce } from '@/hooks/useDebounce';
 
-type Tab = 'all' | 'ships' | 'components' | 'items' | 'commodities' | 'missions' | 'recipes';
+type Tab = 'all' | 'ships' | 'components' | 'items' | 'commodities' | 'missions' | 'recipes' | 'locations';
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'all', label: 'All' },
@@ -26,6 +26,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'commodities', label: 'Commodities' },
   { key: 'missions', label: 'Missions' },
   { key: 'recipes', label: 'Crafting' },
+  { key: 'locations', label: 'Locations' },
 ];
 
 function entityLink(type: string, uuid: string): string {
@@ -36,6 +37,7 @@ function entityLink(type: string, uuid: string): string {
     case 'commodities': return `/commodities/${uuid}`;
     case 'missions': return `/missions/${uuid}`;
     case 'recipes': return `/crafting`;
+    case 'locations': return `/locations/${uuid}`;
     default: return '#';
   }
 }
@@ -72,6 +74,7 @@ export default function SearchResultsPage() {
     { key: 'commodities' as const, label: 'Commodities', items: results?.commodities ?? [] },
     { key: 'missions' as const, label: 'Missions', items: results?.missions ?? [] },
     { key: 'recipes' as const, label: 'Crafting', items: results?.recipes ?? [] },
+    { key: 'locations' as const, label: 'Locations', items: results?.locations ?? [] },
   ];
 
   const filteredSections = activeTab === 'all'

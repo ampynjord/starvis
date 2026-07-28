@@ -97,10 +97,18 @@ export class GameDataService {
     q: string,
     limit = 10,
     env = 'live',
-  ): Promise<{ ships: Row[]; components: Row[]; items: Row[]; commodities: Row[]; missions: Row[]; recipes: Row[] }> {
+  ): Promise<{
+    ships: Row[];
+    components: Row[];
+    items: Row[];
+    commodities: Row[];
+    missions: Row[];
+    recipes: Row[];
+    locations: Row[];
+  }> {
     const cap = Math.min(limit, 20);
     const t = `%${q}%`;
-    const [ships, components, items, commodities, missions, recipes] = await Promise.all([
+    const [ships, components, items, commodities, missions, recipes, locations] = await Promise.all([
       this.ships.searchShipsAutocomplete(q, cap, env),
       this.getClient(env).$queryRawUnsafe<Row[]>(
         toPostgres(`SELECT c.uuid, c.class_name, c.name, c.type, c.sub_type, c.size, c.grade, c.manufacturer_code,
@@ -145,8 +153,20 @@ export class GameDataService {
         t,
         t,
       ),
+      // Les lieux ont un nom lisible dans 1112 cas sur 1120 et une description
+      // dans 1091 : ils se cherchent par nom comme le reste. Ils manquaient a la
+      // recherche unifiee, donc rien dans l'interface ne menait a leur fiche —
+      // la carte stellaire, seule porte d'entree, n'en relie que 58.
+      this.getClient(env).$queryRawUnsafe<Row[]>(
+        toPostgres(`SELECT l.uuid, l.class_name, l.name, l.type, l.system_code
+         FROM game.locations l WHERE l.env = ? AND (l.name ILIKE ? OR l.class_name ILIKE ?)
+         ORDER BY l.name LIMIT ${cap}`),
+        env,
+        t,
+        t,
+      ),
     ]);
-    return { ships, components, items, commodities, missions, recipes };
+    return { ships, components, items, commodities, missions, recipes, locations };
   }
 
   // ── Stats & system info ──────────────────────────────────────────────────

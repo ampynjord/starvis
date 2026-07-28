@@ -22,7 +22,8 @@ export function mountSearchRoutes(router: Router, deps: RouteDependencies): void
         data.items.length +
         data.commodities.length +
         data.missions.length +
-        data.recipes.length,
+        data.recipes.length +
+        data.locations.length,
     });
   }
 

@@ -14,6 +14,7 @@ type SearchResult = {
   commodities: { uuid: string; name: string }[];
   missions: { uuid: string; name: string }[];
   recipes: { uuid: string; name: string }[];
+  locations: { uuid: string; name: string; type?: string | null }[];
 };
 
 export function SearchOmnibar({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -85,7 +86,8 @@ export function SearchOmnibar({ open, onClose }: { open: boolean; onClose: () =>
     results.ships.length > 0 ||
     results.components.length > 0 ||
     results.items.length > 0 ||
-    results.commodities.length > 0
+    results.commodities.length > 0 ||
+    results.locations.length > 0
   );
 
   return (
@@ -186,6 +188,25 @@ export function SearchOmnibar({ open, onClose }: { open: boolean; onClose: () =>
                     >
                       <span className="font-rajdhani">{c.name}</span>
                       <ArrowRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {results.locations?.length > 0 && (
+                <div className="mb-4">
+                  <div className="px-3 py-1 text-[10px] font-orbitron font-bold text-cyan-700 tracking-widest uppercase">Locations</div>
+                  {results.locations.map(l => (
+                    <button
+                      key={l.uuid}
+                      onClick={() => navigateTo(`/locations/${l.uuid}`)}
+                      className="w-full text-left px-3 py-2 flex items-center justify-between text-slate-300 hover:bg-cyan-950/40 hover:text-cyan-400 group rounded-xs transition-colors"
+                    >
+                      <span className="font-rajdhani">{l.name}</span>
+                      <span className="flex items-center gap-2">
+                        <span className="font-mono-sc text-[10px] text-slate-600">{l.type ?? ''}</span>
+                        <ArrowRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </span>
                     </button>
                   ))}
                 </div>
