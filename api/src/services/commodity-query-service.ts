@@ -2,7 +2,7 @@
  * CommodityQueryService — Tradeable/mineable goods (metals, minerals, gas, food, etc.)
  */
 import type { PrismaLike as PrismaClient } from '@starvis/db';
-import { type FiltersResult, type PaginatedResult, paginate, type Row, stripInternal, toPostgres } from './shared.js';
+import { type FiltersResult, type PaginatedResult, paginate, type Row, stripInternal } from './shared.js';
 
 const COMMODITY_SORT = new Set(['name', 'class_name', 'type', 'sub_type', 'symbol', 'occupancy_scu']);
 const COMMODITY_CATEGORY_DEFS: Array<{ label: string; regex: RegExp }> = [

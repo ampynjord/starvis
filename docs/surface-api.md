@@ -117,3 +117,48 @@ complète de l'API avant migration — liste triée, filtrée par type, par
 catégorie, recherche, fiche, types, filtres — puis comparer octet à octet après.
 Une égalité stricte est la seule preuve acceptable qu'un changement interne n'a
 pas fui jusqu'au contrat.
+
+## 6. Les deux obstacles sont levés, et le but a changé
+
+**`PrismaLike` est désormais un alias du client généré.** Le type décrivait une
+intention — « ici on écrit du SQL brut » — devenue l'inverse de celle du projet.
+Typecheck vert sur les quatre espaces de travail ; les doublures de test
+passaient déjà par un double cast, elles n'ont rien perdu.
+
+**`commodity-query-service` est migré**, et sert de patron. Trois requêtes vers
+les modèles typés, un sérialiseur `toPublicCommodity` dont l'ordre des clés
+reproduit celui des colonnes. Neuf appels comparés avant et après : **empreintes
+identiques**, chronométrage exclu.
+
+Le cas décimal a pu être tranché plutôt que supposé. Aucune marchandise ne porte
+d'`occupancy_scu`, mais le conteneur local tournait encore l'ancien code : une
+ligne sonde insérée avant redémarrage a montré que le pilote rendait la colonne
+`numeric` sous forme de **chaîne** — `"12.3456"`, pas `12.3456`. Prisma en fait un
+`Decimal` ; sans conversion, la valeur serait sortie comme un objet.
+
+### Ce que la suite a appris : tout le SQL n'a pas vocation à partir
+
+En cherchant le service suivant, deux candidats ont révélé la limite de
+l'exercice :
+
+| Service | Ce que fait son SQL |
+|---|---|
+| `mining-query-service` | `json_agg`, `json_build_object`, `ROUND(AVG(…))` |
+| `shop-service` | sous-requêtes corrélées, `COALESCE` sur cinq tables jointes |
+
+Traduire cela en Prisma serait une réécriture, pour un résultat probablement
+**différent** — l'ordre d'un `json_agg` et le formatage d'un numérique ne se
+reproduisent pas à l'identique. On échangerait une garantie de type contre une
+perte de fidélité.
+
+**Le critère n'est donc pas « sortir du SQL » mais « typer le résultat ».**
+
+- Requête simple sur une table — sélection, filtre, `GROUP BY` — : passer aux
+  modèles typés, avec sérialisation explicite et preuve par égalité.
+- Requête dont le SQL porte une vraie logique ensembliste : **la garder**, et
+  remplacer `Row = Record<string, any>` par un type de résultat déclaré. Le gain
+  visé — savoir quelles colonnes existent et de quel type — s'obtient sans
+  réécrire la requête.
+
+Cette seconde voie couvre la majorité des 195 appels et n'a pas encore été
+entamée. C'est elle qui rapporte le plus, pas la migration des cas faciles.
