@@ -29,7 +29,7 @@ import { healthRouter } from './src/routes/health.js';
 import { createRoutes } from './src/routes/index.js';
 import { verifyAuthToken } from './src/services/auth-service.js';
 import { GameDataService } from './src/services/game-data-service.js';
-import { redis } from './src/services/redis.js';
+import { redis, setDataVersionResolver } from './src/services/redis.js';
 import { configureRequestLogPersistence, recordRequestLog } from './src/services/request-log-service.js';
 import { RsiWebsiteService } from './src/services/rsi-website-service.js';
 import { ShipMatrixService } from './src/services/ship-matrix-service.js';
@@ -395,6 +395,16 @@ async function start() {
   const shipMatrixService = new ShipMatrixService(prisma);
   const rsiWebsiteService = new RsiWebsiteService(prisma);
   gameDataService = new GameDataService(() => prisma, prisma);
+
+  // Le cache suit la donnee : la cle Redis porte l'empreinte de la derniere
+  // extraction. Une extraction change l'empreinte, les anciennes cles
+  // deviennent inatteignables et expirent seules — plus besoin d'invalider a
+  // la main, ce que personne ne faisait.
+  setDataVersionResolver(async () => {
+    const latest = await gameDataService?.getLatestExtraction('live');
+    const hash = latest?.extraction_hash;
+    return typeof hash === 'string' && hash ? hash.slice(0, 12) : null;
+  });
 
   // 5. Mount routes
   app.use('/', createRoutes({ prisma, shipMatrixService, gameDataService, rsiWebsiteService }));

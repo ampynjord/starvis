@@ -84,6 +84,64 @@ export const CACHE_TTL = {
   CHANGELOG: 1800, // 30 minutes
 };
 
+// ── Version de donnees ───────────────────────────────────────────────────────
+
+/**
+ * Le cache suit la donnee, pas l'horloge.
+ *
+ * Redis n'avait aucune invalidation : `cacheInvalidatePattern` n'etait appele
+ * nulle part, et le ship-matrix restait perime jusqu'a deux heures apres une
+ * extraction. Verser la version de donnees dans la cle regle le probleme sans
+ * qu'aucun appelant n'ait a penser a invalider : une extraction change la
+ * version, les anciennes cles deviennent inatteignables et s'effacent d'
+ * elles-memes a leur TTL.
+ *
+ * Le resolveur est injecte plutot qu'importe : ce module ne doit rien savoir de
+ * la base, et un test doit pouvoir fixer la version sans Postgres.
+ */
+type DataVersionResolver = () => Promise<string | null>;
+
+const VERSION_REFRESH_MS = 60_000;
+let dataVersion = 'v0';
+let lastVersionRefresh = 0;
+let resolveDataVersion: DataVersionResolver | null = null;
+
+export function setDataVersionResolver(resolver: DataVersionResolver | null): void {
+  resolveDataVersion = resolver;
+  lastVersionRefresh = 0;
+}
+
+export function getDataVersion(): string {
+  return dataVersion;
+}
+
+async function currentDataVersion(): Promise<string> {
+  if (!resolveDataVersion) return dataVersion;
+  const now = Date.now();
+  if (now - lastVersionRefresh < VERSION_REFRESH_MS) return dataVersion;
+  lastVersionRefresh = now;
+  try {
+    const resolved = await resolveDataVersion();
+    if (resolved) dataVersion = resolved;
+  } catch (error) {
+    // Garder la version precedente : une base injoignable doit degrader le
+    // cache, pas le vider ni servir sous une version inventee.
+    logger.warn('Data version refresh failed, keeping previous', { version: dataVersion, error });
+  }
+  return dataVersion;
+}
+
+/**
+ * Prefixe une cle applicative de la version courante.
+ *
+ * Le prefixe est pose ici, au seul endroit qui touche Redis, plutot que dans
+ * `buildCacheKey` : les appelants n'ont rien a changer, et une cle ne peut pas
+ * arriver a Redis sans sa version.
+ */
+async function versionedKey(key: string): Promise<string> {
+  return `${await currentDataVersion()}|${key}`;
+}
+
 /**
  * Generic get wrapper with metrics
  */
@@ -93,7 +151,7 @@ export async function cacheGet<T>(key: string): Promise<T | null> {
   }
 
   try {
-    const result = await redis.get(key);
+    const result = await redis.get(await versionedKey(key));
 
     if (result) {
       cacheHits++;
@@ -123,7 +181,7 @@ export async function cacheSet<T>(key: string, value: T, ttl: number = DEFAULT_T
 
   try {
     const serialized = JSON.stringify(value);
-    await redis.setex(key, ttl, serialized);
+    await redis.setex(await versionedKey(key), ttl, serialized);
     cacheCounter.inc({ operation: 'set', result: 'success' });
     return true;
   } catch (error) {
@@ -142,10 +200,14 @@ export async function cacheInvalidatePattern(pattern: string): Promise<number> {
   }
 
   try {
+    // Les cles portent leur version en tete. Un motif applicatif seul ne
+    // matcherait plus rien : on efface le motif dans toutes les versions, ce
+    // qui est le sens d'une invalidation explicite.
+    const versionedPattern = pattern.startsWith('*|') ? pattern : `*|${pattern}`;
     let cursor = '0';
     let deletedCount = 0;
     do {
-      const [nextCursor, keys] = await redis.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+      const [nextCursor, keys] = await redis.scan(cursor, 'MATCH', versionedPattern, 'COUNT', 100);
       cursor = nextCursor;
       if (keys.length > 0) {
         deletedCount += await redis.del(...keys);
