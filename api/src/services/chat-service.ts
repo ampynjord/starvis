@@ -27,6 +27,7 @@ import { validateQueryDatabaseSql } from './chat/sql-guard.js';
 import type { GameDataService } from './game-data-service.js';
 import type { RsiWebsiteService } from './rsi-website-service.js';
 import type { ShipMatrixService } from './ship-matrix-service.js';
+import type { PublicShip } from './ships/ship-types.js';
 
 export { validateQueryDatabaseSql } from './chat/sql-guard.js';
 
@@ -631,19 +632,19 @@ export class ChatService {
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
-  private async resolveShipUuid(name: string, env: string): Promise<{ uuid: string; data: Record<string, unknown> } | null> {
+  private async resolveShipUuid(name: string, env: string): Promise<{ uuid: string; data: PublicShip } | null> {
     const result = await this.gameDataService.ships.getAllShips({ env, search: name, limit: 1, page: 1 });
     if (result.data.length) {
-      const ship = result.data[0] as Record<string, unknown>;
-      return { uuid: ship.uuid as string, data: ship };
+      const ship = result.data[0];
+      return { uuid: ship.uuid, data: ship };
     }
     // Fallback: strip the first word to handle "Anvil Arrow" → "Arrow", "Drake Cutlass Black" → "Cutlass Black"
     if (!name.includes(' ')) return null;
     const shorter = name.slice(name.indexOf(' ') + 1);
     const r2 = await this.gameDataService.ships.getAllShips({ env, search: shorter, limit: 1, page: 1 });
     if (!r2.data.length) return null;
-    const ship = r2.data[0] as Record<string, unknown>;
-    return { uuid: ship.uuid as string, data: ship };
+    const ship = r2.data[0];
+    return { uuid: ship.uuid, data: ship };
   }
 
   /** Strips heavy fields unused by the LLM (blobs, long URLs, raw JSON) */
@@ -701,7 +702,7 @@ export class ChatService {
           }
           return {
             total: result.total,
-            ships: result.data.map((s: Record<string, unknown>) => ({
+            ships: result.data.map((s) => ({
               name: s.name,
               manufacturer: s.manufacturer_code,
               role: s.role,

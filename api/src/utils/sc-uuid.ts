@@ -29,7 +29,7 @@ export function dataForgeUuidToScUuid(uuid: string): string | null {
   const hex = uuid.replace(/-/g, '').toLowerCase();
   if (!UUID_HEX.test(hex)) return null;
   const b = hex.match(/../g);
-  if (!b || b.length !== 16) return null;
+  if (b?.length !== 16) return null;
   const r = [...b.slice(6, 8), ...b.slice(4, 6), ...b.slice(0, 4), ...b.slice(10, 16).reverse(), ...b.slice(8, 10).reverse()];
   return `${r.slice(0, 4).join('')}-${r.slice(4, 6).join('')}-${r.slice(6, 8).join('')}-${r.slice(8, 10).join('')}-${r.slice(10, 16).join('')}`;
 }

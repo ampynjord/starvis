@@ -17,8 +17,15 @@ import {
 } from './rankings-config.js';
 import type { RouteDependencies } from './types.js';
 
-function numericStat(row: Record<string, unknown>, key: string): number {
-  const value = Number(row[key] ?? 0);
+/**
+ * Lit une statistique nommée sur une ligne dont la forme n'est pas connue à
+ * l'avance — la clé vient de la configuration des classements.
+ *
+ * `object` plutôt que `Record<string, unknown>` : les entités dont la forme est
+ * déclarée n'ont plus à être dégradées pour franchir cette fonction.
+ */
+function numericStat(row: object, key: string): number {
+  const value = Number((row as Record<string, unknown>)[key] ?? 0);
   return Number.isFinite(value) ? value : 0;
 }
 
@@ -46,10 +53,19 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
         // Override vehicle_category to the route's category (ignore query param)
         filters.vehicle_category = category;
         const result = await gameDataService!.ships.getAllShips(filters);
-        let outputData = result.data as Record<string, unknown>[];
+        let outputData: object[] = result.data;
         if (filters.view === 'compact') {
-          outputData = outputData.map((ship) =>
-            compactObject(ship, ['uuid', 'name', 'manufacturer', 'role', 'career', 'size', 'price', 'total_hp']),
+          outputData = result.data.map((ship) =>
+            compactObject(ship as unknown as Record<string, unknown>, [
+              'uuid',
+              'name',
+              'manufacturer',
+              'role',
+              'career',
+              'size',
+              'price',
+              'total_hp',
+            ]),
           );
         }
 
@@ -62,7 +78,7 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
           source: 'Game Data',
           responseTime: `${Date.now() - t}ms`,
         });
-        if (req.query.format === 'csv') return void sendCsvOrJson(req, res, result.data as Record<string, unknown>[], payload);
+        if (req.query.format === 'csv') return void sendCsvOrJson(req, res, result.data, payload);
         sendWithETag(req, res, payload);
       }),
     );
@@ -206,10 +222,16 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
         } catch {
           /* keep raw */
         }
-      // Attach lightweight variant list if ship belongs to a chassis family
-      if (ship.chassis_id) {
-        ship.variants = await gameDataService!.ships.getVariantSummary(Number(ship.chassis_id), String(ship.uuid), env);
-      }
+      // Le bloc qui attachait ici la liste des variantes a été retiré : il ne
+      // s'exécutait jamais. Il testait `ship.chassis_id`, colonne que la requête
+      // de détail ne sélectionne pas — la condition était donc toujours fausse,
+      // en silence. Trouvé en déclarant le type du vaisseau, qui a signalé un
+      // champ inexistant là où le SQL restait muet.
+      //
+      // Rien à réparer pour autant : `/api/v1/ships/{uuid}/variants` rend déjà
+      // ce service, et le vérifier en production le confirme. Faire fonctionner
+      // le bloc aurait alourdi chaque fiche d'une liste que personne ne
+      // demande, l'IHM comprise.
       if (ship.ship_matrix_id) {
         ship.gallery = await gameDataService!.ships.getShipGallery(Number(ship.ship_matrix_id));
       } else {
@@ -423,9 +445,13 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
         'insurance_expedite_cost',
       ];
       const deltas: Record<string, { ship1: number; ship2: number; diff: number; pct: string }> = {};
+      // Les champs à comparer sont nommés par une liste, pas par le type : cette
+      // vue locale permet l'indexation sans dégrader la signature des appelants.
+      const f1 = ship1 as unknown as Record<string, unknown>;
+      const f2 = ship2 as unknown as Record<string, unknown>;
       for (const f of numericFields) {
-        const v1 = parseFloat(String(ship1[f])) || 0,
-          v2 = parseFloat(String(ship2[f])) || 0;
+        const v1 = parseFloat(String(f1[f])) || 0,
+          v2 = parseFloat(String(f2[f])) || 0;
         if (v1 !== 0 || v2 !== 0) {
           const diff = v2 - v1;
           const pct = v1 !== 0 ? `${diff >= 0 ? '+' : ''}${((diff / v1) * 100).toFixed(1)}%` : v2 !== 0 ? '+inf' : '0%';

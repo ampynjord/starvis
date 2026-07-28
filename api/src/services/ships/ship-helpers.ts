@@ -1,7 +1,15 @@
 import type { Row } from '../shared.js';
 
+/**
+ * Les colonnes exposées par la branche « vaisseaux réels » de l'union.
+ *
+ * Exposées comme tableau, et pas seulement sous leur forme jointe : c'est ce qui
+ * permet de vérifier par test qu'elles restent alignées avec `CONCEPT_SELECT`.
+ * Les deux listes sont réunies par `UNION ALL` — ajouter une colonne à l'une
+ * sans l'autre ne casse rien à la compilation, seulement en production.
+ */
 // prettier-ignore
-export const SHIP_SELECT = [
+export const SHIP_SELECT_COLUMNS = [
   // Identity
   's.uuid',
   's.class_name',
@@ -79,7 +87,9 @@ export const SHIP_SELECT = [
   'ship_market.min_rental_price_30d',
   'COALESCE(ship_market.purchase_location_count, 0)::integer as purchase_location_count',
   'COALESCE(ship_market.rental_location_count, 0)::integer as rental_location_count',
-].join(', ');
+];
+
+export const SHIP_SELECT = SHIP_SELECT_COLUMNS.join(', ');
 
 export const SHIP_MATRIX_CATEGORY_SQL = `CASE
   WHEN LOWER(COALESCE(sm2.type, '')) = 'gravlev'
@@ -92,8 +102,9 @@ export const SHIP_MATRIX_CATEGORY_SQL = `CASE
   ELSE 'ship'
 END`;
 
+/** Voir `SHIP_SELECT_COLUMNS` : même forme, obligatoirement. */
 // prettier-ignore
-export const CONCEPT_SELECT = [
+export const CONCEPT_SELECT_COLUMNS = [
   // Identity (derived from ship_matrix alias sm2)
   "'concept-' || sm2.id::text as uuid",
   "LOWER(REPLACE(REPLACE(sm2.name, ' ', '_'), '''', '')) as class_name",
@@ -171,7 +182,22 @@ export const CONCEPT_SELECT = [
   'NULL::numeric as min_rental_price_30d',
   '0::integer as purchase_location_count',
   '0::integer as rental_location_count',
-].join(', ');
+];
+
+export const CONCEPT_SELECT = CONCEPT_SELECT_COLUMNS.join(', ');
+
+/**
+ * L'alias sous lequel une expression de `SELECT` sort.
+ *
+ * `'s.cargo_capacity'` donne `cargo_capacity` ; `'sm2.focus as role'` donne
+ * `role`. C'est ce nom, et lui seul, que voit l'appelant — et c'est donc lui
+ * qu'il faut comparer entre les deux branches de l'union.
+ */
+export function selectAlias(expression: string): string {
+  const explicit = expression.match(/\s+as\s+([a-zA-Z_0-9]+)\s*$/i);
+  if (explicit) return explicit[1];
+  return expression.replace(/^[a-zA-Z0-9_]+\./, '').trim();
+}
 
 export const SHIP_MATRIX_UPCOMING_STATUSES = new Set(['in-concept', 'in-production', 'in-development']);
 export const SHIP_MATRIX_UPCOMING_SQL = "sm2.production_status IN ('in-concept', 'in-production', 'in-development')";

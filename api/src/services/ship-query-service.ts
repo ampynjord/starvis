@@ -19,6 +19,7 @@ import {
   SHIP_SORT,
   SHIP_SORT_EXPRESSION_MAP,
 } from './ships/ship-helpers.js';
+import type { PublicShip, PublicShipDetail } from './ships/ship-types.js';
 export class ShipQueryService {
   constructor(private getClient: (env: string) => PrismaClient) {}
 
@@ -35,7 +36,7 @@ export class ShipQueryService {
     order?: string;
     page?: number;
     limit?: number;
-  }): Promise<PaginatedResult> {
+  }): Promise<PaginatedResult<PublicShip>> {
     const env = filters?.env ?? 'live';
     const prisma = this.getClient(env);
     const where: string[] = ['s.env = ?'];
@@ -171,17 +172,17 @@ export class ShipQueryService {
       allParams = [...params];
     }
 
-    const rows = await prisma.$queryRawUnsafe<Row[]>(toPostgres(sql), ...allParams);
+    const rows = await prisma.$queryRawUnsafe<PublicShip[]>(toPostgres(sql), ...allParams);
     const data = rows.map(convertBigIntToNumber);
     return { data, total: totalCount, page, limit, pages: Math.ceil(totalCount / limit) };
   }
 
-  async getShipByUuid(uuid: string, env = 'live'): Promise<Row | null> {
+  async getShipByUuid(uuid: string, env = 'live'): Promise<PublicShipDetail | null> {
     const prisma = this.getClient(env);
     if (uuid.startsWith('concept-')) {
       const smId = Number(uuid.replace('concept-', ''));
       if (!Number.isInteger(smId)) return null;
-      const rows = await prisma.$queryRawUnsafe<Row[]>(
+      const rows = await prisma.$queryRawUnsafe<PublicShipDetail[]>(
         toPostgres(
           `SELECT ${CONCEPT_SELECT}, TRUE as is_concept_only FROM rsi.ship_matrix sm2 WHERE sm2.id = ? AND ${SHIP_MATRIX_UPCOMING_SQL} AND sm2.id NOT IN (SELECT ship_matrix_id FROM game.ships WHERE ship_matrix_id IS NOT NULL AND env = ?)`,
         ),
@@ -190,7 +191,10 @@ export class ShipQueryService {
       );
       return rows[0] ? convertBigIntToNumber(rows[0]) : null;
     }
-    const rows = await prisma.$queryRawUnsafe<Row[]>(
+    // Les trois colonnes `sm_*` sont des colonnes de travail : elles complètent
+    // les dimensions manquantes puis sont retirées de l'objet. Le type les
+    // déclare ici, et pas dans le contrat public, pour cette raison.
+    const rows = await prisma.$queryRawUnsafe<Array<PublicShipDetail & { sm_length?: unknown; sm_beam?: unknown; sm_height?: unknown }>>(
       toPostgres(`SELECT ${SHIP_SELECT}, s.game_data, FALSE as is_concept_only,
               sm.length as sm_length, sm.beam as sm_beam, sm.height as sm_height
        ${SHIP_JOINS} WHERE s.uuid = ? AND s.env = ?`),
@@ -210,9 +214,9 @@ export class ShipQueryService {
     return convertBigIntToNumber(ship);
   }
 
-  async getShipByClassName(className: string, env = 'live'): Promise<Row | null> {
+  async getShipByClassName(className: string, env = 'live'): Promise<PublicShip | null> {
     const prisma = this.getClient(env);
-    const rows = await prisma.$queryRawUnsafe<Row[]>(
+    const rows = await prisma.$queryRawUnsafe<PublicShip[]>(
       toPostgres(`SELECT ${SHIP_SELECT}, FALSE as is_concept_only ${SHIP_JOINS} WHERE s.class_name = ? AND s.env = ?`),
       className,
       env,

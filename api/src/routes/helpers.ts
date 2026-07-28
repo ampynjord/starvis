@@ -5,6 +5,7 @@ import { withStatusDiscriminators } from '../middleware/response-shape.js';
 import { arrayToCsv } from '../schemas.js';
 import type { GameDataService } from '../services/game-data-service.js';
 import type { ShipQueryService } from '../services/ship-query-service.js';
+import type { PublicShipDetail } from '../services/ships/ship-types.js';
 import logger from '../utils/logger.js';
 
 /** Wrap async route handler — catches errors (including ZodErrors → 400) */
@@ -118,9 +119,11 @@ export function makeShipResolver(ships: ShipQueryService) {
       if (id.startsWith('concept-')) return id;
       if (id.length === 36) return id;
       const ship = await ships.getShipByClassName(id, env);
-      return (ship?.uuid as string) || null;
+      return ship?.uuid || null;
     },
-    async resolveShip(id: string, env = 'live'): Promise<Record<string, unknown> | null> {
+    // Le type de retour suit désormais celui du service, au lieu d'aplatir en
+    // dictionnaire ouvert ce que le service sait décrire précisément.
+    async resolveShip(id: string, env = 'live'): Promise<PublicShipDetail | null> {
       return (await ships.getShipByUuid(id, env)) || (await ships.getShipByClassName(id, env));
     },
   };
