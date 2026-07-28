@@ -297,6 +297,21 @@ async function auditEntities() {
   requireCoverage('missions', missions, 'base_xp', 0);
   requireCoverage('missions', missions, 'reputation_reward', 0);
 
+  // Les éléments miniers ne sont pas paginés : la route rend les 42 d'un coup.
+  //
+  // Un pourcentage au-dessus de cent n'est pas un pourcentage. Ce contrôle
+  // trivial aurait épargné un défaut bien réel : `probability` est stockée en
+  // fraction et se multiplie par cent, `min_percentage` et `max_percentage` sont
+  // déjà des pourcentages — les trois passaient par la même multiplication, et
+  // l'Agricium sortait annoncé à 2502 %.
+  const mining = (await get('/mining/elements', { env })).data ?? [];
+  if (mining.length) {
+    requireCoverage('mining elements', mining, 'name', 1);
+    requirePlausible('mining elements', mining, 'avg_probability_pct', { min: 0, max: 100 });
+    requirePlausible('mining elements', mining, 'avg_min_pct', { min: 0, max: 100 });
+    requirePlausible('mining elements', mining, 'avg_max_pct', { min: 0, max: 100 });
+  }
+
   const commodities = await getAll('/commodities', { env });
   requireCoverage('commodities', commodities, 'name', 1);
   requireHumanNames('commodities', commodities);

@@ -19,8 +19,13 @@ export class MiningQueryService {
               e.explosion_multiplier, e.cluster_factor, e.p4k_path,
               COUNT(DISTINCT mcp.composition_uuid) AS rocks_containing,
               ROUND(AVG(mcp.probability) * 100, 1) AS avg_probability_pct,
-              ROUND(AVG(mcp.min_percentage) * 100, 1) AS avg_min_pct,
-              ROUND(AVG(mcp.max_percentage) * 100, 1) AS avg_max_pct
+              -- probability est stockée en fraction (0,02 a 1) : elle se
+              -- multiplie par cent. min_percentage et max_percentage sont deja
+              -- des pourcentages (1 a 100) : les multiplier aussi les rendait
+              -- cent fois trop grands, l'Agricium sortait a 2502 % au lieu
+              -- de 25 %.
+              ROUND(AVG(mcp.min_percentage), 1) AS avg_min_pct,
+              ROUND(AVG(mcp.max_percentage), 1) AS avg_max_pct
        FROM game.mining_elements e
        LEFT JOIN game.mining_composition_parts mcp ON mcp.element_uuid = e.uuid AND mcp.element_env = e.env
        WHERE e.env = ?

@@ -39,3 +39,33 @@ describe('parseIntent', () => {
     expect(parseIntent('buy a')).toBeNull();
   });
 });
+
+describe('parseIntent — classement', () => {
+  it('reconnaît une demande de meilleur', () => {
+    expect(parseIntent('best shield')).toEqual({ kind: 'best', subject: 'shield', size: undefined });
+    expect(parseIntent('top thruster')).toMatchObject({ kind: 'best', subject: 'thruster' });
+    expect(parseIntent("what's the best cooler")).toMatchObject({ kind: 'best', subject: 'cooler' });
+  });
+
+  it('extrait la taille et la retire du sujet', () => {
+    // Le sujet doit rester interrogeable : « shield size 2 » ne correspond à
+    // aucun type de composant, « shield » si.
+    expect(parseIntent('best shield size 2')).toEqual({ kind: 'best', subject: 'shield', size: 2 });
+    expect(parseIntent('best size 3 shield')).toEqual({ kind: 'best', subject: 'shield', size: 3 });
+    expect(parseIntent('best s1 thruster')).toEqual({ kind: 'best', subject: 'thruster', size: 1 });
+  });
+
+  it('ignore un nombre qui ne peut pas être une taille', () => {
+    // Au-delà de 12, le nombre parlait d'autre chose ; le retirer mutilerait le
+    // sujet.
+    expect(parseIntent('best s99 rifle')).toMatchObject({ kind: 'best', subject: 's99 rifle' });
+  });
+
+  it('ne confond pas « best sell price » avec un classement', () => {
+    expect(parseIntent('agricium best sell price')).toEqual({ kind: 'sell', subject: 'agricium' });
+  });
+
+  it('refuse un classement sans sujet une fois la taille retirée', () => {
+    expect(parseIntent('best size 2')).toBeNull();
+  });
+});

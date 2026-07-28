@@ -1,6 +1,7 @@
 ﻿'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { BestAnswer } from '@/components/search/BestAnswer';
 import { IntentAnswer } from '@/components/search/IntentAnswer';
 import { parseIntent } from '@/lib/intent';
 import { ChevronRight, Search } from 'lucide-react';
@@ -119,7 +120,7 @@ export default function SearchResultsPage() {
 
       {/* Réponse directe quand la saisie portait une question — les résultats
           ordinaires restent affichés en dessous. */}
-      {intent && <IntentAnswer intent={intent} env={env} />}
+      {intent?.kind === 'best' ? <BestAnswer intent={intent} env={env} /> : intent ? <IntentAnswer intent={intent} env={env} /> : null}
 
       {/* Results */}
       {isLoading && debouncedQuery.length >= 2 ? (
