@@ -566,6 +566,8 @@ export const api = {
       (await get<MiningComposition[]>('/mining/compositions', { include_empty: includeEmpty || undefined, env })).map(mapMiningComposition),
     composition: async (uuid: string, env?: string) =>
       mapMiningComposition(await get<MiningComposition>(`/mining/compositions/${uuid}`, { env })),
+    /** L'API sert le détail d'un élément ; rien ne le consommait jusqu'ici. */
+    element: async (uuid: string, env?: string) => mapMiningElement(await get<MiningElement>(`/mining/elements/${uuid}`, { env })),
     lasers: (env?: string) => get<MiningLaserInfo[]>('/mining/lasers', { env }),
   },
 

@@ -61,7 +61,11 @@ export class MiningQueryService {
       uuid,
     );
     if (!rows[0]) return null;
-    const row = rows[0];
+    // Sans cette conversion, les colonnes numeriques sortent en chaines : le
+    // Decimal de Prisma se serialise ainsi. La liste l'appliquait deja, pas la
+    // fiche, si bien que le meme champ etait un nombre d'un cote et une chaine
+    // de l'autre. Un consommateur qui additionnait obtenait une concatenation.
+    const row = convertBigIntToNumber(rows[0]);
     if (!row.found_in) row.found_in = [];
     return row;
   }

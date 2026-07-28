@@ -296,7 +296,17 @@ export function MineralsTable({ header }: MineralsTableProps) {
                       isSelected ? 'bg-cyan-950/30 border-cyan-800/40' : 'hover:bg-slate-800/20'
                     }`}
                   >
-                    <td className="p-2 text-slate-200 font-semibold">{el.name ?? 'Unknown mineral'}</td>
+                    <td className="p-2 font-semibold">
+                      {/* La ligne ouvre le panneau latéral ; le nom mène à la
+                          fiche complète, qui dit où trouver le minerai. */}
+                      <Link
+                        href={`/mining/${el.uuid}`}
+                        onClick={(event) => event.stopPropagation()}
+                        className="text-slate-200 hover:text-cyan-300 transition-colors"
+                      >
+                        {el.name ?? 'Unknown mineral'}
+                      </Link>
+                    </td>
                     <td className="p-2 text-center">
                       <GlowBadge color={rarityCol} size="sm">{rarity}</GlowBadge>
                     </td>
