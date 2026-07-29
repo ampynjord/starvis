@@ -214,3 +214,25 @@ model BugReport {
 }
 
 // ╔══════════════════════════════════════════════════════════════╗
+
+/// Le taux de remplissage de chaque colonne, à chaque extraction.
+///
+/// Le garde-fou existant compare des nombres de lignes ; il ne voit rien quand
+/// une colonne se vide en gardant ses lignes. C'est pourtant le mode d'échec le
+/// plus courant : un champ renommé côté jeu, et l'extraction réussit en
+/// produisant des nulls.
+model FieldCoverage {
+  id            Int      @id @default(autoincrement())
+  extractionId  Int?     @map("extraction_id")
+  env           String   @default("live") @db.VarChar(10)
+  tableName     String   @map("table_name") @db.VarChar(120)
+  columnName    String   @map("column_name") @db.VarChar(120)
+  rowCount      Int      @map("row_count")
+  nonNullCount  Int      @map("non_null_count")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([env, tableName, columnName, id(sort: Desc)], map: "field_coverage_lookup_idx")
+  @@index([extractionId], map: "field_coverage_extraction_idx")
+  @@map("field_coverage")
+  @@schema("meta")
+}

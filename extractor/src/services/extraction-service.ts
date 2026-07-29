@@ -20,6 +20,7 @@ import { saveComponents } from '../persisters/components.js';
 import type { PersistContext } from '../persisters/context.js';
 import { saveCraftingRecipes } from '../persisters/crafting.js';
 import { saveShipCtmModels } from '../persisters/ctm.js';
+import { recordFieldCoverage } from '../persisters/field-coverage.js';
 import { saveGameInsights } from '../persisters/game-insights.js';
 import { saveItems } from '../persisters/items.js';
 import { saveLocations } from '../persisters/locations.js';
@@ -495,6 +496,16 @@ export class ExtractionService {
         } catch (e) {
           logger.warn('Changelog generation failed', { error: String(e) });
         }
+      }
+
+      // 8. Relever le remplissage des colonnes, et signaler ce qui s'est vide.
+      //    Ne fait pas echouer l'extraction : une colonne effondree doit se
+      //    voir, mais le rejet reste l'affaire du garde-fou sur les nombres de
+      //    lignes, juste en dessous.
+      try {
+        await recordFieldCoverage(conn, env, extractionId, onProgress);
+      } catch (e) {
+        logger.warn('Field coverage measurement failed', { error: String(e) });
       }
 
       onProgress?.(
