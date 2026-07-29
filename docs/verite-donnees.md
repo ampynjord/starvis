@@ -551,6 +551,41 @@ En attendant, l'audit mesure la part non rattachée — 45,6 % — et la plafonn
 55 %. Le champ `location_uuid` documente ce que son absence veut dire, pour qu'un
 consommateur tiers puisse filtrer en connaissance de cause.
 
+### D11 — Deviner le nom d'un champ, trois fois le même défaut
+
+Trois défauts trouvés le 29 juillet 2026 ont la même forme : le code cherche un
+champ dont il a supposé le nom, ne le trouve pas, et n'en dit rien.
+
+| Où | Ce qui était cherché | Ce que le jeu écrit | Effet |
+|---|---|---|---|
+| `buildFranchiseMap` | `name` | `localizedName` | 37 franchises chargées, aucune clé — les noms commerciaux n'ont jamais servi |
+| `extractCoordinates` | `position`, `coordinates`, `location` | *rien de tel dans `StarMapObject`* | 0 coordonnée sur 1 120 lieux |
+| `game-insight-extractor` | `value`, `amount`, `price`, `reward` | *inconnu, à observer* | 3 valeurs numériques sur 6 032 lignes |
+
+Le motif est toujours le même : une liste de noms plausibles passée à un
+`firstNumber(…)` ou un `COALESCE`, qui renvoie `null` sans distinguer « le champ
+est absent » de « le champ est vide ». L'extraction réussit, le compte de lignes
+est juste, et la colonne reste vide.
+
+**`game_insights` n'est donc pas exposé.** Sur ses 6 032 lignes : trois valeurs
+numériques, aucun `related_uuid`, et 2 579 valeurs textuelles dont l'essentiel
+sont des clés de localisation non résolues de la catégorie `navigation`. Quatre-
+vingt-neuf lignes `medical` ont un UUID pour nom. Ce qu'elle porte de lisible —
+le butin, les munitions — est déjà servi ailleurs et mieux : les tables de butin
+ont leurs chances et leurs rendements, `game.ammo` a ses statistiques.
+
+La servir publierait des noms sans données. Le manque est à l'extraction, et se
+répare catégorie par catégorie, en observant les structures DataForge plutôt
+qu'en devinant leurs champs.
+
+**Ce qui garde désormais contre ce défaut.** Chaque extraction relève le taux de
+remplissage des colonnes nullables et le compare au relevé précédent : une chute
+de plus d'un quart est signalée. La comparaison ne voit cependant pas une colonne
+vide depuis toujours — elle ne chute pas. Les colonnes à zéro sont donc listées
+séparément, sans alerte : il y en a 43, dont `components.mass`,
+`components.power_output`, `components.cooling_rate`, `locations.coordinates` et
+les quatre colonnes de lieu des missions.
+
 ## 6. Ce que l'audit ne fait pas encore
 
 Honnêtement listé, pour ne pas confondre couverture et confiance :

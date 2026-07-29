@@ -54,6 +54,20 @@ export interface CoverageDrop {
   after: number;
 }
 
+export interface CoverageReport {
+  drops: CoverageDrop[];
+  /**
+   * Les colonnes vides depuis toujours.
+   *
+   * La comparaison entre deux relevés ne les voit pas : une colonne qui n'a
+   * jamais rien porté ne chute pas. C'est pourtant le meme defaut vu
+   * autrement — `game_insights` remplit trois valeurs numeriques sur 6 032
+   * lignes parce que l'extracteur devine les noms de champs du jeu au lieu de
+   * les observer.
+   */
+  alwaysEmpty: { table: string; column: string }[];
+}
+
 interface CoverageRow {
   table: string;
   column: string;
@@ -104,9 +118,9 @@ export async function recordFieldCoverage(
   env: GameEnv,
   extractionId: number | null,
   onProgress?: (msg: string) => void,
-): Promise<CoverageDrop[]> {
+): Promise<CoverageReport> {
   const current = await measure(conn, env);
-  if (current.length === 0) return [];
+  if (current.length === 0) return { drops: [], alwaysEmpty: [] };
 
   const { rows: previous } = await conn.query<{ table_name: string; column_name: string; row_count: number; non_null_count: number }>(
     `SELECT DISTINCT ON (table_name, column_name) table_name, column_name, row_count, non_null_count
@@ -140,12 +154,22 @@ export async function recordFieldCoverage(
     values,
   );
 
-  onProgress?.(`Field coverage: ${current.length} columns measured across ${WATCHED_TABLES.length} tables`);
+  const alwaysEmpty = current.filter((row) => row.nonNull === 0).map((row) => ({ table: row.table, column: row.column }));
+
+  onProgress?.(`Field coverage: ${current.length} columns measured across ${WATCHED_TABLES.length} tables, ${alwaysEmpty.length} empty`);
   for (const drop of drops) {
     const message = `Field coverage collapsed: ${drop.table}.${drop.column} ${(drop.before * 100).toFixed(1)}% → ${(drop.after * 100).toFixed(1)}%`;
     logger.warn(message, { module: 'field-coverage' });
     onProgress?.(`⚠️ ${message}`);
   }
+  if (alwaysEmpty.length > 0) {
+    // Journalise sans alerter : une colonne vide est souvent un manque connu et
+    // assume — `cooling_rate` chez les refroidisseurs — pas un incident. La
+    // liste sert a ce qu'on ne l'oublie pas, pas a reveiller quelqu'un.
+    logger.info(`Columns with no value at all: ${alwaysEmpty.map((c) => `${c.table}.${c.column}`).join(', ')}`, {
+      module: 'field-coverage',
+    });
+  }
 
-  return drops;
+  return { drops, alwaysEmpty };
 }
