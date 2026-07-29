@@ -236,8 +236,18 @@ vaisseau. Les tables d'origine restent le détail par source ; l'offre est la
 vue croisée.
 
 **C9 — Les lieux deviennent une hiérarchie complète.** Système, astre, orbite,
-station, avant-poste, avec coordonnées — aucune n'est renseignée aujourd'hui — et
-le rattachement à la carte RSI porté de 58 à ce que le croisement permet.
+station, avant-poste.
+
+*Les coordonnées sont abandonnées, enquête faite* — voir
+[D12](verite-donnees.md). Le DataForge n'en porte pas ; la carte RSI est
+épuisée à 53 lieux sur 170 de type majeur, un seul de plus étant appariable ; et
+les positions des socpaks sont locales à leur conteneur, en mètres à l'intérieur
+d'un bâtiment. Ce qu'il faut abandonner n'est pas « les coordonnées » mais « les
+coordonnées pour chaque lieu » : à l'échelle qui sert un wiki, les 53 rattachés
+sont ce que la donnée permet.
+
+Les commodités, elles, sont extraites : 25 services, 722 rattachements sur 92
+lieux.
 
 **C10 — Le croisement devient une table, pas une jointure de circonstance.**
 `canonical_entities` existe et n'a jamais servi. Elle doit porter l'identité

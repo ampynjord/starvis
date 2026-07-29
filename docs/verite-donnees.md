@@ -586,6 +586,60 @@ séparément, sans alerte : il y en a 43, dont `components.mass`,
 `components.power_output`, `components.cooling_rate`, `locations.coordinates` et
 les quatre colonnes de lieu des missions.
 
+### D12 — Les coordonnées : trois sources sondées, une conclusion
+
+Aucun des 1 120 lieux ne porte de coordonnées. L'enquête est close : ce n'est pas
+un défaut à corriger, c'est une donnée qui n'existe pas sous la forme attendue.
+
+**Le `StarMapObject` du DataForge n'a pas de position.** Ni `position`, ni
+`coordinates`, ni `x/y/z` — quarante-trois champs relevés, aucun spatial.
+`extractCoordinates` cherchait ce qui n'est pas là ([D11](#d11--deviner-le-nom-dun-champ-trois-fois-le-même-défaut)).
+
+**Le `p4k_path` que nous stockons ne désigne aucun fichier.**
+`libs/foundry/records/starmap/…/stanton1_lorville.xml` est le chemin logique de
+l'enregistrement DataForge, pas une entrée du P4K. Le chercher rend zéro
+fichier.
+
+**La carte RSI est épuisée.** Elle porte des coordonnées pour ses 967 entrées,
+mais sur nos 170 lieux de type majeur — système, planète, lune, station, zone
+d'atterrissage, point de saut — 53 sont déjà rattachés et **un seul** de plus
+est appariable par nom. Les 116 autres portent des noms qu'elle ne connaît pas :
+« Prospect Point », « INS Jericho », « Orison General », les points de saut. Le
+plafond réaliste est donc 54 lieux sur 1 120, et nous y sommes.
+
+Les 950 lieux restants sont hors de sa portée par nature : 640 champs
+d'astéroïdes, 135 bunkers, 88 concessions minières, 68 avant-postes.
+
+#### Ce que les socpaks contiennent réellement
+
+`Data/ObjectContainers/PU/` porte 8 284 archives `.socpak` — des ZIP imbriqués
+dans le P4K. Elles contiennent bien des positions :
+
+```
+lorville_hosp.xml → pos="115.50001027103963,280.00008057761033,180.99986822112183"
+```
+
+**Mais c'est une position locale, en mètres, à l'intérieur du conteneur.** Cent
+quinze mètres dans l'hôpital de Lorville, pas une position dans Stanton. Obtenir
+une coordonnée absolue demanderait de composer les transformations en remontant
+l'arbre des conteneurs — hôpital, ville de Lorville, Hurston, Stanton — et de
+rattacher chaque conteneur à notre lieu, ce que seuls les noms permettent
+aujourd'hui (`lorville_city_{70374d96-…}` existe en trois variantes).
+
+Le coût : un lecteur ZIP à écrire, 8 284 archives à parcourir, une composition
+de transformations, et un appariement approximatif à arbitrer. Pour un résultat
+dont l'usage reste à démontrer — une position au mètre près à l'intérieur d'un
+bâtiment ne sert ni une carte ni un calcul de distance.
+
+#### La conclusion
+
+Ce qu'il faut abandonner n'est pas « les coordonnées » mais « les coordonnées
+pour chaque lieu ». À l'échelle qui sert un wiki — situer un corps céleste,
+mesurer une distance entre deux stations — les 53 lieux rattachés à la carte RSI
+sont ce que la donnée permet, et nous les avons déjà. La colonne
+`game.locations.coordinates` reste vide et figure dans la liste des colonnes
+sans valeur, relevée à chaque extraction.
+
 ## 6. Ce que l'audit ne fait pas encore
 
 Honnêtement listé, pour ne pas confondre couverture et confiance :
