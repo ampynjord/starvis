@@ -1,5 +1,5 @@
 import type { Router } from 'express';
-import { requireJwtAdmin } from '../middleware/auth.js';
+import { requireInternalOrAdmin } from '../middleware/auth.js';
 import { CORRELATION_DOMAINS, type CorrelationSource, isCorrelationDomain } from '../services/correlation-service.js';
 import { asyncHandler, getQueryNumber, getQueryString, makeGameDataGuard, sendDataWithETag, sendWithETag } from './helpers.js';
 import type { RouteDependencies } from './types.js';
@@ -50,12 +50,29 @@ export function mountCorrelationRoutes(router: Router, deps: RouteDependencies):
    */
   router.post(
     '/admin/correlations/persist',
-    requireJwtAdmin,
+    requireInternalOrAdmin,
     requireGameData,
     asyncHandler(async (req, res) => {
       const env = getQueryString(req, 'env') ?? 'live';
       const report = await gameDataService!.correlations.persistCanonicalEntities(env);
       res.json({ success: true, data: report });
+    }),
+  );
+
+  /**
+   * Tout ce qu'on sait d'une entite, depuis n'importe lequel de ses UUID.
+   *
+   * C'est ce a quoi l'identite canonique sert : ne pas avoir a savoir de quelle
+   * source vient l'identifiant qu'on tient.
+   */
+  router.get(
+    '/api/v1/canonical/by-uuid/:uuid',
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const env = getQueryString(req, 'env') ?? 'live';
+      const data = await gameDataService!.correlations.getCanonicalBySourceUuid(req.params.uuid, env);
+      if (!data) return void res.status(404).json({ success: false, error: 'No canonical identity for this uuid' });
+      sendWithETag(req, res, { success: true, data });
     }),
   );
 

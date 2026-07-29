@@ -8367,6 +8367,35 @@
         }
       }
     },
+    "/api/v1/canonical/by-uuid/{uuid}": {
+      "get": {
+        "tags": ["Game Data"],
+        "summary": "Everything known about one entity, from any of its identifiers",
+        "description": "Give it a UUID from any source — the P4K record, a UEX price row — and it returns the canonical identity and every source that describes it, best match first. The point is not having to know which source your identifier came from. Identity is recomputed in the background when an extraction has landed since it was last written.",
+        "operationId": "getCanonicalByUuid",
+        "parameters": [
+          {
+            "name": "uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/env"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Canonical entity with all its source links"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
     "/api/v1/changelog/summary": {
       "get": {
         "tags": ["Game Versions"],

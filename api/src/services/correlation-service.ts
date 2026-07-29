@@ -31,6 +31,28 @@ export interface CanonicalCorrelation {
   sources: CorrelationSourceLink[];
 }
 
+export interface CanonicalRecord {
+  id: string;
+  env: string;
+  domain: string;
+  key: string;
+  name: string;
+  /** Nullable au schema : une entite peut n'avoir aucune source prioritaire. */
+  primary_source: string | null;
+  confidence: string;
+  updated_at: string;
+  sources: {
+    source: string;
+    source_table: string;
+    source_id: string | null;
+    source_uuid: string | null;
+    source_name: string | null;
+    match_method: string;
+    match_score: number;
+    is_primary: boolean;
+  }[];
+}
+
 export interface CorrelationQuery {
   domain: CorrelationDomain;
   env?: string;
@@ -264,6 +286,85 @@ export class CorrelationService {
     }
 
     return report;
+  }
+
+  /**
+   * L'identite canonique d'une entite, depuis n'importe lequel de ses UUID.
+   *
+   * C'est ce que la table servait a rendre possible : demander « tout ce qu'on
+   * sait de cette chose » sans savoir de quelle source vient l'identifiant qu'on
+   * tient.
+   */
+  async getCanonicalBySourceUuid(sourceUuid: string, env = 'live'): Promise<CanonicalRecord | null> {
+    const prisma = this.getClient(env);
+    void this.refreshIfStale(env);
+
+    const link = await prisma.canonicalEntityLink.findFirst({
+      where: { env, sourceUuid },
+      include: { canonical: { include: { links: true } } },
+    });
+    if (!link) return null;
+
+    const entity = link.canonical;
+    return {
+      id: entity.id,
+      env: entity.env,
+      domain: entity.domain,
+      key: entity.canonicalKey,
+      name: entity.name,
+      primary_source: entity.primarySource,
+      confidence: entity.confidence,
+      updated_at: entity.updatedAt.toISOString(),
+      sources: entity.links
+        .map((row) => ({
+          source: row.source,
+          source_table: row.sourceTable,
+          source_id: row.sourceId,
+          source_uuid: row.sourceUuid,
+          source_name: row.sourceName,
+          match_method: row.matchMethod,
+          match_score: row.matchScore,
+          is_primary: row.isPrimary,
+        }))
+        .sort((a, b) => b.match_score - a.match_score),
+    };
+  }
+
+  /**
+   * Recalcule en arriere-plan si une extraction est passee depuis la derniere
+   * ecriture.
+   *
+   * La persistance est declenchee a la main ; sans ce controle elle se
+   * perimerait en silence, ce qui est pire que de ne pas l'avoir. Le
+   * rafraichissement ne bloque pas la requete en cours : celle-ci sert l'etat
+   * precedent, la suivante aura le nouveau.
+   */
+  private refreshing = false;
+
+  private async refreshIfStale(env: string): Promise<void> {
+    if (this.refreshing) return;
+    const prisma = this.getClient(env);
+    try {
+      const latest = await prisma.$queryRawUnsafe<Row[]>(
+        toPostgres('SELECT MAX(extracted_at) AS at FROM meta.extraction_log WHERE game_env = ?'),
+        env,
+      );
+      const extractedAt = latest[0]?.at ? new Date(String(latest[0].at)) : null;
+      if (!extractedAt) return;
+
+      const persisted = await prisma.canonicalEntity.aggregate({ where: { env }, _max: { updatedAt: true } });
+      const persistedAt = persisted._max.updatedAt;
+      if (persistedAt && persistedAt >= extractedAt) return;
+
+      this.refreshing = true;
+      void this.persistCanonicalEntities(env).finally(() => {
+        this.refreshing = false;
+      });
+    } catch {
+      // Une identite perimee vaut mieux qu'une requete en echec : le controle
+      // de fraicheur ne doit jamais faire tomber la lecture.
+      this.refreshing = false;
+    }
   }
 
   async getSummary(env = 'live'): Promise<Record<CorrelationDomain, { total: number; correlated: number; singleSource: number }>> {
