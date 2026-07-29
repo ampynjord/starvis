@@ -308,7 +308,26 @@ Chaque étape reste déployable, et la production fonctionnelle.
 **Contrainte tenue tout du long** : `/api/v1` continue de répondre. La
 restructuration se fait sous `/api/v2` ; la v1 devient une couche de
 compatibilité au-dessus du nouveau modèle, jamais un second chemin vers la
-donnée. Les tiers migrent quand ils le décident, pas quand nous déployons.
+donnée.
+
+*Pourquoi deux versions, et jusqu'à quand.* Trois intégrations tierces
+appellent réellement l'API — « Moteur organisationnel » (5 039 requêtes),
+« FlightDockxDNR » (150), « stelliverse » (10). Changer l'enveloppe en place les
+casserait sans erreur visible : un client lisant `data.total` recevrait
+`undefined` et des listes tronquées sans le savoir.
+
+Deux versions permanentes seraient pourtant une dette, pas une architecture. La
+règle est donc :
+
+1. **La v1 est figée** — plus de nouvelle ressource, seulement les correctifs
+   qu'un défaut impose.
+2. **La v2 devient la surface complète**, ressource par ressource.
+3. **La v1 s'arrête** quand les trois tiers ont migré ; leurs jetons donnent de
+   quoi les joindre.
+
+À noter, honnêtement : sur les trois défauts que la v2 corrige, deux — la
+pagination à deux endroits et les colonnes vides — auraient pu l'être par ajout
+sur la v1, sans version nouvelle. Seul le retrait de `success` l'exigeait.
 
 ## 7. Suggestions ajoutées
 
