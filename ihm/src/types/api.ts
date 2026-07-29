@@ -1546,3 +1546,31 @@ export interface LocationTreeNode extends Location {
   children: LocationTreeNode[];
   shops: Shop[];
 }
+
+// ─── Butin ────────────────────────────────────────────────────────────────────
+
+export interface LootTable {
+  uuid: string;
+  class_name: string;
+  name: string | null;
+  p4k_path: string | null;
+  entry_count: number;
+}
+
+export interface LootTableEntry {
+  entry_index: number;
+  archetype_uuid: string | null;
+  archetype_name: string | null;
+  /** Le poids brut, tel que le jeu le déclare — une chaîne, comme tout `Decimal`. */
+  weight: string | null;
+  /** La part du poids dans le total de la table, calculée côté serveur. */
+  chance_pct: number | null;
+  min_results: number | null;
+  max_results: number | null;
+  /** Ce que l'archétype produit, en clair. */
+  yields: string[];
+}
+
+export interface LootTableDetail extends LootTable {
+  entries: LootTableEntry[];
+}

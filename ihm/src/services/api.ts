@@ -27,6 +27,8 @@ import type {
   LoadoutResult,
   Location,
   LocationTreeNode,
+  LootTable,
+  LootTableDetail,
   LootTableInsight,
   Manufacturer,
   MiningComposition,
@@ -359,6 +361,12 @@ export const api = {
   },
 
   // ─── Components ────────────────────────────────────────────────────
+  // ─── Butin : ce qui peut tomber, et avec quelle chance ──────────────────
+  loot: {
+    tables: (p?: { env?: string; page?: number; limit?: number }) => get<PaginatedResponse<LootTable>>('/loot/tables', p),
+    table: (uuid: string, env?: string) => get<LootTableDetail>(`/loot/tables/${uuid}`, { env }),
+  },
+
   components: {
     list: (p: {
       env?: string;
