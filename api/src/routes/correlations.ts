@@ -1,4 +1,5 @@
 import type { Router } from 'express';
+import { requireJwtAdmin } from '../middleware/auth.js';
 import { CORRELATION_DOMAINS, type CorrelationSource, isCorrelationDomain } from '../services/correlation-service.js';
 import { asyncHandler, getQueryNumber, getQueryString, makeGameDataGuard, sendDataWithETag, sendWithETag } from './helpers.js';
 import type { RouteDependencies } from './types.js';
@@ -37,6 +38,24 @@ export function mountCorrelationRoutes(router: Router, deps: RouteDependencies):
       const env = getQueryString(req, 'env') ?? 'live';
       const summary = await gameDataService!.correlations.getSummary(env);
       sendDataWithETag(req, res, summary);
+    }),
+  );
+
+  /**
+   * Fige l'identite calculee dans `canonical_entities`.
+   *
+   * Reserve a l'administration : le calcul parcourt les sept domaines sur toute
+   * la base et remplace ce qui s'y trouve. C'est une operation d'apres
+   * extraction, pas une lecture.
+   */
+  router.post(
+    '/admin/correlations/persist',
+    requireJwtAdmin,
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const env = getQueryString(req, 'env') ?? 'live';
+      const report = await gameDataService!.correlations.persistCanonicalEntities(env);
+      res.json({ success: true, data: report });
     }),
   );
 

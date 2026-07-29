@@ -9431,6 +9431,27 @@
         }
       }
     },
+    "/admin/correlations/persist": {
+      "post": {
+        "tags": ["Admin"],
+        "summary": "Freeze the computed cross-source identity into canonical_entities",
+        "description": "Correlation was recomputed on every request and stored nowhere, so two calls could hand back two different identifiers for the same entity and nothing could hang off it. This writes one canonical entity per group and one link per source row, replacing each domain wholesale inside a transaction — an entity gone from the game must disappear here too. Run it after an extraction.",
+        "operationId": "persistCanonicalEntities",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/env"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Per-domain counts of entities, links and deduplicated source rows"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
     "/admin/maintenance/prune-old-env": {
       "post": {
         "tags": ["Admin"],

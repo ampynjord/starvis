@@ -1,4 +1,5 @@
-import type { PrismaLike as PrismaClient } from '@starvis/db';
+import { randomUUID } from 'node:crypto';
+import type { Prisma, PrismaLike as PrismaClient } from '@starvis/db';
 import { convertBigIntToNumber, type Row, toPostgres } from './shared.js';
 
 export const CORRELATION_DOMAINS = ['system', 'location', 'shop', 'ship', 'commodity', 'item', 'component'] as const;
@@ -103,8 +104,26 @@ function rowLink(row: Row, isPrimary: boolean): CorrelationSourceLink {
 export class CorrelationService {
   constructor(private getClient: (env: string) => PrismaClient) {}
 
+  /**
+   * Tous les groupes d'un domaine, sans filtre ni plafond.
+   *
+   * `getCorrelations` en sert une tranche filtrée ; la persistance a besoin de
+   * l'ensemble. Les séparer évite qu'un plafond d'affichage se glisse dans ce
+   * qu'on écrit — il s'y était déjà glissé dans le résumé, qui comptait 500
+   * composants sur 3 275.
+   */
+  private async computeGroups(domain: CorrelationDomain, env: string): Promise<CanonicalCorrelation[]> {
+    const query: CorrelationQuery = { domain, env };
+    return this.groupsFor(query, env);
+  }
+
   async getCorrelations(query: CorrelationQuery): Promise<CanonicalCorrelation[]> {
     const env = query.env ?? 'live';
+    const groups = await this.groupsFor(query, env);
+    return groups.sort((a, b) => a.name.localeCompare(b.name)).slice(0, Math.min(Math.max(query.limit ?? 200, 1), 500));
+  }
+
+  private async groupsFor(query: CorrelationQuery, env: string): Promise<CanonicalCorrelation[]> {
     const prisma = this.getClient(env);
     const rows = convertBigIntToNumber(
       await prisma.$queryRawUnsafe<Row[]>(toPostgres(sqlForDomain(query.domain)), ...paramsForDomain(query.domain, env)),
@@ -149,13 +168,111 @@ export class CorrelationService {
       });
     }
 
-    return result.sort((a, b) => a.name.localeCompare(b.name)).slice(0, Math.min(Math.max(query.limit ?? 200, 1), 500));
+    return result;
+  }
+
+  /**
+   * Fige l'identite calculee dans `canonical_entities` et ses liens.
+   *
+   * La correspondance etait recalculee a chaque requete et n'existait nulle
+   * part : deux appels pouvaient rendre deux identifiants differents pour la
+   * meme entite, et rien d'autre ne pouvait s'y rattacher. Les tables existaient
+   * depuis une migration de juin et portaient zero ligne.
+   *
+   * Le remplacement est complet par domaine : une entite disparue du jeu doit
+   * disparaitre d'ici, ce qu'un upsert seul ne ferait pas. Le tout dans une
+   * transaction — un domaine a moitie reecrit serait pire que pas reecrit.
+   */
+  async persistCanonicalEntities(env = 'live'): Promise<Record<string, { entities: number; links: number; duplicates: number }>> {
+    const prisma = this.getClient(env);
+    const report: Record<string, { entities: number; links: number; duplicates: number }> = {};
+
+    for (const domain of CORRELATION_DOMAINS) {
+      const groups = await this.computeGroups(domain, env);
+
+      // Une meme ligne source peut ressortir deux fois du SQL — deux prix UEX
+      // du meme article ne different que par leur ressource, et le `DISTINCT`
+      // les garde tous deux. La table n'accepte qu'un lien par ligne source :
+      // on garde le meilleur score et on compte les autres, plutot que de les
+      // absorber en silence.
+      let duplicates = 0;
+      for (const group of groups) {
+        const bySource = new Map<string, (typeof group.sources)[number]>();
+        for (const link of group.sources) {
+          const key = `${link.source}|${link.sourceTable}|${link.sourceId ?? ''}|${link.sourceUuid ?? ''}`;
+          const kept = bySource.get(key);
+          if (!kept) {
+            bySource.set(key, link);
+            continue;
+          }
+          duplicates++;
+          if (link.matchScore > kept.matchScore) bySource.set(key, { ...link, isPrimary: kept.isPrimary || link.isPrimary });
+          else if (link.isPrimary) kept.isPrimary = true;
+        }
+        group.sources = [...bySource.values()];
+      }
+
+      // Trois ordres par domaine, pas un par entite : creer les milliers de
+      // lignes une a une depassait le delai de la transaction interactive au
+      // bout de cinq secondes. Les identifiants sont donc generes ici, pour
+      // pouvoir ecrire les liens dans la foulee sans relire ce qui vient d'etre
+      // insere.
+      const entityRows = groups.map((group) => ({
+        id: randomUUID(),
+        env,
+        domain,
+        canonicalKey: group.key.slice(0, 255),
+        name: group.name.slice(0, 255),
+        primarySource: group.primarySource,
+        primarySourceId: group.sources.find((link) => link.isPrimary)?.sourceId?.slice(0, 160) ?? null,
+        confidence: group.confidence,
+      }));
+
+      const linkRows = groups.flatMap((group, index) =>
+        group.sources.map((link) => ({
+          canonicalId: entityRows[index].id,
+          env,
+          domain,
+          source: link.source,
+          sourceTable: link.sourceTable.slice(0, 120),
+          sourceId: link.sourceId?.slice(0, 160) ?? null,
+          sourceUuid: link.sourceUuid?.slice(0, 80) ?? null,
+          sourceName: link.sourceName?.slice(0, 255) ?? null,
+          matchMethod: link.matchMethod.slice(0, 40),
+          matchScore: link.matchScore,
+          isPrimary: link.isPrimary,
+          // Prisma attend une valeur JSON d'entree ; le service manipule un
+          // enregistrement libre, la conversion est explicite ici plutot que
+          // diffuse dans le calcul des groupes.
+          metadata: link.metadata as Prisma.InputJsonValue,
+        })),
+      );
+
+      await prisma.$transaction(
+        async (tx) => {
+          await tx.canonicalEntity.deleteMany({ where: { env, domain } });
+          if (entityRows.length > 0) await tx.canonicalEntity.createMany({ data: entityRows });
+          if (linkRows.length > 0) await tx.canonicalEntityLink.createMany({ data: linkRows });
+        },
+        // Un domaine a moitie reecrit serait pire que pas reecrit : la
+        // transaction couvre la suppression et la reecriture, et se donne de
+        // quoi finir sur les domaines les plus larges.
+        { timeout: 120_000 },
+      );
+
+      report[domain] = { entities: groups.length, links: groups.reduce((sum, g) => sum + g.sources.length, 0), duplicates };
+    }
+
+    return report;
   }
 
   async getSummary(env = 'live'): Promise<Record<CorrelationDomain, { total: number; correlated: number; singleSource: number }>> {
     const entries = await Promise.all(
       CORRELATION_DOMAINS.map(async (domain) => {
-        const correlations = await this.getCorrelations({ domain, env, limit: 500 });
+        // Sur les groupes complets : passer par `getCorrelations` plafonnait le
+        // compte a 500, et le resume annoncait donc 500 composants la ou il y en
+        // a 3 275.
+        const correlations = await this.computeGroups(domain, env);
         return [
           domain,
           {
@@ -291,7 +408,12 @@ function resourceSql(domain: 'commodity' | 'item' | 'component', table: string, 
   return `
 SELECT '${domain}' AS domain, 'p4k' AS source, '${table}' AS source_table,
        p.class_name AS source_id, p.uuid AS source_uuid, p.name AS source_name,
-       COALESCE(p.${canonicalColumn}, 'uuid:' || p.uuid, p.name) AS source_group_key,
+       -- L'UUID d'abord, et non la cle canonique : UEX regroupe sur
+       -- 'uuid:<uuid>', si bien qu'une cle composite du cote P4K —
+       -- « gimbal::gimbal::a::5::varipuck-s5-gimbal-mount » — ne pouvait
+       -- jamais rencontrer la sienne. Les deux sources tombaient dans des
+       -- groupes separes, et le rapprochement n'avait jamais lieu.
+       COALESCE('uuid:' || p.uuid, p.${canonicalColumn}, p.name) AS source_group_key,
        'p4k_${domain}_uuid' AS match_method, 90 AS match_score,
        jsonb_build_object('class_name', p.class_name, 'type', p.type) AS metadata
   FROM ${table} p

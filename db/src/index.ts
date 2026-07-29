@@ -7,7 +7,9 @@
  *   meta - extraction logs, changelogs, users
  */
 
-export type { UserRole } from './client/prisma.js';
+// `Prisma` porte les types d'entree — notamment `InputJsonValue`, qu'un service
+// doit nommer pour ecrire une colonne JSON sans casting aveugle.
+export type { Prisma, UserRole } from './client/prisma.js';
 export { getPrisma, initPrisma, PrismaClient } from './client/prisma.js';
 export { resolveEnv } from './env/resolve-env.js';
 export type { GameComponentCategory } from './shared/component-taxonomy.js';
