@@ -8267,6 +8267,199 @@
         }
       }
     },
+    "/api/v2/ships": {
+      "get": {
+        "tags": ["Ships"],
+        "summary": "List ships (v2 envelope)",
+        "description": "Single `/api/v2` envelope: `data`, `meta`, and `page` on lists. In v1 pagination sits under `meta` for ships but at the root for components, locations and shops — a consumer reading `response.total` gets a number for three resources and `undefined` for the fourth, with nothing to signal it. `meta.data_version` names the extraction the values come from.",
+        "operationId": "v2ListShips",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/env"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "manufacturer",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "role",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["asc", "desc"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated ships"
+          }
+        }
+      }
+    },
+    "/api/v2/ships/{uuid}": {
+      "get": {
+        "tags": ["Ships"],
+        "summary": "Get one ship (v2 envelope)",
+        "description": "Single `/api/v2` envelope: `data`, `meta`, and `page` on lists. In v1 pagination sits under `meta` for ships but at the root for components, locations and shops — a consumer reading `response.total` gets a number for three resources and `undefined` for the fourth, with nothing to signal it. `meta.data_version` names the extraction the values come from.",
+        "operationId": "v2GetShip",
+        "parameters": [
+          {
+            "name": "uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/env"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ship detail"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v2/locations": {
+      "get": {
+        "tags": ["Locations"],
+        "summary": "List locations (v2 envelope)",
+        "description": "Single `/api/v2` envelope: `data`, `meta`, and `page` on lists. In v1 pagination sits under `meta` for ships but at the root for components, locations and shops — a consumer reading `response.total` gets a number for three resources and `undefined` for the fourth, with nothing to signal it. `meta.data_version` names the extraction the values come from.",
+        "operationId": "v2ListLocations",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/env"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated locations"
+          }
+        }
+      }
+    },
+    "/api/v2/locations/{uuid}": {
+      "get": {
+        "tags": ["Locations"],
+        "summary": "Get one location, amenities included",
+        "description": "On-site services come with the record rather than a second call. Single `/api/v2` envelope: `data`, `meta`, and `page` on lists. In v1 pagination sits under `meta` for ships but at the root for components, locations and shops — a consumer reading `response.total` gets a number for three resources and `undefined` for the fourth, with nothing to signal it. `meta.data_version` names the extraction the values come from.",
+        "operationId": "v2GetLocation",
+        "parameters": [
+          {
+            "name": "uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/env"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Location with its amenities"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
     "/api/v2/components/families": {
       "get": {
         "tags": ["Components"],
