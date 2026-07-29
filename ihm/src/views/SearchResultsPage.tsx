@@ -3,6 +3,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { BestAnswer } from '@/components/search/BestAnswer';
 import { IntentAnswer } from '@/components/search/IntentAnswer';
+import { LootAnswer } from '@/components/search/LootAnswer';
+import { PlaceAnswer } from '@/components/search/PlaceAnswer';
 import { parseIntent } from '@/lib/intent';
 import { ChevronRight, Search } from 'lucide-react';
 import { useState } from 'react';
@@ -123,7 +125,12 @@ export default function SearchResultsPage() {
 
       {/* Réponse directe quand la saisie portait une question — les résultats
           ordinaires restent affichés en dessous. */}
-      {intent?.kind === 'best' ? <BestAnswer intent={intent} env={env} /> : intent ? <IntentAnswer intent={intent} env={env} /> : null}
+      {/* Une intention, un répondeur. Chacun se tait quand il ne trouve pas :
+          les résultats ordinaires restent affichés dessous dans tous les cas. */}
+      {intent?.kind === 'best' && <BestAnswer intent={intent} env={env} />}
+      {intent?.kind === 'services' && <PlaceAnswer intent={intent} env={env} />}
+      {intent?.kind === 'drops' && <LootAnswer intent={intent} env={env} />}
+      {(intent?.kind === 'sell' || intent?.kind === 'buy') && <IntentAnswer intent={intent} env={env} />}
 
       {/* Results */}
       {isLoading && debouncedQuery.length >= 2 ? (

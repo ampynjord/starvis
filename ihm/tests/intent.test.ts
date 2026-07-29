@@ -69,3 +69,33 @@ describe('parseIntent — classement', () => {
     expect(parseIntent('best size 2')).toBeNull();
   });
 });
+
+describe('parseIntent — questions ouvertes par les données du 29 juillet', () => {
+  it('reconnaît une question sur les services d’un lieu', () => {
+    for (const query of ['services at Lorville', 'amenities at Everus Harbor', 'what is at Lorville', "what's at Lorville"]) {
+      expect(parseIntent(query)?.kind, query).toBe('services');
+    }
+    expect(parseIntent('services at Lorville')?.subject).toBe('Lorville');
+    expect(parseIntent('Lorville services')?.subject).toBe('Lorville');
+  });
+
+  it('reconnaît une question sur le contenu d’une caisse', () => {
+    for (const query of ['what drops from a large container', 'drops in contested zone', 'loot from derelict']) {
+      expect(parseIntent(query)?.kind, query).toBe('drops');
+    }
+    expect(parseIntent('drops in contested zone')?.subject).toBe('contested zone');
+  });
+
+  it('lit « best loot » comme un classement, pas comme une question de butin', () => {
+    // Le motif en suffixe « X loot » passe après « best X » : sans cet ordre, le
+    // sujet retenu serait « best », qui ne désigne rien.
+    expect(parseIntent('best loot')).toEqual({ kind: 'best', subject: 'loot' });
+  });
+
+  it('n’invente pas d’intention sur une saisie voisine', () => {
+    // « looting » n'est pas « loot », et « service » au singulier suivi de rien
+    // ne demande rien : le module ne doit pas approximer.
+    expect(parseIntent('looting guide')).toBeNull();
+    expect(parseIntent('services')).toBeNull();
+  });
+});

@@ -10,6 +10,13 @@
  * connue, et laquelle. Il ne cherche rien, ne calcule rien, n'affiche rien —
  * ce qui le rend vérifiable seul.
  *
+ * ── Les questions reconnues ──────────────────────────────────────────────────
+ *
+ * `sell` et `buy` interrogent le marché, `best` un classement, `services` ce
+ * qu'on trouve sur place, `drops` ce que contient une caisse. Les deux
+ * dernières ne sont là que depuis que la donnée existe : les commodités d'un
+ * lieu et les tables de butin ont été extraites le 29 juillet 2026.
+ *
  * ── Ce qu'il refuse de faire ─────────────────────────────────────────────────
  *
  * Deviner. Une saisie qui ne correspond à aucun motif ne produit pas d'intention
@@ -18,7 +25,7 @@
  * résultats.
  */
 
-export type IntentKind = 'sell' | 'buy' | 'best';
+export type IntentKind = 'sell' | 'buy' | 'best' | 'services' | 'drops';
 
 export interface Intent {
   kind: IntentKind;
@@ -47,7 +54,15 @@ const PATTERNS: Array<{ kind: IntentKind; regex: RegExp }> = [
   { kind: 'sell', regex: /^(?:where\s+(?:can\s+i\s+|to\s+|do\s+i\s+)?)?sell\s+(.+)$/i },
   { kind: 'buy', regex: /^(?:where\s+(?:can\s+i\s+|to\s+|do\s+i\s+)?)?buy\s+(.+)$/i },
   { kind: 'buy', regex: /^cheapest\s+(.+)$/i },
+  { kind: 'services', regex: /^(?:what(?:'s| is)\s+)?(?:services|amenities|facilities)\s+(?:at|on|in)\s+(.+)$/i },
+  { kind: 'services', regex: /^what(?:'s| is)\s+(?:at|on)\s+(.+)$/i },
+  { kind: 'drops', regex: /^(?:what\s+)?drops?\s+(?:from|in)\s+(.+)$/i },
+  { kind: 'drops', regex: /^loot\s+(?:from|in|at)\s+(.+)$/i },
   { kind: 'best', regex: /^(?:what(?:'s| is)\s+the\s+)?(?:best|top)\s+(.+)$/i },
+  // Les formes en suffixe passent apres « best » : sinon « best loot » serait lu
+  // comme une question de butin portant sur « best ».
+  { kind: 'services', regex: /^(.+?)\s+(?:services|amenities|facilities)$/i },
+  { kind: 'drops', regex: /^(.+?)\s+loot$/i },
 ];
 
 /** « shield size 2 », « size 2 shield », « s2 shield » — la taille se dit ainsi. */
