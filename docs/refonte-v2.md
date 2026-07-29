@@ -248,6 +248,20 @@ lieu s'adresse d'un seul identifiant quelle que soit la source qui en parle.
 d'observation, une divergence entre sources ne s'arbitre pas, et une mise à jour
 du jeu ne se distingue pas d'une régression d'extraction.
 
+*Le second besoin est traité, le premier ne l'est pas.* Chaque extraction relève
+le taux de remplissage des 260 colonnes nullables de neuf tables et le compare au
+relevé précédent ; une chute de plus d'un quart est signalée. C'est ce qui aurait
+attrapé les deux défauts du 29 juillet — `name` lu à la place de
+`localizedName`, et un champ `position` cherché là où le jeu n'en met pas : dans
+les deux cas l'extraction réussissait, le compte de lignes était juste, et la
+colonne était vide.
+
+La provenance **par valeur** reste à faire. Le changelog garde déjà l'historique
+au champ près (`entity_uuid`, `field_name`, ancienne et nouvelle valeur, par
+extraction) ; ce qui manque est de dire *quelle source* a produit une valeur
+donnée, ce qui n'a d'intérêt que pour les champs qu'au moins deux sources
+renseignent.
+
 **C12 — Ce qui est extrait est exposé.** `game_insights`, tables de butin,
 réputation, munitions : 7 008 lignes extraites que rien ne sert.
 
