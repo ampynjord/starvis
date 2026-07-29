@@ -4550,6 +4550,93 @@
         }
       }
     },
+    "/api/v1/components/families": {
+      "get": {
+        "tags": ["Components"],
+        "summary": "List component families and their counts",
+        "description": "A component's statistics depend on what it is: a shield has regeneration, a quantum drive has spool time. The flat component table carries every family's columns at once, so a shield came with a hundred empty fields. These families each expose only their own.",
+        "operationId": "listComponentFamilies",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/env"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Families that currently hold at least one component"
+          }
+        }
+      }
+    },
+    "/api/v1/components/families/{family}": {
+      "get": {
+        "tags": ["Components"],
+        "summary": "List components of one family, with that family's statistics only",
+        "description": "Placeholder and template components are excluded, exactly as on /components.",
+        "operationId": "listComponentFamily",
+        "parameters": [
+          {
+            "name": "family",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "weapons",
+                "shields",
+                "quantum-drives",
+                "missiles",
+                "thrusters",
+                "radars",
+                "countermeasures",
+                "fuel-tanks",
+                "fuel-intakes",
+                "emps",
+                "interdictions",
+                "mining-lasers",
+                "salvage-heads",
+                "coolers",
+                "power-plants",
+                "gimbals",
+                "turrets"
+              ]
+            }
+          },
+          {
+            "$ref": "#/components/parameters/env"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated components of that family"
+          },
+          "404": {
+            "description": "Unknown family"
+          }
+        }
+      }
+    },
     "/api/v1/components/{uuid}": {
       "get": {
         "tags": ["Components"],

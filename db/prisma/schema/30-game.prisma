@@ -1138,3 +1138,495 @@ view MarketOffer {
   @@map("market_offers")
   @@schema("game")
 }
+
+/// WeaponGun, RocketPod — statistiques propres à la famille.
+view ComponentWeapons {
+  uuid                       String @unique @db.Char(36)
+  env                        String @db.VarChar(10) @default("live")
+  className                  String @map("class_name") @db.VarChar(255)
+  name                       String @db.VarChar(255)
+  normalizedName             String? @map("normalized_name") @db.VarChar(255)
+  canonicalComponentKey      String? @map("canonical_component_key") @db.VarChar(255)
+  type                       String @db.VarChar(50)
+  subType                    String? @map("sub_type") @db.VarChar(100)
+  size                       Int?
+  grade                      String? @db.VarChar(10)
+  manufacturerCode           String? @map("manufacturer_code") @db.VarChar(10)
+  hp                         Int?
+  isBespoke                  Boolean @map("is_bespoke") @default(false)
+  gameComponentCategory      String? @map("game_component_category") @db.VarChar(50)
+  p4kPath                    String? @map("p4k_path") @db.VarChar(500)
+  createdAt                  DateTime @map("created_at") @default(now())
+  updatedAt                  DateTime @map("updated_at") @default(now())
+  weaponDamage               Decimal? @map("weapon_damage") @db.Decimal(10, 4)
+  weaponDamageType           String? @map("weapon_damage_type") @db.VarChar(50)
+  weaponFireRate             Decimal? @map("weapon_fire_rate") @db.Decimal(10, 4)
+  weaponRange                Decimal? @map("weapon_range") @db.Decimal(10, 2)
+  weaponSpeed                Decimal? @map("weapon_speed") @db.Decimal(10, 2)
+  weaponAmmoCount            Int? @map("weapon_ammo_count")
+  weaponAlphaDamage          Decimal? @map("weapon_alpha_damage") @db.Decimal(10, 4)
+  weaponDps                  Decimal? @map("weapon_dps") @db.Decimal(10, 4)
+  weaponBurstDps             Decimal? @map("weapon_burst_dps") @db.Decimal(10, 4)
+  weaponSustainedDps         Decimal? @map("weapon_sustained_dps") @db.Decimal(10, 4)
+  weaponDamagePhysical       Decimal? @map("weapon_damage_physical") @db.Decimal(10, 4)
+  weaponPelletsPerShot       Int? @map("weapon_pellets_per_shot") @default(1)
+  weaponBurstSize            Int? @map("weapon_burst_size")
+  weaponChargeTime           Decimal? @map("weapon_charge_time") @db.Decimal(10, 2)
+  weaponDamageEnergy         Decimal? @map("weapon_damage_energy") @db.Decimal(10, 4)
+  weaponDamageDistortion     Decimal? @map("weapon_damage_distortion") @db.Decimal(10, 4)
+  weaponDamageBiochemical    Decimal? @map("weapon_damage_biochemical") @db.Decimal(10, 4)
+  weaponDamageStun           Decimal? @map("weapon_damage_stun") @db.Decimal(10, 4)
+  weaponDamageThermal        Decimal? @map("weapon_damage_thermal") @db.Decimal(10, 4)
+  weaponBeamCapacity         Decimal? @map("weapon_beam_capacity") @db.Decimal(10, 2)
+  weaponBeamRegenCooldown    Decimal? @map("weapon_beam_regen_cooldown") @db.Decimal(10, 2)
+
+  @@map("component_weapons")
+  @@schema("game")
+}
+
+/// Shield — statistiques propres à la famille.
+view ComponentShields {
+  uuid                       String @unique @db.Char(36)
+  env                        String @db.VarChar(10) @default("live")
+  className                  String @map("class_name") @db.VarChar(255)
+  name                       String @db.VarChar(255)
+  normalizedName             String? @map("normalized_name") @db.VarChar(255)
+  canonicalComponentKey      String? @map("canonical_component_key") @db.VarChar(255)
+  type                       String @db.VarChar(50)
+  subType                    String? @map("sub_type") @db.VarChar(100)
+  size                       Int?
+  grade                      String? @db.VarChar(10)
+  manufacturerCode           String? @map("manufacturer_code") @db.VarChar(10)
+  hp                         Int?
+  isBespoke                  Boolean @map("is_bespoke") @default(false)
+  gameComponentCategory      String? @map("game_component_category") @db.VarChar(50)
+  p4kPath                    String? @map("p4k_path") @db.VarChar(500)
+  createdAt                  DateTime @map("created_at") @default(now())
+  updatedAt                  DateTime @map("updated_at") @default(now())
+  shieldHp                   Decimal? @map("shield_hp") @db.Decimal(15, 2)
+  shieldRegen                Decimal? @map("shield_regen") @db.Decimal(10, 4)
+  shieldRegenDelay           Decimal? @map("shield_regen_delay") @db.Decimal(10, 2)
+  shieldHardening            Decimal? @map("shield_hardening") @db.Decimal(10, 4)
+  shieldFaces                Int? @map("shield_faces")
+
+  @@map("component_shields")
+  @@schema("game")
+}
+
+/// QuantumDrive — statistiques propres à la famille.
+view ComponentQuantumDrives {
+  uuid                       String @unique @db.Char(36)
+  env                        String @db.VarChar(10) @default("live")
+  className                  String @map("class_name") @db.VarChar(255)
+  name                       String @db.VarChar(255)
+  normalizedName             String? @map("normalized_name") @db.VarChar(255)
+  canonicalComponentKey      String? @map("canonical_component_key") @db.VarChar(255)
+  type                       String @db.VarChar(50)
+  subType                    String? @map("sub_type") @db.VarChar(100)
+  size                       Int?
+  grade                      String? @db.VarChar(10)
+  manufacturerCode           String? @map("manufacturer_code") @db.VarChar(10)
+  hp                         Int?
+  isBespoke                  Boolean @map("is_bespoke") @default(false)
+  gameComponentCategory      String? @map("game_component_category") @db.VarChar(50)
+  p4kPath                    String? @map("p4k_path") @db.VarChar(500)
+  createdAt                  DateTime @map("created_at") @default(now())
+  updatedAt                  DateTime @map("updated_at") @default(now())
+  qdSpeed                    Decimal? @map("qd_speed") @db.Decimal(15, 2)
+  qdSpoolTime                Decimal? @map("qd_spool_time") @db.Decimal(10, 2)
+  qdCooldown                 Decimal? @map("qd_cooldown") @db.Decimal(10, 2)
+  qdFuelRate                 Decimal? @map("qd_fuel_rate") @db.Decimal(10, 6)
+  qdStage1Accel              Decimal? @map("qd_stage1_accel") @db.Decimal(15, 2)
+  qdStage2Accel              Decimal? @map("qd_stage2_accel") @db.Decimal(15, 2)
+  qdTuningRate               Decimal? @map("qd_tuning_rate") @db.Decimal(10, 4)
+  qdAlignmentRate            Decimal? @map("qd_alignment_rate") @db.Decimal(10, 4)
+  qdDisconnectRange          Decimal? @map("qd_disconnect_range") @db.Decimal(15, 2)
+  qdRange                    Decimal? @map("qd_range") @db.Decimal(15, 2)
+  qdCalibrationDelay         Decimal? @map("qd_calibration_delay") @db.Decimal(10, 2)
+  qdCalibrationMaxAngle      Decimal? @map("qd_calibration_max_angle") @db.Decimal(8, 2)
+
+  @@map("component_quantum_drives")
+  @@schema("game")
+}
+
+/// Missile — statistiques propres à la famille.
+view ComponentMissiles {
+  uuid                       String @unique @db.Char(36)
+  env                        String @db.VarChar(10) @default("live")
+  className                  String @map("class_name") @db.VarChar(255)
+  name                       String @db.VarChar(255)
+  normalizedName             String? @map("normalized_name") @db.VarChar(255)
+  canonicalComponentKey      String? @map("canonical_component_key") @db.VarChar(255)
+  type                       String @db.VarChar(50)
+  subType                    String? @map("sub_type") @db.VarChar(100)
+  size                       Int?
+  grade                      String? @db.VarChar(10)
+  manufacturerCode           String? @map("manufacturer_code") @db.VarChar(10)
+  hp                         Int?
+  isBespoke                  Boolean @map("is_bespoke") @default(false)
+  gameComponentCategory      String? @map("game_component_category") @db.VarChar(50)
+  p4kPath                    String? @map("p4k_path") @db.VarChar(500)
+  createdAt                  DateTime @map("created_at") @default(now())
+  updatedAt                  DateTime @map("updated_at") @default(now())
+  missileDamage              Decimal? @map("missile_damage") @db.Decimal(10, 2)
+  missileSignalType          String? @map("missile_signal_type") @db.VarChar(20)
+  missileLockTime            Decimal? @map("missile_lock_time") @db.Decimal(10, 2)
+  missileSpeed               Decimal? @map("missile_speed") @db.Decimal(10, 2)
+  missileRange               Decimal? @map("missile_range") @db.Decimal(10, 2)
+  missileLockRange           Decimal? @map("missile_lock_range") @db.Decimal(10, 2)
+  missileDamagePhysical      Decimal? @map("missile_damage_physical") @db.Decimal(10, 2)
+  missileDamageEnergy        Decimal? @map("missile_damage_energy") @db.Decimal(10, 2)
+  missileDamageDistortion    Decimal? @map("missile_damage_distortion") @db.Decimal(10, 2)
+  missileDamageBiochemical   Decimal? @map("missile_damage_biochemical") @db.Decimal(10, 2)
+  missileDamageStun          Decimal? @map("missile_damage_stun") @db.Decimal(10, 2)
+  missileDamageThermal       Decimal? @map("missile_damage_thermal") @db.Decimal(10, 2)
+
+  @@map("component_missiles")
+  @@schema("game")
+}
+
+/// Thruster — statistiques propres à la famille.
+view ComponentThrusters {
+  uuid                       String @unique @db.Char(36)
+  env                        String @db.VarChar(10) @default("live")
+  className                  String @map("class_name") @db.VarChar(255)
+  name                       String @db.VarChar(255)
+  normalizedName             String? @map("normalized_name") @db.VarChar(255)
+  canonicalComponentKey      String? @map("canonical_component_key") @db.VarChar(255)
+  type                       String @db.VarChar(50)
+  subType                    String? @map("sub_type") @db.VarChar(100)
+  size                       Int?
+  grade                      String? @db.VarChar(10)
+  manufacturerCode           String? @map("manufacturer_code") @db.VarChar(10)
+  hp                         Int?
+  isBespoke                  Boolean @map("is_bespoke") @default(false)
+  gameComponentCategory      String? @map("game_component_category") @db.VarChar(50)
+  p4kPath                    String? @map("p4k_path") @db.VarChar(500)
+  createdAt                  DateTime @map("created_at") @default(now())
+  updatedAt                  DateTime @map("updated_at") @default(now())
+  thrusterMaxThrust          Decimal? @map("thruster_max_thrust") @db.Decimal(15, 2)
+  thrusterType               String? @map("thruster_type") @db.VarChar(50)
+
+  @@map("component_thrusters")
+  @@schema("game")
+}
+
+/// Radar — statistiques propres à la famille.
+view ComponentRadars {
+  uuid                       String @unique @db.Char(36)
+  env                        String @db.VarChar(10) @default("live")
+  className                  String @map("class_name") @db.VarChar(255)
+  name                       String @db.VarChar(255)
+  normalizedName             String? @map("normalized_name") @db.VarChar(255)
+  canonicalComponentKey      String? @map("canonical_component_key") @db.VarChar(255)
+  type                       String @db.VarChar(50)
+  subType                    String? @map("sub_type") @db.VarChar(100)
+  size                       Int?
+  grade                      String? @db.VarChar(10)
+  manufacturerCode           String? @map("manufacturer_code") @db.VarChar(10)
+  hp                         Int?
+  isBespoke                  Boolean @map("is_bespoke") @default(false)
+  gameComponentCategory      String? @map("game_component_category") @db.VarChar(50)
+  p4kPath                    String? @map("p4k_path") @db.VarChar(500)
+  createdAt                  DateTime @map("created_at") @default(now())
+  updatedAt                  DateTime @map("updated_at") @default(now())
+  radarRange                 Decimal? @map("radar_range") @db.Decimal(15, 2)
+  radarDetectionLifetime     Decimal? @map("radar_detection_lifetime") @db.Decimal(10, 2)
+  radarTrackingSignal        Decimal? @map("radar_tracking_signal") @db.Decimal(10, 4)
+
+  @@map("component_radars")
+  @@schema("game")
+}
+
+/// Countermeasure — statistiques propres à la famille.
+view ComponentCountermeasures {
+  uuid                       String @unique @db.Char(36)
+  env                        String @db.VarChar(10) @default("live")
+  className                  String @map("class_name") @db.VarChar(255)
+  name                       String @db.VarChar(255)
+  normalizedName             String? @map("normalized_name") @db.VarChar(255)
+  canonicalComponentKey      String? @map("canonical_component_key") @db.VarChar(255)
+  type                       String @db.VarChar(50)
+  subType                    String? @map("sub_type") @db.VarChar(100)
+  size                       Int?
+  grade                      String? @db.VarChar(10)
+  manufacturerCode           String? @map("manufacturer_code") @db.VarChar(10)
+  hp                         Int?
+  isBespoke                  Boolean @map("is_bespoke") @default(false)
+  gameComponentCategory      String? @map("game_component_category") @db.VarChar(50)
+  p4kPath                    String? @map("p4k_path") @db.VarChar(500)
+  createdAt                  DateTime @map("created_at") @default(now())
+  updatedAt                  DateTime @map("updated_at") @default(now())
+  cmAmmoCount                Int? @map("cm_ammo_count")
+
+  @@map("component_countermeasures")
+  @@schema("game")
+}
+
+/// FuelTank — statistiques propres à la famille.
+view ComponentFuelTanks {
+  uuid                       String @unique @db.Char(36)
+  env                        String @db.VarChar(10) @default("live")
+  className                  String @map("class_name") @db.VarChar(255)
+  name                       String @db.VarChar(255)
+  normalizedName             String? @map("normalized_name") @db.VarChar(255)
+  canonicalComponentKey      String? @map("canonical_component_key") @db.VarChar(255)
+  type                       String @db.VarChar(50)
+  subType                    String? @map("sub_type") @db.VarChar(100)
+  size                       Int?
+  grade                      String? @db.VarChar(10)
+  manufacturerCode           String? @map("manufacturer_code") @db.VarChar(10)
+  hp                         Int?
+  isBespoke                  Boolean @map("is_bespoke") @default(false)
+  gameComponentCategory      String? @map("game_component_category") @db.VarChar(50)
+  p4kPath                    String? @map("p4k_path") @db.VarChar(500)
+  createdAt                  DateTime @map("created_at") @default(now())
+  updatedAt                  DateTime @map("updated_at") @default(now())
+  fuelCapacity               Decimal? @map("fuel_capacity") @db.Decimal(10, 2)
+
+  @@map("component_fuel_tanks")
+  @@schema("game")
+}
+
+/// FuelIntake — statistiques propres à la famille.
+view ComponentFuelIntakes {
+  uuid                       String @unique @db.Char(36)
+  env                        String @db.VarChar(10) @default("live")
+  className                  String @map("class_name") @db.VarChar(255)
+  name                       String @db.VarChar(255)
+  normalizedName             String? @map("normalized_name") @db.VarChar(255)
+  canonicalComponentKey      String? @map("canonical_component_key") @db.VarChar(255)
+  type                       String @db.VarChar(50)
+  subType                    String? @map("sub_type") @db.VarChar(100)
+  size                       Int?
+  grade                      String? @db.VarChar(10)
+  manufacturerCode           String? @map("manufacturer_code") @db.VarChar(10)
+  hp                         Int?
+  isBespoke                  Boolean @map("is_bespoke") @default(false)
+  gameComponentCategory      String? @map("game_component_category") @db.VarChar(50)
+  p4kPath                    String? @map("p4k_path") @db.VarChar(500)
+  createdAt                  DateTime @map("created_at") @default(now())
+  updatedAt                  DateTime @map("updated_at") @default(now())
+  fuelIntakeRate             Decimal? @map("fuel_intake_rate") @db.Decimal(10, 4)
+
+  @@map("component_fuel_intakes")
+  @@schema("game")
+}
+
+/// EMP — statistiques propres à la famille.
+view ComponentEmps {
+  uuid                       String @unique @db.Char(36)
+  env                        String @db.VarChar(10) @default("live")
+  className                  String @map("class_name") @db.VarChar(255)
+  name                       String @db.VarChar(255)
+  normalizedName             String? @map("normalized_name") @db.VarChar(255)
+  canonicalComponentKey      String? @map("canonical_component_key") @db.VarChar(255)
+  type                       String @db.VarChar(50)
+  subType                    String? @map("sub_type") @db.VarChar(100)
+  size                       Int?
+  grade                      String? @db.VarChar(10)
+  manufacturerCode           String? @map("manufacturer_code") @db.VarChar(10)
+  hp                         Int?
+  isBespoke                  Boolean @map("is_bespoke") @default(false)
+  gameComponentCategory      String? @map("game_component_category") @db.VarChar(50)
+  p4kPath                    String? @map("p4k_path") @db.VarChar(500)
+  createdAt                  DateTime @map("created_at") @default(now())
+  updatedAt                  DateTime @map("updated_at") @default(now())
+  empDamage                  Decimal? @map("emp_damage") @db.Decimal(10, 2)
+  empRadius                  Decimal? @map("emp_radius") @db.Decimal(10, 2)
+  empChargeTime              Decimal? @map("emp_charge_time") @db.Decimal(10, 2)
+  empCooldown                Decimal? @map("emp_cooldown") @db.Decimal(10, 2)
+
+  @@map("component_emps")
+  @@schema("game")
+}
+
+/// QuantumInterdictionGenerator — statistiques propres à la famille.
+view ComponentInterdictions {
+  uuid                       String @unique @db.Char(36)
+  env                        String @db.VarChar(10) @default("live")
+  className                  String @map("class_name") @db.VarChar(255)
+  name                       String @db.VarChar(255)
+  normalizedName             String? @map("normalized_name") @db.VarChar(255)
+  canonicalComponentKey      String? @map("canonical_component_key") @db.VarChar(255)
+  type                       String @db.VarChar(50)
+  subType                    String? @map("sub_type") @db.VarChar(100)
+  size                       Int?
+  grade                      String? @db.VarChar(10)
+  manufacturerCode           String? @map("manufacturer_code") @db.VarChar(10)
+  hp                         Int?
+  isBespoke                  Boolean @map("is_bespoke") @default(false)
+  gameComponentCategory      String? @map("game_component_category") @db.VarChar(50)
+  p4kPath                    String? @map("p4k_path") @db.VarChar(500)
+  createdAt                  DateTime @map("created_at") @default(now())
+  updatedAt                  DateTime @map("updated_at") @default(now())
+  qigJammerRange             Decimal? @map("qig_jammer_range") @db.Decimal(15, 2)
+  qigSnareRadius             Decimal? @map("qig_snare_radius") @db.Decimal(15, 2)
+  qigChargeTime              Decimal? @map("qig_charge_time") @db.Decimal(10, 2)
+  qigCooldown                Decimal? @map("qig_cooldown") @db.Decimal(10, 2)
+
+  @@map("component_interdictions")
+  @@schema("game")
+}
+
+/// MiningLaser — statistiques propres à la famille.
+view ComponentMiningLasers {
+  uuid                       String @unique @db.Char(36)
+  env                        String @db.VarChar(10) @default("live")
+  className                  String @map("class_name") @db.VarChar(255)
+  name                       String @db.VarChar(255)
+  normalizedName             String? @map("normalized_name") @db.VarChar(255)
+  canonicalComponentKey      String? @map("canonical_component_key") @db.VarChar(255)
+  type                       String @db.VarChar(50)
+  subType                    String? @map("sub_type") @db.VarChar(100)
+  size                       Int?
+  grade                      String? @db.VarChar(10)
+  manufacturerCode           String? @map("manufacturer_code") @db.VarChar(10)
+  hp                         Int?
+  isBespoke                  Boolean @map("is_bespoke") @default(false)
+  gameComponentCategory      String? @map("game_component_category") @db.VarChar(50)
+  p4kPath                    String? @map("p4k_path") @db.VarChar(500)
+  createdAt                  DateTime @map("created_at") @default(now())
+  updatedAt                  DateTime @map("updated_at") @default(now())
+  miningSpeed                Decimal? @map("mining_speed") @db.Decimal(10, 4)
+  miningRange                Decimal? @map("mining_range") @db.Decimal(10, 2)
+  miningResistance           Decimal? @map("mining_resistance") @db.Decimal(10, 4)
+
+  @@map("component_mining_lasers")
+  @@schema("game")
+}
+
+/// SalvageHead — statistiques propres à la famille.
+view ComponentSalvageHeads {
+  uuid                       String @unique @db.Char(36)
+  env                        String @db.VarChar(10) @default("live")
+  className                  String @map("class_name") @db.VarChar(255)
+  name                       String @db.VarChar(255)
+  normalizedName             String? @map("normalized_name") @db.VarChar(255)
+  canonicalComponentKey      String? @map("canonical_component_key") @db.VarChar(255)
+  type                       String @db.VarChar(50)
+  subType                    String? @map("sub_type") @db.VarChar(100)
+  size                       Int?
+  grade                      String? @db.VarChar(10)
+  manufacturerCode           String? @map("manufacturer_code") @db.VarChar(10)
+  hp                         Int?
+  isBespoke                  Boolean @map("is_bespoke") @default(false)
+  gameComponentCategory      String? @map("game_component_category") @db.VarChar(50)
+  p4kPath                    String? @map("p4k_path") @db.VarChar(500)
+  createdAt                  DateTime @map("created_at") @default(now())
+  updatedAt                  DateTime @map("updated_at") @default(now())
+  salvageSpeed               Decimal? @map("salvage_speed") @db.Decimal(10, 4)
+  salvageRadius              Decimal? @map("salvage_radius") @db.Decimal(10, 2)
+  salvageRange               Decimal? @map("salvage_range") @db.Decimal(10, 2)
+
+  @@map("component_salvage_heads")
+  @@schema("game")
+}
+
+/// Cooler — statistiques propres à la famille.
+view ComponentCoolers {
+  uuid                       String @unique @db.Char(36)
+  env                        String @db.VarChar(10) @default("live")
+  className                  String @map("class_name") @db.VarChar(255)
+  name                       String @db.VarChar(255)
+  normalizedName             String? @map("normalized_name") @db.VarChar(255)
+  canonicalComponentKey      String? @map("canonical_component_key") @db.VarChar(255)
+  type                       String @db.VarChar(50)
+  subType                    String? @map("sub_type") @db.VarChar(100)
+  size                       Int?
+  grade                      String? @db.VarChar(10)
+  manufacturerCode           String? @map("manufacturer_code") @db.VarChar(10)
+  hp                         Int?
+  isBespoke                  Boolean @map("is_bespoke") @default(false)
+  gameComponentCategory      String? @map("game_component_category") @db.VarChar(50)
+  p4kPath                    String? @map("p4k_path") @db.VarChar(500)
+  createdAt                  DateTime @map("created_at") @default(now())
+  updatedAt                  DateTime @map("updated_at") @default(now())
+  coolingRate                Decimal? @map("cooling_rate") @db.Decimal(15, 2)
+  heatGeneration             Decimal? @map("heat_generation") @db.Decimal(10, 2)
+
+  @@map("component_coolers")
+  @@schema("game")
+}
+
+/// PowerPlant — statistiques propres à la famille.
+view ComponentPowerPlants {
+  uuid                       String @unique @db.Char(36)
+  env                        String @db.VarChar(10) @default("live")
+  className                  String @map("class_name") @db.VarChar(255)
+  name                       String @db.VarChar(255)
+  normalizedName             String? @map("normalized_name") @db.VarChar(255)
+  canonicalComponentKey      String? @map("canonical_component_key") @db.VarChar(255)
+  type                       String @db.VarChar(50)
+  subType                    String? @map("sub_type") @db.VarChar(100)
+  size                       Int?
+  grade                      String? @db.VarChar(10)
+  manufacturerCode           String? @map("manufacturer_code") @db.VarChar(10)
+  hp                         Int?
+  isBespoke                  Boolean @map("is_bespoke") @default(false)
+  gameComponentCategory      String? @map("game_component_category") @db.VarChar(50)
+  p4kPath                    String? @map("p4k_path") @db.VarChar(500)
+  createdAt                  DateTime @map("created_at") @default(now())
+  updatedAt                  DateTime @map("updated_at") @default(now())
+  powerOutput                Decimal? @map("power_output") @db.Decimal(10, 2)
+  powerBase                  Decimal? @map("power_base") @db.Decimal(10, 2)
+  powerDraw                  Decimal? @map("power_draw") @db.Decimal(10, 2)
+
+  @@map("component_power_plants")
+  @@schema("game")
+}
+
+/// Gimbal — statistiques propres à la famille.
+view ComponentGimbals {
+  uuid                       String @unique @db.Char(36)
+  env                        String @db.VarChar(10) @default("live")
+  className                  String @map("class_name") @db.VarChar(255)
+  name                       String @db.VarChar(255)
+  normalizedName             String? @map("normalized_name") @db.VarChar(255)
+  canonicalComponentKey      String? @map("canonical_component_key") @db.VarChar(255)
+  type                       String @db.VarChar(50)
+  subType                    String? @map("sub_type") @db.VarChar(100)
+  size                       Int?
+  grade                      String? @db.VarChar(10)
+  manufacturerCode           String? @map("manufacturer_code") @db.VarChar(10)
+  hp                         Int?
+  isBespoke                  Boolean @map("is_bespoke") @default(false)
+  gameComponentCategory      String? @map("game_component_category") @db.VarChar(50)
+  p4kPath                    String? @map("p4k_path") @db.VarChar(500)
+  createdAt                  DateTime @map("created_at") @default(now())
+  updatedAt                  DateTime @map("updated_at") @default(now())
+  gimbalMaxAngle             Decimal? @map("gimbal_max_angle") @db.Decimal(8, 2)
+  gimbalPitchSpeed           Decimal? @map("gimbal_pitch_speed") @db.Decimal(8, 2)
+  gimbalYawSpeed             Decimal? @map("gimbal_yaw_speed") @db.Decimal(8, 2)
+
+  @@map("component_gimbals")
+  @@schema("game")
+}
+
+/// Turret, TurretUnmanned — statistiques propres à la famille.
+view ComponentTurrets {
+  uuid                       String @unique @db.Char(36)
+  env                        String @db.VarChar(10) @default("live")
+  className                  String @map("class_name") @db.VarChar(255)
+  name                       String @db.VarChar(255)
+  normalizedName             String? @map("normalized_name") @db.VarChar(255)
+  canonicalComponentKey      String? @map("canonical_component_key") @db.VarChar(255)
+  type                       String @db.VarChar(50)
+  subType                    String? @map("sub_type") @db.VarChar(100)
+  size                       Int?
+  grade                      String? @db.VarChar(10)
+  manufacturerCode           String? @map("manufacturer_code") @db.VarChar(10)
+  hp                         Int?
+  isBespoke                  Boolean @map("is_bespoke") @default(false)
+  gameComponentCategory      String? @map("game_component_category") @db.VarChar(50)
+  p4kPath                    String? @map("p4k_path") @db.VarChar(500)
+  createdAt                  DateTime @map("created_at") @default(now())
+  updatedAt                  DateTime @map("updated_at") @default(now())
+  turretMaxPitch             Decimal? @map("turret_max_pitch") @db.Decimal(8, 2)
+  turretMaxYaw               Decimal? @map("turret_max_yaw") @db.Decimal(8, 2)
+  turretMinPitch             Decimal? @map("turret_min_pitch") @db.Decimal(8, 2)
+  turretMinYaw               Decimal? @map("turret_min_yaw") @db.Decimal(8, 2)
+
+  @@map("component_turrets")
+  @@schema("game")
+}

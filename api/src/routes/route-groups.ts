@@ -4,6 +4,7 @@ import { mountBugReportRoutes } from './bug-reports.js';
 import { mountCalculateRoutes } from './calculate.js';
 import { mountChatRoutes } from './chat.js';
 import { mountCommodityRoutes } from './commodities.js';
+import { mountComponentFamilyRoutes } from './component-families.js';
 import { mountComponentRoutes } from './components.js';
 import { mountCorrelationRoutes } from './correlations.js';
 import { mountCraftingRoutes } from './crafting.js';
@@ -45,6 +46,7 @@ export const routeGroups = [
     mounts: [
       mountShipMatrixRoutes,
       mountShipRoutes,
+      mountComponentFamilyRoutes,
       mountComponentRoutes,
       mountManufacturerRoutes,
       mountPaintRoutes,
