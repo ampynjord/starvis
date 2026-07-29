@@ -37,11 +37,11 @@ CREATE INDEX "location_amenities_location_idx" ON "game"."location_amenities" ("
 CREATE INDEX "location_amenities_amenity_idx" ON "game"."location_amenities" ("env", "amenity_id");
 
 ALTER TABLE "game"."location_amenities"
-  ADD CONSTRAINT "location_amenities_location_fkey"
+  ADD CONSTRAINT "location_amenities_location_uuid_env_fkey"
   FOREIGN KEY ("location_uuid", "env") REFERENCES "game"."locations"("uuid", "env")
   ON DELETE CASCADE ON UPDATE CASCADE;
 
 ALTER TABLE "game"."location_amenities"
-  ADD CONSTRAINT "location_amenities_amenity_fkey"
+  ADD CONSTRAINT "location_amenities_amenity_id_env_fkey"
   FOREIGN KEY ("amenity_id", "env") REFERENCES "game"."location_amenity_types"("id", "env")
   ON DELETE CASCADE ON UPDATE CASCADE;
