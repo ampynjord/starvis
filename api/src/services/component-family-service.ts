@@ -37,6 +37,35 @@ export const COMPONENT_FAMILIES = {
 
 export type ComponentFamily = keyof typeof COMPONENT_FAMILIES;
 
+/**
+ * Le `type` d'un composant vers sa famille.
+ *
+ * Repris de la decoupe des vues, ou l'appartenance est declaree en SQL. La
+ * redire ici plutot que d'interroger la base evite un aller-retour pour une
+ * information qui ne change qu'avec une migration.
+ */
+export const FAMILY_BY_TYPE: Record<string, ComponentFamily> = {
+  WeaponGun: 'weapons',
+  RocketPod: 'weapons',
+  Shield: 'shields',
+  QuantumDrive: 'quantum-drives',
+  Missile: 'missiles',
+  Thruster: 'thrusters',
+  Radar: 'radars',
+  Countermeasure: 'countermeasures',
+  FuelTank: 'fuel-tanks',
+  FuelIntake: 'fuel-intakes',
+  EMP: 'emps',
+  QuantumInterdictionGenerator: 'interdictions',
+  MiningLaser: 'mining-lasers',
+  SalvageHead: 'salvage-heads',
+  Cooler: 'coolers',
+  PowerPlant: 'power-plants',
+  Gimbal: 'gimbals',
+  Turret: 'turrets',
+  TurretUnmanned: 'turrets',
+};
+
 export const isComponentFamily = (value: string): value is ComponentFamily => value in COMPONENT_FAMILIES;
 
 export interface FamilySummary {
@@ -90,6 +119,30 @@ export class ComponentFamilyService {
       counts.push({ family, count: await this.delegate(family).count({ where: { env } }) });
     }
     return counts.filter((entry) => entry.count > 0).sort((a, b) => b.count - a.count);
+  }
+
+  /**
+   * Un composant avec les seules statistiques de sa famille.
+   *
+   * `/api/v1/components/{uuid}` rend 124 colonnes dont cent cinq vides pour un
+   * bouclier. Ici, la famille est resolue depuis le `type` et la vue
+   * correspondante lue : ce qui sort est ce qui a un sens pour cette piece.
+   *
+   * Rend `null` pour les six types sans famille — porte-missiles, rayon
+   * tracteur, support de vie, module de saut, modificateur de minage : la donnee
+   * ne leur donne aucune statistique propre, et l'appelant doit le savoir plutot
+   * que de recevoir un objet vide.
+   */
+  async findByUuid(uuid: string, env = 'live'): Promise<{ family: ComponentFamily; component: Record<string, unknown> } | null> {
+    // Le type d'abord, la vue ensuite : deux requetes. Balayer les dix-sept
+    // familles en ferait dix-sept pour une seule piece.
+    const base = await this.prisma.component.findFirst({ where: { env, uuid }, select: { type: true } });
+    const family = base ? FAMILY_BY_TYPE[base.type] : undefined;
+    if (!family) return null;
+
+    const rows = await this.delegate(family).findMany({ where: { env, uuid }, take: 1 });
+    if (rows.length === 0) return null;
+    return { family, component: toSnakeCase(rows[0]) };
   }
 
   async list(family: ComponentFamily, env = 'live', page = 1, limit = 50): Promise<FamilyPage> {

@@ -115,6 +115,18 @@ export function getDataVersion(): string {
   return dataVersion;
 }
 
+/**
+ * Force un premier relevé, sans attendre qu'une lecture de cache le déclenche.
+ *
+ * Sans lui, `getDataVersion()` rend « v0 » — une valeur par defaut — jusqu'au
+ * premier acces au cache. Une reponse qui annonce « v0 » comme version de
+ * donnee ment, et c'est pire que de ne rien annoncer.
+ */
+export async function refreshDataVersion(): Promise<string> {
+  lastVersionRefresh = 0;
+  return currentDataVersion();
+}
+
 async function currentDataVersion(): Promise<string> {
   if (!resolveDataVersion) return dataVersion;
   const now = Date.now();

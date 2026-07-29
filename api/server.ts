@@ -29,7 +29,7 @@ import { healthRouter } from './src/routes/health.js';
 import { createRoutes } from './src/routes/index.js';
 import { verifyAuthToken } from './src/services/auth-service.js';
 import { GameDataService } from './src/services/game-data-service.js';
-import { redis, setDataVersionResolver } from './src/services/redis.js';
+import { redis, refreshDataVersion, setDataVersionResolver } from './src/services/redis.js';
 import { configureRequestLogPersistence, recordRequestLog } from './src/services/request-log-service.js';
 import { RsiWebsiteService } from './src/services/rsi-website-service.js';
 import { ShipMatrixService } from './src/services/ship-matrix-service.js';
@@ -405,6 +405,11 @@ async function start() {
     const hash = latest?.extraction_hash;
     return typeof hash === 'string' && hash ? hash.slice(0, 12) : null;
   });
+
+  // Un premier relevé tout de suite : la version de donnée figure dans chaque
+  // réponse `/api/v2`, et « v0 » y serait un mensonge. L'échec est sans
+  // conséquence — la valeur se rattrapera au premier accès au cache.
+  await refreshDataVersion().catch(() => undefined);
 
   // 5. Mount routes
   app.use('/', createRoutes({ prisma, shipMatrixService, gameDataService, rsiWebsiteService }));

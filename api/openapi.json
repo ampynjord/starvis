@@ -8267,6 +8267,103 @@
         }
       }
     },
+    "/api/v2/components/families": {
+      "get": {
+        "tags": ["Components"],
+        "summary": "List component families and their counts (v2 envelope)",
+        "description": "Part of `/api/v2`, which carries a single envelope — `data`, `meta`, and `page` on lists — with no `success` field: the HTTP status already says whether the call worked. `meta.data_version` names the extraction the values come from. `/api/v1` is unchanged and stays served.",
+        "operationId": "v2ListComponentFamilies",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/env"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Families holding at least one component"
+          }
+        }
+      }
+    },
+    "/api/v2/components/families/{family}": {
+      "get": {
+        "tags": ["Components"],
+        "summary": "List one family's components, with that family's statistics only",
+        "description": "Part of `/api/v2`, which carries a single envelope — `data`, `meta`, and `page` on lists — with no `success` field: the HTTP status already says whether the call worked. `meta.data_version` names the extraction the values come from. `/api/v1` is unchanged and stays served.",
+        "operationId": "v2ListComponentFamily",
+        "parameters": [
+          {
+            "name": "family",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/env"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated components of that family"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v2/components/{uuid}": {
+      "get": {
+        "tags": ["Components"],
+        "summary": "One component, carrying only its own family's statistics",
+        "description": "Where /api/v1/components/{uuid} returns 124 columns — 104 of them null for a shield — this returns the shared identity plus the statistics that mean something for that kind of part. Six types have no family of their own (missile racks, tractor beams, life support, jump modules, mining modifiers): the game gives them no specific statistics, so they answer 404 here and are read from v1 instead. Part of `/api/v2`, which carries a single envelope — `data`, `meta`, and `page` on lists — with no `success` field: the HTTP status already says whether the call worked. `meta.data_version` names the extraction the values come from. `/api/v1` is unchanged and stays served.",
+        "operationId": "v2GetComponent",
+        "parameters": [
+          {
+            "name": "uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/env"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Component with its family statistics"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
     "/api/v1/version": {
       "get": {
         "tags": ["Game Versions"],

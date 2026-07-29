@@ -11,8 +11,9 @@ import type { NextFunction, Request, Response } from 'express';
  * consommé par des intégrations tierces, et la pagination vit en racine côté
  * `{ success }` là où JSend la placerait sous `meta`. Ce middleware complète donc
  * chaque réponse avec le discriminant manquant, sans jamais déplacer ni écraser
- * quoi que ce soit : les deux lectures restent valides, et une v2 pourra retirer
- * `success` une fois les consommateurs migrés.
+ * quoi que ce soit : les deux lectures restent valides. `/api/v2` en est
+ * exclue — elle porte l'enveloppe unique que ce dispositif ne pouvait pas
+ * imposer à la v1 sans la casser.
  *
  * La valeur est dérivée du code HTTP, pas devinée depuis le corps : `/health/ready`
  * renvoie `{ status: 'not_ready' }` avec un 503 et doit bien être marqué en échec.
@@ -31,7 +32,21 @@ export function withStatusDiscriminators(body: unknown, ok: boolean): void {
   if (!('status' in payload)) payload.status = ok ? 'success' : 'error';
 }
 
-export function responseShapeMiddleware(_req: Request, res: Response, next: NextFunction): void {
+/**
+ * `/api/v2` sort du dispositif.
+ *
+ * Elle porte une enveloppe unique ou le code HTTP suffit a dire l'issue :
+ * ajouter `success` a cote y reintroduirait la redondance que la v2 supprime,
+ * et autoriserait les deux a diverger.
+ */
+const V2_PREFIX = '/api/v2';
+
+export function responseShapeMiddleware(req: Request, res: Response, next: NextFunction): void {
+  if (req.path.startsWith(V2_PREFIX)) {
+    next();
+    return;
+  }
+
   const originalJson = res.json.bind(res);
 
   res.json = (body: unknown) => {

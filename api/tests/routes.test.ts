@@ -1125,13 +1125,20 @@ describe('RSI website routes', () => {
 describe('OpenAPI coverage', () => {
   it('documents every mounted Express route', () => {
     const routeDir = join(process.cwd(), 'src', 'routes');
-    const routeFiles = readdirSync(routeDir).filter((file) => file.endsWith('.ts'));
+    // Recursif : le scan a plat laissait passer les routes d'un sous-repertoire,
+    // et `/api/v2` s'y est glissee sans etre documentee. Un garde-fou aveugle a
+    // une moitie du code est pire qu'aucun — il rassure a tort.
+    const listRouteFiles = (dir: string): string[] =>
+      readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
+        entry.isDirectory() ? listRouteFiles(join(dir, entry.name)) : entry.name.endsWith('.ts') ? [join(dir, entry.name)] : [],
+      );
+    const routeFiles = listRouteFiles(routeDir);
     const routes: Array<{ method: string; path: string; file: string }> = [];
     const routeRe = /router\.(get|post|put|patch|delete)\(\s*([`'"])(.*?)\2/gs;
     const envDataRouteRe = /mountEnvDataRoute\(\s*router\s*,\s*([`'"])(.*?)\1/gs;
 
     for (const file of routeFiles) {
-      const text = readFileSync(join(routeDir, file), 'utf8');
+      const text = readFileSync(file, 'utf8');
       for (const match of text.matchAll(routeRe)) {
         routes.push({ method: match[1], path: match[3], file });
       }
