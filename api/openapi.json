@@ -6550,6 +6550,74 @@
         }
       }
     },
+    "/api/v1/loot/tables": {
+      "get": {
+        "tags": ["Game Data"],
+        "summary": "List loot tables",
+        "description": "What can drop, and from where. 161 tables, 709 weighted entries and 267 archetypes were extracted long ago and served nowhere.",
+        "operationId": "listLootTables",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/env"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated loot tables with their entry counts"
+          }
+        }
+      }
+    },
+    "/api/v1/loot/tables/{uuid}": {
+      "get": {
+        "tags": ["Game Data"],
+        "summary": "Get one loot table with its weighted entries",
+        "description": "Each entry names the archetype it draws from, what that archetype yields in plain words, and `chance_pct`: the entry's weight as a share of the table total, since a raw weight says nothing on its own. Quantities are present on 244 of 709 entries — that is the game's own data, not a gap.",
+        "operationId": "getLootTable",
+        "parameters": [
+          {
+            "name": "uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/env"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Loot table with entries, chances and yields"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
     "/api/v1/manufacturers": {
       "get": {
         "tags": ["Manufacturers"],

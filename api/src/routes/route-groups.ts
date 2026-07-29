@@ -11,6 +11,7 @@ import { mountCraftingRoutes } from './crafting.js';
 import { mountFactionRoutes } from './factions.js';
 import { mountItemRoutes } from './items.js';
 import { mountLocationRoutes } from './locations.js';
+import { mountLootRoutes } from './loot.js';
 import { mountManufacturerRoutes } from './manufacturers.js';
 import { mountMarketRoutes } from './market.js';
 import { mountMiningRoutes } from './mining.js';
@@ -52,6 +53,7 @@ export const routeGroups = [
       mountPaintRoutes,
       mountShopRoutes,
       mountMarketRoutes,
+      mountLootRoutes,
       mountItemRoutes,
       mountCommodityRoutes,
       mountCraftingRoutes,
