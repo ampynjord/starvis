@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, ChevronRight, Radar, Store } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, ChevronRight, Radar, Store } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -72,6 +72,7 @@ export default function LocationDetailPage() {
   const contained = (children ?? []) as unknown as ChildLocation[];
   const terminals = (shops ?? []) as unknown as LocationShop[];
   const description = (location as unknown as { description?: string | null }).description;
+  const amenities = location.amenities ?? [];
 
   return (
     <PageShell size="xl">
@@ -102,6 +103,27 @@ export default function LocationDetailPage() {
         </div>
         {description && <p className="mt-4 text-sm text-slate-400 leading-relaxed max-w-3xl">{description}</p>}
       </div>
+
+      {amenities.length > 0 && (
+        <ScifiPanel
+          title="On Site"
+          subtitle={`${amenities.length} service${amenities.length !== 1 ? 's' : ''}`}
+          actions={<CheckCircle2 size={14} className="text-emerald-700" />}
+        >
+          {/* Ce que le jeu déclare offrir ici — hangars, plateformes, boutiques,
+              clinique. C'est la première question qu'on se pose avant d'y aller. */}
+          <div className="flex flex-wrap gap-2">
+            {amenities.map((amenity) => (
+              <span
+                key={amenity.id}
+                className="sci-panel px-2.5 py-1 text-xs font-rajdhani text-slate-300"
+              >
+                {amenity.display_name || amenity.name}
+              </span>
+            ))}
+          </div>
+        </ScifiPanel>
+      )}
 
       {contained.length > 0 && (
         <ScifiPanel

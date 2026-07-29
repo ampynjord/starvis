@@ -1531,6 +1531,15 @@ export interface Location {
    * révélé.
    */
   affiliation?: string | null;
+  /** Ce qu'on peut faire sur place. Servie sur la fiche seule, pas sur la liste. */
+  amenities?: LocationAmenity[];
+}
+
+export interface LocationAmenity {
+  id: string;
+  name: string;
+  display_name: string | null;
+  icon_path: string | null;
 }
 
 export interface LocationTreeNode extends Location {

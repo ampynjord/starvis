@@ -24,7 +24,11 @@ function createMockPrisma(responses: Array<any[] | Error> = []): PrismaClient {
     if (response instanceof Error) throw response;
     return response;
   });
-  return { $queryRawUnsafe } as unknown as PrismaClient;
+  // `getLocation` interroge desormais `locationAmenity` en plus de son SQL : la
+  // doublure le fournit vide, pour que le test porte sur la requete principale
+  // et non sur l'absence d'un delegue.
+  const locationAmenity = { findMany: vi.fn(async () => []) };
+  return { $queryRawUnsafe, locationAmenity } as unknown as PrismaClient;
 }
 
 /**

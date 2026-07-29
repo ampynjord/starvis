@@ -28,4 +28,22 @@ export interface PublicLocation {
   affiliation: PoliticalAffiliation | null;
   /** Forme standard de l'identifiant, ajoutée par `stripInternal`. */
   sc_uuid?: string;
+  /**
+   * Ce qu'on peut faire sur place.
+   *
+   * Vingt-cinq services possibles — hangars S à XL, plateformes d'atterrissage,
+   * achat d'armes ou d'armure, cour de restauration, ascenseur de fret,
+   * clinique, raffinerie. Servie sur la fiche seule, pas sur la liste : c'est
+   * une requête de plus par lieu.
+   */
+  amenities?: LocationAmenityRef[];
+}
+
+export interface LocationAmenityRef {
+  id: string;
+  /** Le nom interne du jeu, déjà lisible : « Hangar L », « Food Court ». */
+  name: string;
+  /** Le libellé localisé quand le jeu en fournit un, sinon le nom interne. */
+  display_name: string | null;
+  icon_path: string | null;
 }

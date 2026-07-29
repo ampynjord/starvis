@@ -163,7 +163,25 @@ export class LocationQueryService {
       uuid,
     );
     if (!rows.length) return null;
-    return annotateWithAffiliation(convertBigIntToNumber(stripInternal(rows[0]))) as PublicLocation;
+
+    // Ce qu'on peut faire sur place : hangars, plateformes, boutiques d'armure,
+    // cour de restauration. Une requete separee plutot qu'une jointure : elle
+    // rendrait autant de lignes que de commodites, et il faudrait les replier.
+    const amenities = await prisma.locationAmenity.findMany({
+      where: { env, locationUuid: uuid },
+      include: { amenity: true },
+    });
+
+    const location = annotateWithAffiliation(convertBigIntToNumber(stripInternal(rows[0]))) as PublicLocation;
+    location.amenities = amenities
+      .map((link) => ({
+        id: link.amenityId,
+        name: link.amenity.name,
+        display_name: link.amenity.displayName,
+        icon_path: link.amenity.iconPath,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    return location;
   }
 
   async getAll(env = 'live'): Promise<Row[]> {
