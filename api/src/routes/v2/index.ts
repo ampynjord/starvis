@@ -1,6 +1,7 @@
 import type { Router } from 'express';
 import { z } from 'zod';
 import { ComponentFamilyService, isComponentFamily } from '../../services/component-family-service.js';
+import { MissionBrokerService } from '../../services/mission-broker-service.js';
 import { asyncHandler, makeGameDataGuard } from '../helpers.js';
 import type { RouteDependencies } from '../types.js';
 import { sendMissing, sendOne, sendPage } from './envelope.js';
@@ -40,6 +41,7 @@ export function mountV2Routes(router: Router, deps: RouteDependencies): void {
   const { gameDataService } = deps;
   const requireGameData = makeGameDataGuard(gameDataService);
   const families = new ComponentFamilyService(deps.prisma);
+  const missionBrokers = new MissionBrokerService(deps.prisma);
 
   const ShipQuery = PageQuery.extend({
     manufacturer: z.string().max(60).optional(),
@@ -90,6 +92,36 @@ export function mountV2Routes(router: Router, deps: RouteDependencies): void {
       const location = await gameDataService!.locations.getLocation(req.params.uuid, env);
       if (!location) return void sendMissing(res, 'Location');
       sendOne(res, env, location);
+    }),
+  );
+
+  /**
+   * Combien paie une mission, et a quelles conditions.
+   *
+   * `/api/v1/missions` vient de `ContractTemplate` et ne porte aucune
+   * recompense : la question n'avait pas de reponse. Elle en a une ici pour
+   * 1 858 offres sur 1 978.
+   */
+  router.get(
+    '/api/v2/missions/brokers',
+    asyncHandler(async (req, res) => {
+      const query = PageQuery.extend({
+        lawful: z.enum(['true', 'false']).optional(),
+        min_reward: z.coerce.number().int().min(0).optional(),
+        readable_only: z.enum(['true', 'false']).optional(),
+        search: z.string().max(120).optional(),
+      }).parse(req.query);
+
+      const result = await missionBrokers.list({
+        env: query.env,
+        page: query.page,
+        limit: query.limit,
+        lawful: query.lawful === undefined ? undefined : query.lawful === 'true',
+        min_reward: query.min_reward,
+        readable_only: query.readable_only === 'true',
+        search: query.search,
+      });
+      sendPage(res, query.env, result.data, result.page, result.limit, result.total);
     }),
   );
 

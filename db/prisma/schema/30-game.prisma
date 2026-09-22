@@ -1672,3 +1672,43 @@ model LocationAmenity {
   @@map("location_amenities")
   @@schema("game")
 }
+
+/// Les missions telles que le courtier les propose.
+///
+/// `Mission` vient de `ContractTemplate` et n'a aucune récompense.
+/// `MissionBrokerEntry` en porte une pour chacune de ses 1 978 entrées
+/// publiables, avec la légalité, la difficulté et le donneur. Deux tables parce
+/// que les deux structures décrivent des choses différentes.
+model MissionBroker {
+  className            String   @map("class_name") @db.VarChar(255)
+  env                  String   @default("live") @db.VarChar(10)
+  titleLocKey          String?  @map("title_loc_key") @db.VarChar(255)
+  title                String?  @db.VarChar(500)
+  titleIsTemplate      Boolean  @default(false) @map("title_is_template")
+  descriptionLocKey    String?  @map("description_loc_key") @db.VarChar(255)
+  description          String?
+  giverLocKey          String?  @map("giver_loc_key") @db.VarChar(255)
+  giver                String?  @db.VarChar(255)
+  missionModule        String?  @map("mission_module") @db.VarChar(500)
+  missionType          String?  @map("mission_type") @db.VarChar(255)
+  rewardAmount         Int?     @map("reward_amount")
+  rewardMax            Int?     @map("reward_max")
+  rewardCurrency       String?  @map("reward_currency") @db.VarChar(20)
+  difficulty           Int?
+  isLawful             Boolean  @default(true) @map("is_lawful")
+  onceOnly             Boolean  @default(false) @map("once_only")
+  isTutorial           Boolean  @default(false) @map("is_tutorial")
+  maxInstances         Int?     @map("max_instances")
+  deadlineSeconds      Int?     @map("deadline_seconds")
+  availableInPrison    Boolean  @default(false) @map("available_in_prison")
+  failIfBecameCriminal Boolean  @default(false) @map("fail_if_became_criminal")
+  minRequiredMissions  Int?     @map("min_required_missions")
+  rawJson              Json?    @map("raw_json")
+  extractedAt          DateTime @default(now()) @map("extracted_at")
+
+  @@id([className, env])
+  @@index([env, rewardAmount(sort: Desc)], map: "mission_brokers_reward_idx")
+  @@index([env, isLawful], map: "mission_brokers_lawful_idx")
+  @@map("mission_brokers")
+  @@schema("game")
+}
