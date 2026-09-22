@@ -126,7 +126,15 @@ function markdownToHtml(md: string): string {
   return html;
 }
 
-function resolveRsiUrl(src: string | null | undefined): string | null {
+/**
+ * Résout la source d'une image trouvée dans du HTML.
+ *
+ * Strict à dessein, contrairement à `resolveRsiUrl` du module de configuration :
+ * un `src` qui n'est ni absolu ni enraciné n'est pas une image RSI, et lui coller
+ * la base fabriquerait une adresse inventée. Les deux portaient le même nom pour
+ * deux comportements, ce qui invitait à prendre l'un pour l'autre.
+ */
+function resolveImageSrc(src: string | null | undefined): string | null {
   if (!src) return null;
   if (src.startsWith('http')) return src;
   if (src.startsWith('/')) return `${RSI_BASE_URL}${src}`;
@@ -147,7 +155,7 @@ function parseOrganizationsHtml(html: string): RsiOrgSummary[] {
     orgs.push({
       symbol,
       name,
-      logoUrl: resolveRsiUrl(logoSrc),
+      logoUrl: resolveImageSrc(logoSrc),
       archetype: cell.match(/Archetype: <\/span><span class="value">([^<]+)/)?.[1]?.trim() ?? null,
       language: cell.match(/Lang: <\/span><span class="value">([^<]+)/)?.[1]?.trim() ?? null,
       commitment: cell.match(/Commitment: <\/span><span class="value[^"]*">([^<]+)/)?.[1]?.trim() ?? null,

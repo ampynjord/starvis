@@ -10,7 +10,7 @@
  */
 
 import { chromium } from 'playwright';
-import { CTM_INTER_SHIP_DELAY_MS, CTM_WAIT_MS, RSI_BASE_URL } from '../config.js';
+import { CTM_INTER_SHIP_DELAY_MS, CTM_WAIT_MS, resolveRsiUrl } from '../config.js';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -108,7 +108,11 @@ export async function scrapeShipCtmUrls(
 // ── Private helpers ────────────────────────────────────────────────────────
 
 async function scrapeOnePage(ship: ShipToScrape): Promise<string | null> {
-  const fullUrl = `${RSI_BASE_URL}${ship.rsiUrl}`;
+  // `ship.rsiUrl` arrive absolue depuis la synchronisation du Ship Matrix, et
+  // relative des donnees plus anciennes : le resolveur partage traite les deux.
+  const fullUrl = resolveRsiUrl(ship.rsiUrl);
+  // Sans adresse, il n'y a rien à ouvrir : le vaisseau ressort sans modèle 3D.
+  if (!fullUrl) return null;
   const foundCtm: string[] = [];
 
   // headful=true is required: WebGL/3D viewer is often disabled in headless mode
