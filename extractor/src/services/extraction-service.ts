@@ -26,6 +26,7 @@ import { saveItems } from '../persisters/items.js';
 import { saveLocations } from '../persisters/locations.js';
 import { saveManufacturersFromData } from '../persisters/manufacturers.js';
 import { saveMiningData } from '../persisters/mining.js';
+import { saveMissionBrokers } from '../persisters/mission-brokers.js';
 import { saveMissionBlueprintLinks, saveMissions } from '../persisters/missions.js';
 import { savePaints } from '../persisters/paints.js';
 import { saveOfficialShipGalleries } from '../persisters/ship-galleries.js';
@@ -100,6 +101,8 @@ export interface ExtractionStats {
   miningElements: number;
   miningCompositions: number;
   missions: number;
+  /** Offres du courtier : la source des recompenses, distincte des contrats. */
+  missionBrokers: number;
   craftingRecipes: number;
   locations: number;
   starmapLocationsLinked: number;
@@ -163,6 +166,7 @@ export class ExtractionService {
       miningElements: 0,
       miningCompositions: 0,
       missions: 0,
+      missionBrokers: 0,
       craftingRecipes: 0,
       locations: 0,
       starmapLocationsLinked: 0,
@@ -365,6 +369,12 @@ export class ExtractionService {
       if (run('missions')) {
         onProgress?.('Extracting missions (ContractTemplate)…');
         stats.missions = await saveMissions(ctx);
+      }
+
+      // 5d-bis. Les offres du courtier : la ou vivent les recompenses.
+      if (run('missions')) {
+        onProgress?.('Extracting mission broker offers…');
+        stats.missionBrokers = await saveMissionBrokers(ctx);
       }
 
       // 5e. Extract & save crafting recipes
