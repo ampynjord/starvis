@@ -40,3 +40,20 @@ runs:
       if: steps.deps-cache.outputs.cache-hit != 'true'
       shell: bash
       run: npm ci --prefer-offline --no-audit
+
+    # Sur un cache exact, `npm ci` est saute — et avec lui la seule verification
+    # que le lockfile est coherent avec les package.json. Une desynchronisation
+    # reste alors invisible jusqu'a ce qu'un changement de cle force une vraie
+    # installation, potentiellement des semaines plus tard.
+    #
+    # C'est exactement ce qui est arrive le 22 septembre 2026 : le lockfile
+    # portait `@types/node@22.20.1` la ou l'arbre en demandait 22.20.4, et la CI
+    # est restee verte jusqu'a ce qu'une modification du schema Prisma change la
+    # cle de cache.
+    #
+    # Le controle coute moins d'une seconde et ne s'execute que dans le cas ou
+    # l'installation n'a pas eu lieu.
+    - name: Verify lockfile is in sync
+      if: steps.deps-cache.outputs.cache-hit == 'true'
+      shell: bash
+      run: npm ci --dry-run
