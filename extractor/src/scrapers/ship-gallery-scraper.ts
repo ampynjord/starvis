@@ -5,7 +5,13 @@
  * image media from rendered DOM and network responses instead of 3D assets.
  */
 import { chromium } from 'playwright';
-import { RSI_BASE_URL, SHIP_GALLERY_INTER_SHIP_DELAY_MS, SHIP_GALLERY_RETRIES, SHIP_GALLERY_RETRY_BASE_DELAY_MS } from '../config.js';
+import {
+  RSI_BASE_URL,
+  resolveRsiUrl,
+  SHIP_GALLERY_INTER_SHIP_DELAY_MS,
+  SHIP_GALLERY_RETRIES,
+  SHIP_GALLERY_RETRY_BASE_DELAY_MS,
+} from '../config.js';
 import type { ShipToScrape } from './ctm-scraper.js';
 
 export interface ShipGalleryImage {
@@ -116,7 +122,7 @@ async function scrapeOneGalleryPageWithRetry(
 }
 
 async function scrapeOneGalleryPage(ship: ShipGalleryToScrape): Promise<ShipGalleryImage[]> {
-  const fullUrl = normalizePageUrl(ship.rsiUrl);
+  const fullUrl = resolveRsiUrl(ship.rsiUrl) ?? ship.rsiUrl;
   const candidates = new Map<string, ShipGalleryImage>();
 
   const browser = await chromium.launch({ headless: true });
@@ -200,11 +206,6 @@ async function scrapeOneGalleryPage(ship: ShipGalleryToScrape): Promise<ShipGall
   }
 
   return [...candidates.values()].map((image, index) => ({ ...image, position: index })).slice(0, 80);
-}
-
-function normalizePageUrl(url: string): string {
-  if (url.startsWith('http')) return url;
-  return `${RSI_BASE_URL}${url.startsWith('/') ? '' : '/'}${url}`;
 }
 
 function looksRelevantResponse(url: string): boolean {
