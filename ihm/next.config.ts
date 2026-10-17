@@ -26,8 +26,6 @@ const nextConfig: NextConfig = {
     return [
       { source: '/api-docs', destination: `${BACKEND_API_URL}/api-docs/` },
       { source: '/api-docs/:path*', destination: `${BACKEND_API_URL}/api-docs/:path*` },
-      { source: '/admin/api-docs', destination: `${BACKEND_API_URL}/admin/api-docs` },
-      { source: '/admin/api-docs/:path*', destination: `${BACKEND_API_URL}/admin/api-docs/:path*` },
       { source: '/health/:path*', destination: `${BACKEND_API_URL}/health/:path*` },
       { source: '/health', destination: `${BACKEND_API_URL}/health/live` },
     ];
@@ -49,6 +47,16 @@ const nextConfig: NextConfig = {
       // renvoyait vers /consumables/:uuid, qui n'existe pas — toutes les fiches
       // d'items répondaient donc 404, alors que l'IHM y lie depuis la liste des
       // items et les ingrédients de recettes.
+
+      // Les comptes ont été retirés (docs/renaissance.md, D1) : leurs pages
+      // renvoient vers ce qui les remplace plutôt que vers une 404.
+      ...['/login', '/register', '/forgot-password', '/reset-password', '/verify-email', '/profile', '/my-reports'].map((source) => ({
+        source,
+        destination: '/',
+        permanent: true,
+      })),
+      ...['/admin', '/admin/bug-reports', '/admin/monitoring'].map((source) => ({ source, destination: '/', permanent: true })),
+      { source: '/report-bug', destination: 'https://github.com/ampynjord/starvis/issues', permanent: true },
     ];
   },
 };

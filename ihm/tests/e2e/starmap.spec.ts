@@ -89,9 +89,6 @@ const starmapFixture = [
 ];
 
 async function mockStarmap(page: import('@playwright/test').Page) {
-  await page.addInitScript(() => {
-    window.localStorage.setItem('starvis_cookie_consent', 'accepted');
-  });
   await page.route('**/api/public/v1/starmap/positions', async (route) => {
     await route.fulfill({ json: { success: true, data: starmapFixture, total: starmapFixture.length } });
   });

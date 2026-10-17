@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PageShell } from '@/components/ui/PageShell';
-import { DEFAULT_AUTH_COOKIE_NAME } from '@/lib/app-constants';
 
 function env(name: string, fallback: string): string {
   const value = process.env[name]?.trim();
@@ -115,8 +114,8 @@ export default function LegalPage() {
         <Ul
           items={[
             'Do not use STARVIS for illegal activity, harassment, automated abuse, credential sharing, scraping abuse or service disruption.',
-            'Do not submit unlawful, confidential, sensitive, defamatory or third-party personal data in bug reports, corporation notes, Discord prompts or AI chat messages.',
-            'Developer and API tokens are personal credentials. Store them securely and revoke or rotate them if exposed.',
+            'Do not submit unlawful, confidential, sensitive, defamatory or third-party personal data in issue reports, Discord prompts or AI chat messages.',
+            'API tokens are credentials issued to a named project. Store them securely and ask for revocation or rotation if exposed.',
             'External projects using STARVIS APIs are responsible for their own legal notices, privacy disclosures, rate limiting and data accuracy warnings.',
             'Access may be suspended or removed to protect the service, users, infrastructure, or third-party rights.',
           ]}
@@ -162,10 +161,9 @@ export default function LegalPage() {
         <h3 className="pt-2 text-xs font-semibold uppercase tracking-wider text-slate-300">Data categories</h3>
         <Ul
           items={[
-            'Account data: email address, username, role, avatar URL, creation/update dates and email verification status.',
-            'Security data: bcrypt password hash, session JWT, API JWT, email verification token hash, password reset token hash, encrypted 2FA secret and 2FA status.',
-            'User content: bug report titles/descriptions/attachments, corporation memberships, ranks, fleet notes and moderation/admin updates.',
-            'Technical data: server logs, request metadata required for security, error diagnosis and abuse prevention.',
+            'STARVIS no longer offers user accounts. Data from accounts created before their removal (email address, username, role, password hash, 2FA state and bug reports) remains stored only until it is deleted, which is scheduled; you can ask for its earlier deletion through the legal contact channel.',
+            'API token data: the token owner name chosen by the administrator who issued it, a hash of the token and its usage metadata (last use, truncated IP, user agent, usage count).',
+            'Technical data: server logs, request metadata required for security, error diagnosis and abuse prevention, with IP addresses truncated.',
             'AI and Discord data: prompts/messages sent to the STARVIS assistant or Discord bot, limited to the message content needed to generate an answer.',
             'Public game/community data: RSI organization data and public game data cached from public or game-derived sources.',
           ]}
@@ -174,9 +172,8 @@ export default function LegalPage() {
         <h3 className="pt-2 text-xs font-semibold uppercase tracking-wider text-slate-300">Purposes and legal bases</h3>
         <Ul
           items={[
-            'Account creation, authentication and profile management: performance of the requested service.',
-            'Email verification, password reset, 2FA, API token access, rate limiting, logging and abuse prevention: security and legitimate interest.',
-            'Bug reports, corporation tools and support requests: performance of the requested service and legitimate interest in maintaining the project.',
+            'API token access, rate limiting, logging and abuse prevention: security and legitimate interest.',
+            'Support requests: legitimate interest in maintaining the project.',
             'AI assistant and Discord bot answers: user request and performance of the requested feature.',
             'Legal notices, right-holder requests and compliance handling: legal obligation and legitimate interest.',
           ]}
@@ -185,9 +182,9 @@ export default function LegalPage() {
         <h3 className="pt-2 text-xs font-semibold uppercase tracking-wider text-slate-300">Recipients and processors</h3>
         <Ul
           items={[
-            'STARVIS administrators can access account, support and moderation data when required to operate or secure the service.',
+            'STARVIS administrators can access API token, log and support data when required to operate or secure the service.',
             `The hosting provider ${HOST_NAME} hosts the application, database and logs.`,
-            'The configured SMTP provider processes email addresses and message metadata for verification, reset and notification emails.',
+            'GitHub processes issue reports filed on the public STARVIS issue tracker, under its own terms.',
             `${CHAT_PROVIDER} may process AI prompts and contextual messages when the AI assistant or Discord AI command is used.`,
             'Discord may process messages and metadata when users interact with the STARVIS Discord bot.',
           ]}
@@ -199,11 +196,9 @@ export default function LegalPage() {
         <h3 className="pt-2 text-xs font-semibold uppercase tracking-wider text-slate-300">Retention</h3>
         <Ul
           items={[
-            'Account data is kept while the account is active. Inactive accounts may be removed after 2 years, with prior notice when practical.',
-            'Email verification tokens expire after 48 hours. Password reset tokens expire after 1 hour.',
-            'Session tokens follow the configured session duration. Developer/API tokens expire after the configured API token duration.',
-            '2FA secrets are kept while 2FA is configured and are deleted when 2FA is disabled.',
-            'Bug reports and support exchanges are kept while useful for maintenance, security, audit history or legal defense, then deleted or anonymized.',
+            'Data from former accounts is kept only until its scheduled deletion.',
+            'API tokens expire after the configured API token duration and can be revoked at any time.',
+            'Support exchanges are kept while useful for maintenance, security, audit history or legal defense, then deleted or anonymized.',
             'Server logs are kept only as long as needed for security, debugging and abuse prevention, according to the production logging configuration.',
             'AI prompts are not intentionally stored by STARVIS outside technical logs, but may be processed by the AI provider according to its own service terms.',
           ]}
@@ -212,7 +207,7 @@ export default function LegalPage() {
         <h3 className="pt-2 text-xs font-semibold uppercase tracking-wider text-slate-300">Your rights</h3>
         <P>
           You may request access, rectification, erasure, portability, limitation or objection where applicable.
-          Account deletion is available from the profile page. For other requests, use the legal contact channel. You may
+          Use the legal contact channel for any request, including the early deletion of a former account. You may
           also lodge a complaint with the CNIL:{' '}
           <a href="https://www.cnil.fr" target="_blank" rel="noreferrer" className="text-cyan-500 underline underline-offset-2 hover:text-cyan-300">
             www.cnil.fr
@@ -223,23 +218,17 @@ export default function LegalPage() {
 
       <Section id="cookies" title="Cookies and local storage">
         <P>
-          STARVIS uses the strictly necessary session cookie{' '}
-          <span className="font-mono-sc text-slate-300">{DEFAULT_AUTH_COOKIE_NAME}</span> to authenticate logged-in
-          users. It is configured as HttpOnly and Secure in production. It is not used for advertising or analytics.
+          STARVIS sets no cookies: there are no accounts and no sessions to keep.
         </P>
         <P>
-          Local storage may keep interface preferences such as cookie notice state, selected game environment,
-          chat panel size and theme/UI preferences. These values stay on your device and are not used for tracking.
-        </P>
-        <P>
-          Declining the cookie notice only records the choice and does not disable the strictly necessary
-          authentication cookie required for login.
+          Local storage may keep interface preferences such as the selected game environment, chat panel size and
+          theme/UI preferences. These values stay on your device and are not used for tracking.
         </P>
       </Section>
 
       <Section title="AI assistant transparency">
         <P>
-          The AI assistant is optional and restricted to authorized users. When used, messages and contextual prompts
+          The AI assistant is optional and limited to a number of questions per visitor. When used, messages and contextual prompts
           are sent to {CHAT_PROVIDER} through its API endpoint ({CHAT_PROVIDER_URL}) to produce an answer. Do not send
           passwords, API tokens, private keys, personal data, confidential information or third-party secrets in prompts.
         </P>

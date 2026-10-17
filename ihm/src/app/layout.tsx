@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import { Orbitron, Rajdhani, Share_Tech_Mono } from 'next/font/google';
 import { ChatWidget } from '@/components/ui/ChatWidget';
-import { CookieBanner } from '@/components/ui/CookieBanner';
 import { PUBLIC_SITE_URL } from '@/lib/server-config';
 import { Providers } from './providers';
 import '@/index.css';
@@ -69,7 +68,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Providers>
           {children}
           <ChatWidget />
-          <CookieBanner />
         </Providers>
       </body>
     </html>

@@ -36,12 +36,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
-import { useAuth } from '@/contexts/AuthContext';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { OpenAiButton } from '@/components/ui/OpenAiButton';
 import { PageShell } from '@/components/ui/PageShell';
 import { NAV_GROUPS } from '@/components/layout/navigation';
+import { ISSUES_URL } from '@/lib/app-constants';
 import { fDate, fNumber } from '@/utils/formatters';
 import type { ChangelogEntry, StatsOverview } from '@/types/api';
 
@@ -96,7 +96,7 @@ const HOME_SECTION_META: Record<string, Omit<SectionDef, 'label' | 'links'>> = {
 const SECTIONS: SectionDef[] = NAV_GROUPS.filter((group) => group.id in HOME_SECTION_META).map((group) => ({
   ...HOME_SECTION_META[group.id],
   label: group.label,
-  links: group.items.filter((item) => !item.auth).map((item) => ({
+  links: group.items.map((item) => ({
     label: item.label,
     to: item.to,
   })),
@@ -139,8 +139,8 @@ const PLATFORM_PILLARS = [
   {
     to: '/developer',
     icon: Code2,
-    label: 'External API',
-    sub: 'Authenticated REST API, Swagger and project tokens',
+    label: 'Public API',
+    sub: 'Open REST API, Swagger and project tokens',
     accent: 'text-emerald-400',
   },
   {
@@ -262,7 +262,6 @@ function ChangelogRow({ entry }: { entry: ChangelogEntry }) {
 
 export default function HomePage() {
   const { env } = useEnv();
-  const { user } = useAuth();
   const router = useRouter();
   const [heroSearch, setHeroSearch] = useState('');
   const handleHeroSearch = (e: React.FormEvent) => {
@@ -316,15 +315,15 @@ export default function HomePage() {
             Your bug reports are invaluable to improve the platform.
           </p>
         </div>
-        {user && (
-          <Link
-            href="/report-bug"
-            className="sci-btn-ghost py-1.5 px-3 text-[10px] gap-1.5 whitespace-nowrap shrink-0"
-          >
-            <Bug size={11} />
-            Report a bug
-          </Link>
-        )}
+        <a
+          href={ISSUES_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="sci-btn-ghost py-1.5 px-3 text-[10px] gap-1.5 whitespace-nowrap shrink-0"
+        >
+          <Bug size={11} />
+          Report a bug
+        </a>
       </div>
 
       {/* ── Hero ─────────────────────────────────────────────────────── */}

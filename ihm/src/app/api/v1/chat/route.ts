@@ -1,18 +1,16 @@
 /**
  * Route Handler Next.js pour le chatbot SSE.
  * Pipe le stream SSE de l'API backend directement vers le browser (bypass rewrite buffering).
- * Utilise SERVER_API_KEY pour s'authentifier en tant que proxy interne IHM.
+ * Utilise SERVER_API_KEY pour s'authentifier en tant que proxy interne IHM ; sans comptes,
+ * l'API limite les questions par visiteur, dont ce proxy transmet l'adresse.
  */
 import type { NextRequest } from 'next/server';
-import { forwardedClientHeadersFromHeaders, getAuthToken, serverApiHeaders, upstreamUrl } from '../../_utils/proxy';
+import { forwardedClientHeadersFromHeaders, serverApiHeaders, upstreamUrl } from '../../_utils/proxy';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
-  const token = await getAuthToken();
-  if (!token) return new Response(JSON.stringify({ error: 'Authentication required' }), { status: 401 });
-
   const body = await req.json();
 
   const headers: Record<string, string> = {

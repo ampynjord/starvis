@@ -2,7 +2,6 @@
 
 import { motion } from 'framer-motion';
 import {
-  Activity,
   AlertTriangle,
   BookOpen,
   Bug,
@@ -10,24 +9,18 @@ import {
   ExternalLink,
   Home,
   Info,
-  Lock,
   Scale,
-  Shield,
-  User,
   X,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEnv } from '@/contexts/EnvContext';
-import { useAuth } from '@/contexts/AuthContext';
 import { NAV_GROUPS, type NavItemDef } from '@/components/layout/navigation';
-import { ADMIN_ROLE, hasDeveloperAccess, PUBLIC_RSI_URL } from '@/lib/app-constants';
+import { ISSUES_URL, PUBLIC_RSI_URL } from '@/lib/app-constants';
 
-function NavItem({ to, icon: Icon, label, earlyAccess, auth: requiresAuth, exact, onNavigate }: NavItemDef & { onNavigate?: () => void }) {
+function NavItem({ to, icon: Icon, label, earlyAccess, exact, onNavigate }: NavItemDef & { onNavigate?: () => void }) {
   const pathname = usePathname();
-  const { user } = useAuth();
   const isActive = to === '/' ? pathname === '/' : exact ? pathname === to : pathname?.startsWith(to);
-  const locked = requiresAuth && !user;
 
   return (
     <Link
@@ -57,8 +50,7 @@ function NavItem({ to, icon: Icon, label, earlyAccess, auth: requiresAuth, exact
           EA
         </span>
       )}
-      {locked && <Lock size={10} className="shrink-0 text-slate-600" />}
-      {isActive && !locked && (
+      {isActive && (
         <motion.div
           layoutId="nav-indicator"
           className="ml-auto w-1 h-1 rounded-full bg-cyan-400"
@@ -83,8 +75,6 @@ function NavGroup({ label, items, onNavigate }: { label: string; items: NavItemD
 
 export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { env, setEnv } = useEnv();
-  const { user } = useAuth();
-
 
   return (
     <>
@@ -154,72 +144,15 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
           <NavGroup key={group.id} label={group.label} items={group.items} onNavigate={onClose} />
         ))}
 
-        {hasDeveloperAccess(user?.role) && (
-          <NavGroup
-            label="Developer"
-            items={[{ to: '/developer', icon: Code2, label: 'API Access', earlyAccess: true }]}
-            onNavigate={onClose}
-          />
-        )}
-
-        {user?.role === ADMIN_ROLE && (
-          <NavGroup
-            label="Administration"
-            items={[
-              { to: '/admin',              icon: Shield,    label: 'Users',         exact: true },
-              { to: '/admin/bug-reports',  icon: Bug,       label: 'Bug Reports' },
-              { to: '/admin/monitoring',    icon: Activity,  label: 'Monitoring' },
-            ]}
-            onNavigate={onClose}
-          />
-        )}
+        <NavGroup
+          label="Developer"
+          items={[{ to: '/developer', icon: Code2, label: 'Public API' }]}
+          onNavigate={onClose}
+        />
       </nav>
 
       {/* Footer */}
       <div className="px-4 py-3 border-t border-border space-y-2.5">
-        {/* User or sign-in */}
-        {user ? (
-          <Link
-            href="/profile"
-            className="flex items-center gap-2 group"
-          >
-            <div className="w-6 h-6 rounded-full bg-cyan-950 border border-cyan-800/50 flex items-center justify-center shrink-0 overflow-hidden">
-              {user.avatarUrl
-                ? <img src={user.avatarUrl} alt={user.username} className="w-full h-full object-cover" />
-                : <User size={11} className="text-cyan-500" />}
-            </div>
-            <span className="font-mono-sc text-xs text-slate-500 group-hover:text-slate-300 transition-colors truncate flex-1">
-              {user.username}
-            </span>
-            {hasDeveloperAccess(user.role) && (
-              <span className={`text-[8px] font-orbitron tracking-widest px-1 py-0.5 rounded-sm border uppercase shrink-0 ${
-                user.role === ADMIN_ROLE
-                  ? 'text-cyan-500 bg-cyan-950/40 border-cyan-800/50'
-                  : 'text-violet-400 bg-violet-950/40 border-violet-800/50'
-              }`}>
-                {user.role === ADMIN_ROLE ? 'admin' : 'dev'}
-              </span>
-            )}
-          </Link>
-        ) : (
-          <div className="space-y-2">
-            <Link
-              href="/login"
-              className="flex items-center gap-2 text-xs text-slate-600 hover:text-slate-400 transition-colors"
-            >
-              <User size={12} />
-              <span className="font-mono-sc">Sign in</span>
-            </Link>
-            <p className="text-[10px] leading-snug text-slate-700">
-              Create a free account to unlock connected features: profile, corporation tools, reports, API access
-              and AI assistant.
-            </p>
-            <Link href="/register" className="inline-flex text-[10px] font-mono-sc text-cyan-600 hover:text-cyan-400">
-              Create account
-            </Link>
-          </div>
-        )}
-
         {/* Secondary links */}
         <div className="flex flex-wrap gap-x-3 gap-y-1">
           <Link href="/changelog" className="flex items-center gap-1 text-[10px] text-slate-700 hover:text-slate-500 transition-colors font-mono-sc">
@@ -228,11 +161,14 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
           <Link href="/about" className="flex items-center gap-1 text-[10px] text-slate-700 hover:text-slate-500 transition-colors font-mono-sc">
             <Info size={9} /> About
           </Link>
-          {user && (
-            <Link href="/report-bug" className="flex items-center gap-1 text-[10px] text-slate-700 hover:text-slate-500 transition-colors font-mono-sc">
-              <Bug size={9} /> Report bug
-            </Link>
-          )}
+          <a
+            href={ISSUES_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-1 text-[10px] text-slate-700 hover:text-slate-500 transition-colors font-mono-sc"
+          >
+            <Bug size={9} /> Report bug
+          </a>
           <a
             href={PUBLIC_RSI_URL}
             target="_blank"

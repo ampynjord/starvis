@@ -1,8 +1,7 @@
 'use client';
 
 import { AnimatePresence, motion } from 'framer-motion';
-import { Bot, ChevronDown, Grip, LogIn, Send, Sparkles, X } from 'lucide-react';
-import Link from 'next/link';
+import { Bot, ChevronDown, Grip, Send, Sparkles, X } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import {
   type CSSProperties,
@@ -14,7 +13,6 @@ import {
   useRef,
   useState,
 } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -69,7 +67,7 @@ const PAGE_CONTEXTS: { match: RegExp; label: string; prompts: string[] }[] = [
   {
     match: /^\/developer/,
     label: 'External API',
-    prompts: ['Help me use the Starvis external API', 'Generate a curl example for ships and search', 'Explain authentication and API tokens'],
+    prompts: ['Help me use the Starvis public API', 'Generate a curl example for ships and search', 'When do I need an API token?'],
   },
   {
     match: /^\/discord/,
@@ -103,7 +101,6 @@ function clampChatSize(size: ChatSize): ChatSize {
 }
 
 export function ChatWidget() {
-  const { user, loading: authLoading } = useAuth();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -217,6 +214,14 @@ export function ChatWidget() {
         signal: abortRef.current.signal,
       });
 
+      if (res.status === 429) {
+        setMessages((prev) => {
+          const next = [...prev];
+          next[assistantIdx] = { role: 'assistant', content: 'Question limit reached for now. Try again in about 15 minutes.', streaming: false };
+          return next;
+        });
+        return;
+      }
       if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
 
       const reader = res.body.getReader();
@@ -286,50 +291,12 @@ export function ChatWidget() {
     }
   };
 
-  if (authLoading) return null;
   const pageContext = getPageContext(pathname);
 
   return (
     <div className="fixed inset-x-3 bottom-3 z-[60] flex flex-col items-end gap-3 sm:inset-x-auto sm:right-6 sm:bottom-6">
       <AnimatePresence>
-        {open && !user && (
-          <motion.div
-            key="login-prompt"
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            transition={{ duration: 0.2 }}
-            className="w-full max-w-72 flex flex-col items-center gap-4 p-6 text-center"
-            style={panelStyle}
-          >
-            <Bot size={28} style={{ color: '#00d4ff' }} />
-            <div>
-              <p className="font-orbitron text-xs tracking-widest text-cyan-400 uppercase mb-1">STARVIS</p>
-              <p className="text-sm text-slate-400">
-                Sign in or create a free account to access the Starvis AI assistant and other connected features.
-              </p>
-            </div>
-            <div className="flex flex-wrap justify-center gap-2">
-              <Link
-                href="/login"
-                onClick={() => setOpen(false)}
-                className="flex items-center gap-2 px-4 py-2 border border-cyan-700/50 hover:border-cyan-500/70 bg-cyan-900/20 hover:bg-cyan-900/40 text-cyan-400 hover:text-cyan-300 font-mono-sc text-xs rounded transition-colors"
-              >
-                <LogIn size={13} />
-                SIGN IN
-              </Link>
-              <Link
-                href="/register"
-                onClick={() => setOpen(false)}
-                className="flex items-center gap-2 px-4 py-2 border border-slate-700 hover:border-cyan-700/60 text-slate-400 hover:text-cyan-300 font-mono-sc text-xs rounded transition-colors"
-              >
-                CREATE ACCOUNT
-              </Link>
-            </div>
-          </motion.div>
-        )}
-
-        {open && user && (
+        {open && (
           <motion.div
             key="chat-panel"
             initial={{ opacity: 0, y: 20, scale: 0.95 }}

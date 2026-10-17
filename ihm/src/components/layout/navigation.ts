@@ -28,7 +28,6 @@ export type NavItemDef = {
   icon: React.ElementType;
   label: string;
   earlyAccess?: boolean;
-  auth?: boolean;
   /** Use exact pathname match for active state (avoids prefix collision between sibling routes). */
   exact?: boolean;
 };

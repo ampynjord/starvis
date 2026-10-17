@@ -19,7 +19,7 @@ const LANES = [
     border: 'border-emerald-900/50',
     items: [
       'Public database browsing for ships, components, items, commodities, missions, manufacturers, lore and locations.',
-      'Authenticated external API access with Swagger, API tokens and admin supervision.',
+      'Public external API with Swagger, anonymous read access and project tokens.',
       'Discord bot command map connected to the Starvis API and data status.',
     ],
   },
