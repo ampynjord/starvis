@@ -127,10 +127,6 @@ const starmapObjects = [
 ];
 
 async function installMobileFixtures(page: Page) {
-  await page.route('**/api/auth/me', async (route) => {
-    await route.fulfill({ json: { user: null } });
-  });
-
   await page.route('**/api/public/v1/**', async (route) => {
     const url = new URL(route.request().url());
     const path = url.pathname;

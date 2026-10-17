@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { SERVER_API_KEY } from '@/lib/server-config';
-import { forwardedClientHeadersFromHeaders, getAuthToken, upstreamUrl } from '../../../_utils/proxy';
+import { forwardedClientHeadersFromHeaders, upstreamUrl } from '../../../_utils/proxy';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -56,9 +56,6 @@ export async function proxyPublicApi(
     'X-API-Key': SERVER_API_KEY,
     'X-Starvis-Internal-Client': 'ihm-public-proxy',
   };
-
-  const token = await getAuthToken();
-  if (token) headers.Authorization = `Bearer ${token}`;
 
   const contentType = req.headers.get('content-type');
   if (contentType) headers['Content-Type'] = contentType;
