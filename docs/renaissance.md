@@ -15,7 +15,7 @@ Le projet ne manque pas de qualité, il manque de **forme**. Chaque chantier a
 | Briques à maintenir | 5 workspaces, 3 services en prod + Postgres, Redis, Traefik |
 | Surface d'API | 178 routes documentées, 71 sans consommateur interne, deux versions servies |
 | Pages de l'IHM | 59, dont 13 d'auth/compte/admin pour un wiki en lecture |
-| Rendu | 0 page pré-générée, 16 routes `force-dynamic`, 30 vues sur 31 en `'use client'` |
+| Rendu | 0 page pré-générée, 16 routes `force-dynamic` ; 6 fiches de détail sur 9 chargent déjà leurs données côté serveur, mais les lieux, le minage et les 14 pages de liste reposent sur le contournement `SeoEntitySnapshot` |
 | SQL brut | 190 `$queryRawUnsafe`, y compris dans les services déclarés « faits » |
 | God files | StarmapGalaxy 2 246 l., dataforge-service 2 048 l., chat-service 1 141 l. |
 | Documentation de refonte | 4 documents, 1 400 lignes, dont aucun ne dit ce qu'on arrête |
@@ -97,13 +97,27 @@ neuve, et la CI est verte.
 On supprime d'abord, parce que tout ce qui part n'a plus besoin d'être migré,
 réécrit ni testé ensuite.
 
+- **D'abord, découpler les jetons des comptes.** Aujourd'hui un jeton API
+  appartient à un utilisateur (`ApiToken.userId` obligatoire, suppression en
+  cascade) et la validation relit la table `User` (`api/middleware/auth.ts`).
+  Supprimer les comptes tel quel effacerait les jetons des trois intégrations
+  que D2 promet de garder. Ordre imposé :
+  1. une migration qui rend le jeton autonome (propriétaire en texte libre,
+     rôle porté par le jeton), avec reprise des jetons existants ;
+  2. la validation des jetons sans passer par `User` ni par `auth-service` ;
+  3. une vérification que les jetons existants authentifient toujours, contre
+     une copie de la base de production ;
+  4. seulement ensuite, la suppression des comptes.
 - Retirer les pages et routes de comptes, de 2FA, de profil, de signalements,
   de demandes d'accès et de monitoring d'admin, avec leurs services et leurs
   tests (selon D1 et D2).
 - Migration Prisma qui supprime les tables correspondantes, **après une
-  sauvegarde vérifiée** (`db/scripts/backup.sh`, restauration éprouvée).
+  sauvegarde vérifiée** (`db/scripts/backup.sh`, restauration éprouvée). La
+  sauvegarde protège la donnée, pas l'accès : c'est le point précédent qui
+  garde les jetons valides.
 - Retirer `notebooks/` et les dépendances devenues orphelines
-  (`bcryptjs`, `otplib`, `qrcode`, `nodemailer`, `jsonwebtoken` selon D2).
+  (`bcryptjs`, `otplib`, `qrcode`, `nodemailer` ; `jsonwebtoken` reste tant que
+  les jetons sont des JWT).
 - Supprimer les routes v1 sans consommateur **et** sans appel dans les journaux
   depuis 90 jours — la mesure existe déjà, il reste à l'appliquer.
 
@@ -126,13 +140,19 @@ le bot ou l'IA. Mesure attendue : moins de 40 pages, moins de 120 routes.
 
 ### Phase 3 — Un wiki qui se lit (2 à 3 sessions)
 
-C'est la phase qui ramène des visiteurs : aujourd'hui Google ne voit pas le
-contenu des fiches.
+C'est la phase qui doit ramener des visiteurs. Une partie du travail est déjà
+faite : les fiches vaisseau, composant, objet, marchandise, Galactapedia et
+comm-link chargent leurs données côté serveur et rendent un résumé lisible dès
+le premier HTML. Ce qui manque :
 
-- Fiches de contenu (vaisseaux, composants, objets, lieux, missions,
-  marchandises, Galactapedia) en composants serveur, pré-générées à la
-  publication d'une extraction (`generateStaticParams` + revalidation
-  déclenchée par l'extracteur).
+- **Pré-générer** ces fiches à la publication d'une extraction
+  (`generateStaticParams` + revalidation déclenchée par l'extracteur) au lieu de
+  les rendre à chaque requête.
+- **Étendre le rendu serveur** aux fiches qui ne l'ont pas (lieux, minage) et
+  aux pages de liste, qui ne servent aujourd'hui qu'un index de liens.
+- **Mesurer avant de conclure** : ce que Google indexe réellement se lit dans la
+  Search Console, pas dans le code. On ne sait pas aujourd'hui si le résumé
+  serveur suffit.
 - Les vues `'use client'` ne gardent que l'interactif : filtres, comparateur,
   carte 3D, calculateurs.
 - Supprimer le contournement `SeoEntitySnapshot` une fois le vrai contenu servi.
@@ -140,8 +160,8 @@ contenu des fiches.
   des quinze réimplémentations.
 - Découper `StarmapGalaxy` et `ShipLoadout` au passage, puisqu'on les ouvre.
 
-**Fini quand :** une fiche vaisseau s'affiche sans JavaScript, et le sitemap
-couvre toutes les fiches.
+**Fini quand :** toutes les fiches et listes servent leur contenu dans le
+premier HTML, les fiches sont pré-générées, et le sitemap les couvre toutes.
 
 ### Phase 4 — Des outils fiables (1 à 2 sessions)
 
@@ -197,7 +217,7 @@ données de la base.
 
 | # | Question | Recommandation |
 |---|---|---|
-| D1 | Supprimer les comptes utilisateurs ? | **Oui.** Rien dans le wiki, l'API ni les outils n'en a besoin. Les favoris ou loadouts sauvegardés peuvent vivre dans le navigateur. |
+| D1 | Supprimer les comptes utilisateurs ? | **Oui, mais après avoir découplé les jetons** (phase 1). Rien dans le wiki, l'API ni les outils n'a besoin de comptes. Les favoris ou loadouts sauvegardés peuvent vivre dans le navigateur. |
 | D2 | Comment ouvrir l'API publique ? | **Lecture anonyme avec limite de débit, plus des clés pour les gros consommateurs**, délivrées par une commande d'admin. Les trois tiers actuels gardent leur jeton. |
 | D3 | Garder Redis ? | **Non, à terme.** Avec les pages pré-générées et un cache HTTP sur l'API, il n'a plus de rôle. À retirer après la phase 3, mesure à l'appui. |
 | D4 | Garder la carte stellaire 3D ? | **Oui, mais en dernier.** C'est la page la plus coûteuse (2 246 lignes) ; on la découpe, on ne la refait pas. |
