@@ -19,7 +19,7 @@ Le projet ne manque pas de qualité, il manque de **forme**. Chaque chantier a
 | SQL brut | 190 `$queryRawUnsafe`, y compris dans les services déclarés « faits » |
 | God files | StarmapGalaxy 2 246 l., dataforge-service 2 048 l., chat-service 1 141 l. |
 | Documentation de refonte | 4 documents, 1 400 lignes, dont aucun ne dit ce qu'on arrête |
-| Installation propre | `npm ci` échoue — le lockfile fige `@types/node` en 25.x sous 3 workspaces qui déclarent `^22` |
+| Installation propre | `npm ci` échouait — le lockfile figeait `@types/node` en 25.x sous 3 workspaces qui déclarent `^22` (corrigé avec ce plan) |
 
 Et le site n'est plus fréquenté. Une nuance compte : **l'API, elle, l'est
 encore** — trois intégrations tierces l'appellent avec un jeton nommé
@@ -70,9 +70,10 @@ de ce qui débloque vers ce qui se voit.
 
 Rien de nouveau, seulement pouvoir travailler à nouveau sans surprise.
 
-- Réparer le lockfile à la cause : une seule version de `@types/node` pour tous
-  les workspaces, puis `npm ci` propre. Sans cela, la CI cassera au prochain
-  cache manqué, et la panne reviendra à chaque patch publié de `@types/node`.
+- ~~Réparer le lockfile à la cause~~ — **fait** avec ce plan : les copies 25.x
+  de `@types/node` imbriquées sous `api/`, `ihm/` et `extractor/`, que npm jugeait
+  invalides face à `^22`, sont retirées ; il n'en reste qu'une, à la racine.
+  Elles faisaient échouer `npm ci` à chaque nouveau patch de `@types/node` 22.
 - Vérifier l'état réel de la production (services up, dernière extraction,
   patch servi) et le consigner ici.
 - Nettoyer `.agents/AGENTS.md` : le chemin Windows absolu, et la mention d'un
