@@ -1,6 +1,4 @@
 import { mountAdminRoutes } from './admin.js';
-import { mountAuthRoutes } from './auth.js';
-import { mountBugReportRoutes } from './bug-reports.js';
 import { mountCalculateRoutes } from './calculate.js';
 import { mountCommodityRoutes } from './commodities.js';
 import { mountComponentFamilyRoutes } from './component-families.js';
@@ -38,8 +36,8 @@ export interface RouteGroup {
 export const routeGroups = [
   {
     id: 'platform',
-    description: 'Health, auth, admin, bug reports and operational API routes.',
-    mounts: [mountSystemRoutes, mountAuthRoutes, mountAdminRoutes, mountBugReportRoutes],
+    description: 'Health, admin and operational API routes.',
+    mounts: [mountSystemRoutes, mountAdminRoutes],
   },
   {
     id: 'static-game-data',

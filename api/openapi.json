@@ -3,7 +3,7 @@
   "info": {
     "title": "Starvis API",
     "version": "2.0.0",
-    "description": "Public Star Citizen Open Data Engine & REST API.\n\nData sources:\n- **P4K / DataForge game data** (ships, components, items, commodities, shops, missions, mission brokers, mining, crafting, locations, amenities, factions, reputations, loot, ammo, inventory containers)\n- **RSI Website** (ship matrix, galactapedia, comm-links, starmap)\n- **UEX Corp 2.0** (live economy prices, all terminal types, vehicle market data, refinery yields)\n- **Star Citizen Wiki & SC-FR** (community ship naming, bilingual EN/FR localization)\n\nStarvis exposes canonical correlation endpoints to link equivalent records across P4K, RSI and UEX without changing existing resource IDs.\n\n### Public Access & Optional Authentication\nThe `/api/v1` API and `/api-docs` OpenAPI documentation are **publicly accessible** (rate-limited by IP). Optional authentication is supported for higher rate limits and administrative endpoints:\n- **Bearer JWT** (`Authorization: Bearer <token>`): optional on `/api/v1`, required for `/auth/me` and `/admin`.\n- **API Key** (`X-API-Key` header): accepted for trusted server-to-server calls.\n\n### Pagination\nList endpoints generally support `page` and `limit` query parameters and return `{ data, total, page, limit, pages }`.\n\n### Game Environments & Patch History\nUse the `env` (or `version`) query parameter to select the active environment (`live` by default, `ptu`, `custom`) or any archived semantic patch version (e.g. `4.7.2`, `4.8.1`).\n\n### Bilingual Localization (`en` + `fr`)\nQuery `/api/v1/translations` or `/api/v1/translations/{id}` for bilingual English/French names and descriptions.\n\n### Compatibility\n`/api/v1` and `/api/v2` stay served with unchanged responses and are marked deprecated. The canonical Nexus surface has no version prefix (`/api/universe/...`) and calls the same handlers as `/api/v2/universe/...`."
+    "description": "Star Citizen game data, RSI website data, chat and admin REST API.\n\nData sources:\n- **P4K game data** (ships, components, items, commodities, shops, missions, mining, crafting, locations)\n- **RSI Website** (ship matrix, galactapedia, comm-links, starmap, organizations)\n- **UEX Corp** (live economy prices, terminals, vehicle market data)\n\nStarvis exposes canonical correlation endpoints to link equivalent records across P4K, RSI and UEX without changing existing resource IDs.\n\n### Authentication\nStarvis has no user accounts. The external `/api/v1` API is readable in three ways:\n- **Anonymously**, under a stricter per-IP rate limit.\n- **Bearer API token** (`Authorization: Bearer <token>`), issued by a Starvis administrator for a named project. A token that is presented must be valid: a revoked or expired token gets `401`, it never falls back to anonymous access.\n- **API Key** (`X-API-Key` header): trusted Starvis server-to-server calls only (web proxy, CI audits, Discord bot). Never expose it to browsers or third-party clients.\n\nAdmin routes (`/admin/*`) accept the admin API key only.\n\n### Swagger access\n`/api-docs` is public and documents every non-admin route.\n\n### Pagination\nList endpoints generally support `page` and `limit` query parameters and return `{ data, total, page, limit, pages }`.\n\n### Filters\nDomain `/filters` endpoints return `{ filters: { fieldName: [{ value, label, count? }] } }` when available.\n\n### Game environments\nUse the `env` query parameter to select the game environment: `live` (default), `ptu`, `eptu`, `tech-preview`, `custom`."
   },
   "components": {
     "securitySchemes": {
@@ -15,12 +15,8 @@
       "bearerAuth": {
         "type": "http",
         "scheme": "bearer",
-        "bearerFormat": "JWT"
-      },
-      "cookieAuth": {
-        "type": "apiKey",
-        "in": "cookie",
-        "name": "starvis_token"
+        "bearerFormat": "JWT",
+        "description": "API token issued by a Starvis administrator (POST /admin/api-tokens)."
       }
     },
     "parameters": {
@@ -181,33 +177,6 @@
         "type": "string",
         "enum": ["user", "developer", "admin"],
         "description": "User role. `developer` grants access to API documentation and developer tools. `admin` has full access including user management."
-      },
-      "User": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer"
-          },
-          "email": {
-            "type": "string",
-            "format": "email"
-          },
-          "username": {
-            "type": "string"
-          },
-          "role": {
-            "$ref": "#/components/schemas/UserRole"
-          },
-          "avatarUrl": {
-            "type": "string",
-            "format": "uri",
-            "nullable": true
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
       },
       "Ship": {
         "type": "object",
@@ -2001,55 +1970,6 @@
           }
         }
       },
-      "BugReport": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer"
-          },
-          "title": {
-            "type": "string",
-            "maxLength": 200
-          },
-          "description": {
-            "type": "string",
-            "maxLength": 20000
-          },
-          "status": {
-            "type": "string",
-            "enum": ["open", "in_progress", "resolved", "closed"]
-          },
-          "attachments": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "name": {
-                  "type": "string"
-                },
-                "type": {
-                  "type": "string"
-                },
-                "data": {
-                  "type": "string",
-                  "description": "base64-encoded content"
-                }
-              }
-            }
-          },
-          "userId": {
-            "type": "integer"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
       "Corporation": {
         "type": "object",
         "properties": {
@@ -2115,66 +2035,6 @@
                 "type": "integer"
               }
             }
-          }
-        }
-      },
-      "CorporationMembership": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer"
-          },
-          "userId": {
-            "type": "integer"
-          },
-          "corporationId": {
-            "type": "integer"
-          },
-          "rank": {
-            "type": "string",
-            "nullable": true
-          },
-          "role": {
-            "type": "string",
-            "enum": ["member", "leader"]
-          },
-          "status": {
-            "type": "string",
-            "enum": ["pending", "active", "rejected"]
-          },
-          "reviewedById": {
-            "type": "integer",
-            "nullable": true
-          },
-          "reviewedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "declaredAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "user": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "integer"
-              },
-              "username": {
-                "type": "string"
-              },
-              "email": {
-                "type": "string"
-              },
-              "avatarUrl": {
-                "type": "string",
-                "nullable": true
-              }
-            }
-          },
-          "corporation": {
-            "$ref": "#/components/schemas/Corporation"
           }
         }
       },
@@ -2841,84 +2701,6 @@
           }
         }
       },
-      "ExternalApiAccessRequest": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer",
-            "example": 42
-          },
-          "userId": {
-            "type": "integer",
-            "example": 7
-          },
-          "motivation": {
-            "type": "string",
-            "example": "I am building a Discord bot that needs authenticated Starvis ship and economy data."
-          },
-          "status": {
-            "type": "string",
-            "enum": ["pending", "approved", "rejected"],
-            "example": "pending"
-          },
-          "adminNote": {
-            "type": "string",
-            "nullable": true
-          },
-          "reviewedById": {
-            "type": "integer",
-            "nullable": true
-          },
-          "reviewedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "user": {
-            "type": "object",
-            "nullable": true,
-            "properties": {
-              "id": {
-                "type": "integer"
-              },
-              "uuid": {
-                "type": "string"
-              },
-              "username": {
-                "type": "string"
-              },
-              "email": {
-                "type": "string"
-              },
-              "role": {
-                "type": "string",
-                "enum": ["user", "developer", "admin"]
-              }
-            }
-          },
-          "reviewedBy": {
-            "type": "object",
-            "nullable": true,
-            "properties": {
-              "id": {
-                "type": "integer"
-              },
-              "username": {
-                "type": "string"
-              }
-            }
-          }
-        },
-        "required": ["id", "userId", "motivation", "status", "createdAt", "updatedAt"]
-      },
       "LocationTreeNode": {
         "allOf": [
           {
@@ -2999,8 +2781,14 @@
             "type": "string",
             "nullable": true
           },
+          "ownerName": {
+            "type": "string",
+            "description": "Who the token belongs to."
+          },
           "userId": {
-            "type": "integer"
+            "type": "integer",
+            "nullable": true,
+            "description": "Legacy account link, kept until accounts are dropped."
           },
           "roleSnapshot": {
             "$ref": "#/components/schemas/UserRole"
@@ -3037,123 +2825,6 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
-          },
-          "user": {
-            "type": "object",
-            "nullable": true,
-            "properties": {
-              "id": {
-                "type": "integer"
-              },
-              "username": {
-                "type": "string"
-              },
-              "email": {
-                "type": "string"
-              },
-              "role": {
-                "$ref": "#/components/schemas/UserRole"
-              }
-            }
-          }
-        }
-      },
-      "RsiHangarSyncSession": {
-        "type": "object",
-        "properties": {
-          "token": {
-            "type": "string",
-            "description": "Short-lived token scoped to RSI hangar sync."
-          },
-          "expiresInSeconds": {
-            "type": "integer",
-            "example": 600
-          }
-        }
-      },
-      "RsiHangarSyncEntry": {
-        "type": "object",
-        "properties": {
-          "externalId": {
-            "type": "string",
-            "description": "Stable RSI hangar item id or extension-generated id."
-          },
-          "name": {
-            "type": "string"
-          },
-          "label": {
-            "type": "string"
-          },
-          "title": {
-            "type": "string"
-          },
-          "className": {
-            "type": "string",
-            "description": "Known Star Citizen ship class name when the extension can read it."
-          },
-          "shipUuid": {
-            "type": "string",
-            "nullable": true
-          },
-          "packageName": {
-            "type": "string",
-            "nullable": true
-          },
-          "imageUrl": {
-            "type": "string",
-            "nullable": true
-          },
-          "url": {
-            "type": "string",
-            "nullable": true
-          },
-          "quantity": {
-            "type": "integer",
-            "minimum": 1,
-            "default": 1
-          },
-          "raw": {
-            "type": "object",
-            "additionalProperties": true,
-            "nullable": true
-          }
-        }
-      },
-      "RsiHangarSyncResult": {
-        "type": "object",
-        "properties": {
-          "syncedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "imported": {
-            "type": "integer"
-          },
-          "updated": {
-            "type": "integer"
-          },
-          "removed": {
-            "type": "integer"
-          },
-          "unmatched": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "externalId": {
-                  "type": "string"
-                },
-                "label": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/CorporationFleetItem"
-            }
           }
         }
       },
@@ -3416,16 +3087,8 @@
       "description": "Administrative endpoints (require Bearer JWT admin role or X-API-Key)"
     },
     {
-      "name": "Auth",
-      "description": "Authentication — register, login, JWT tokens"
-    },
-    {
       "name": "Chat",
       "description": "AI assistant powered by Mistral (requires Bearer JWT)"
-    },
-    {
-      "name": "Bug Reports",
-      "description": "User bug reports and admin management"
     },
     {
       "name": "Factions",
@@ -3571,9 +3234,7 @@
           "503": {
             "$ref": "#/components/responses/ServiceUnavailable"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/ships/filters": {
@@ -3598,9 +3259,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/ground-vehicles": {
@@ -3679,9 +3338,7 @@
           "503": {
             "$ref": "#/components/responses/ServiceUnavailable"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/ground-vehicles/filters": {
@@ -3698,9 +3355,7 @@
           "200": {
             "description": "Available filter values for ground vehicles"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/gravlev": {
@@ -3765,9 +3420,7 @@
           "503": {
             "$ref": "#/components/responses/ServiceUnavailable"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/gravlev/filters": {
@@ -3784,9 +3437,7 @@
           "200": {
             "description": "Available filter values for grav-lev vehicles"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/ships/search": {
@@ -3800,10 +3451,8 @@
             "in": "query",
             "schema": {
               "type": "string",
-              "maxLength": 10,
-              "pattern": "^(?:live|ptu|eptu|tech-preview|custom|\\d+\\.\\d+(?:\\.\\d+)?)$"
+              "enum": ["live", "ptu", "custom"]
             },
-            "required": true,
             "description": "Game environment"
           },
           {
@@ -3850,9 +3499,7 @@
           "400": {
             "description": "Search query too short"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/ships/random": {
@@ -3867,9 +3514,7 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/ships/manufacturers": {
@@ -3886,9 +3531,7 @@
           "200": {
             "description": "Manufacturer list with ship count"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/ships/{uuid}": {
@@ -3938,9 +3581,7 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/ships/{uuid}/loadout": {
@@ -3984,9 +3625,7 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/ships/{uuid}/modules": {
@@ -4011,9 +3650,7 @@
           "200": {
             "description": "Module list"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/ships/{uuid}/paints": {
@@ -4056,9 +3693,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/ships/{uuid}/compare/{uuid2}": {
@@ -4135,9 +3770,7 @@
           "404": {
             "description": "One or both ships not found"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/ship-modules": {
@@ -4186,9 +3819,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/ships/ranking": {
@@ -4220,9 +3851,7 @@
           "200": {
             "description": "Ranked ship list"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/components": {
@@ -4254,10 +3883,8 @@
             "in": "query",
             "schema": {
               "type": "string",
-              "maxLength": 10,
-              "pattern": "^(?:live|ptu|eptu|tech-preview|custom|\\d+\\.\\d+(?:\\.\\d+)?)$"
+              "enum": ["live", "ptu", "custom"]
             },
-            "required": true,
             "description": "Game environment"
           },
           {
@@ -4296,7 +3923,6 @@
               "minimum": 1,
               "default": 50
             },
-            "required": true,
             "description": "Items per page"
           },
           {
@@ -4341,7 +3967,6 @@
               "minimum": 1,
               "default": 1
             },
-            "required": true,
             "description": "Page number"
           },
           {
@@ -4446,9 +4071,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/components/compatible": {
@@ -4499,9 +4122,7 @@
           "200": {
             "description": "Compatible component list"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/components/types": {
@@ -4518,9 +4139,7 @@
           "200": {
             "description": "Available component types"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/components/categories": {
@@ -4572,9 +4191,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/components/filters": {
@@ -4593,9 +4210,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/components/families": {
@@ -4613,9 +4228,7 @@
           "200": {
             "description": "Families that currently hold at least one component"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/components/families/{family}": {
@@ -4684,9 +4297,7 @@
           "404": {
             "description": "Unknown family"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/components/{uuid}": {
@@ -4734,9 +4345,7 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/components/{uuid}/buy-locations": {
@@ -4855,9 +4464,7 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/components/{uuid}/ships": {
@@ -4954,9 +4561,7 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/items": {
@@ -4970,10 +4575,8 @@
             "in": "query",
             "schema": {
               "type": "string",
-              "maxLength": 10,
-              "pattern": "^(?:live|ptu|eptu|tech-preview|custom|\\d+\\.\\d+(?:\\.\\d+)?)$"
+              "enum": ["live", "ptu", "custom"]
             },
-            "required": true,
             "description": "Game environment"
           },
           {
@@ -5019,7 +4622,6 @@
               "minimum": 1,
               "default": 50
             },
-            "required": true,
             "description": "Items per page"
           },
           {
@@ -5048,7 +4650,6 @@
               "minimum": 1,
               "default": 1
             },
-            "required": true,
             "description": "Page number"
           },
           {
@@ -5135,9 +4736,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/items/types": {
@@ -5154,9 +4753,7 @@
           "200": {
             "description": "Available item types"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/items/filters": {
@@ -5180,9 +4777,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/items/navigation": {
@@ -5214,9 +4809,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/items/sub-types": {
@@ -5241,9 +4834,7 @@
           "200": {
             "description": "Sub-types for the requested type"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/items/manufacturers": {
@@ -5267,9 +4858,7 @@
           "200": {
             "description": "Manufacturers list"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/items/categories": {
@@ -5286,9 +4875,7 @@
           "200": {
             "description": "Category → count map"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/items/weapon-attachments/modifiers": {
@@ -5372,9 +4959,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/items/category/{slug}": {
@@ -5397,10 +4982,8 @@
             "in": "query",
             "schema": {
               "type": "string",
-              "maxLength": 10,
-              "pattern": "^(?:live|ptu|eptu|tech-preview|custom|\\d+\\.\\d+(?:\\.\\d+)?)$"
+              "enum": ["live", "ptu", "custom"]
             },
-            "required": true,
             "description": "Game environment"
           },
           {
@@ -5446,7 +5029,6 @@
               "minimum": 1,
               "default": 50
             },
-            "required": true,
             "description": "Items per page"
           },
           {
@@ -5475,7 +5057,6 @@
               "minimum": 1,
               "default": 1
             },
-            "required": true,
             "description": "Page number"
           },
           {
@@ -5547,9 +5128,7 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/items/{uuid}": {
@@ -5597,9 +5176,7 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/commodities": {
@@ -5622,10 +5199,8 @@
             "in": "query",
             "schema": {
               "type": "string",
-              "maxLength": 10,
-              "pattern": "^(?:live|ptu|eptu|tech-preview|custom|\\d+\\.\\d+(?:\\.\\d+)?)$"
+              "enum": ["live", "ptu", "custom"]
             },
-            "required": true,
             "description": "Game environment"
           },
           {
@@ -5646,7 +5221,6 @@
               "minimum": 1,
               "default": 50
             },
-            "required": true,
             "description": "Items per page"
           },
           {
@@ -5666,7 +5240,6 @@
               "minimum": 1,
               "default": 1
             },
-            "required": true,
             "description": "Page number"
           },
           {
@@ -5728,9 +5301,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/commodities/types": {
@@ -5747,9 +5318,7 @@
           "200": {
             "description": "Available commodity types"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/commodities/categories": {
@@ -5784,9 +5353,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/commodities/filters": {
@@ -5810,9 +5377,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/commodities/{uuid}": {
@@ -5852,9 +5417,7 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/paints": {
@@ -5868,10 +5431,8 @@
             "in": "query",
             "schema": {
               "type": "string",
-              "maxLength": 10,
-              "pattern": "^(?:live|ptu|eptu|tech-preview|custom|\\d+\\.\\d+(?:\\.\\d+)?)$"
+              "enum": ["live", "ptu", "custom"]
             },
-            "required": true,
             "description": "Game environment"
           },
           {
@@ -5892,7 +5453,6 @@
               "minimum": 1,
               "default": 50
             },
-            "required": true,
             "description": "Items per page"
           },
           {
@@ -5903,7 +5463,6 @@
               "minimum": 1,
               "default": 1
             },
-            "required": true,
             "description": "Page number"
           },
           {
@@ -5929,9 +5488,7 @@
           "200": {
             "description": "Paginated paint list"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/paints/filters": {
@@ -5951,9 +5508,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/paints/groups": {
@@ -5999,9 +5554,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/shops": {
@@ -6015,10 +5568,8 @@
             "in": "query",
             "schema": {
               "type": "string",
-              "maxLength": 10,
-              "pattern": "^(?:live|ptu|eptu|tech-preview|custom|\\d+\\.\\d+(?:\\.\\d+)?)$"
+              "enum": ["live", "ptu", "custom"]
             },
-            "required": true,
             "description": "Game environment"
           },
           {
@@ -6039,7 +5590,6 @@
               "minimum": 1,
               "default": 20
             },
-            "required": true,
             "description": "Items per page"
           },
           {
@@ -6058,7 +5608,6 @@
               "minimum": 1,
               "default": 1
             },
-            "required": true,
             "description": "Page number"
           },
           {
@@ -6111,9 +5660,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/shops/filters": {
@@ -6132,9 +5679,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/shops/{id}": {
@@ -6182,9 +5727,7 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/shops/{id}/inventory": {
@@ -6333,9 +5876,7 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/locations": {
@@ -6391,9 +5932,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/locations/filters": {
@@ -6412,9 +5951,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/locations/{uuid}": {
@@ -6455,9 +5992,7 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/locations/{uuid}/children": {
@@ -6501,9 +6036,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/locations/{uuid}/shops": {
@@ -6554,9 +6087,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/missions": {
@@ -6618,9 +6149,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/missions/filters": {
@@ -6639,9 +6168,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/missions/{uuid}": {
@@ -6683,9 +6210,7 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/loot/tables": {
@@ -6724,9 +6249,7 @@
           "200": {
             "description": "Paginated loot tables with their entry counts"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/loot/tables/{uuid}": {
@@ -6755,9 +6278,7 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/manufacturers": {
@@ -6801,9 +6322,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/manufacturers/{code}": {
@@ -6829,9 +6348,7 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/manufacturers/{code}/ships": {
@@ -6860,9 +6377,7 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/manufacturers/{code}/components": {
@@ -6891,9 +6406,7 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/manufacturers/{code}/items": {
@@ -6922,9 +6435,7 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/ship-matrix": {
@@ -6939,10 +6450,8 @@
             "in": "query",
             "schema": {
               "type": "string",
-              "maxLength": 10,
-              "pattern": "^(?:live|ptu|eptu|tech-preview|custom|\\d+\\.\\d+(?:\\.\\d+)?)$"
+              "enum": ["live", "ptu", "custom"]
             },
-            "required": true,
             "description": "Game environment"
           },
           {
@@ -6986,9 +6495,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/mining/elements": {
@@ -7018,9 +6525,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/mining/compositions": {
@@ -7053,9 +6558,7 @@
           "200": {
             "description": "Rock composition list with element parts"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/mining/compositions/{uuid}": {
@@ -7083,9 +6586,7 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/market/offers/{uuid}": {
@@ -7122,9 +6623,7 @@
           "200": {
             "description": "Offers, best buy and best sell for the entity"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/mining/elements/{uuid}": {
@@ -7152,9 +6651,7 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/mining/solver": {
@@ -7198,9 +6695,7 @@
           "200": {
             "description": "Ranked mining targets"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/mining/stats": {
@@ -7217,9 +6712,7 @@
           "200": {
             "description": "Counts of elements, compositions, and rocks"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/mining/lasers": {
@@ -7236,9 +6729,7 @@
           "200": {
             "description": "Mining laser and gadget components with stats"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/trade/routes": {
@@ -7334,9 +6825,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/trade/locations": {
@@ -7353,9 +6842,7 @@
           "200": {
             "description": "Shops that have commodity price records"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/trade/systems": {
@@ -7372,9 +6859,7 @@
           "200": {
             "description": "Distinct system names"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/trade/prices/{commodityUuid}": {
@@ -7575,9 +7060,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/trade/prices": {
@@ -7621,9 +7104,7 @@
           "400": {
             "description": "Bad request — missing or invalid parameters"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/trade/location/{shopId}/prices": {
@@ -7651,9 +7132,7 @@
           "400": {
             "description": "Bad request — missing or invalid parameters"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/crafting/recipes": {
@@ -7739,9 +7218,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/crafting/station-types": {
@@ -7758,9 +7235,7 @@
           "200": {
             "description": "Distinct station types with recipe counts"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/crafting/categories": {
@@ -7777,9 +7252,7 @@
           "200": {
             "description": "Crafting category list"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/crafting/resources": {
@@ -7796,9 +7269,7 @@
           "200": {
             "description": "Items used as crafting ingredients"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/crafting/resources/{itemName}/recipes": {
@@ -7826,9 +7297,7 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/crafting/recipes/{uuid}": {
@@ -7856,9 +7325,7 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/calculate/fps-damage": {
@@ -7934,9 +7401,7 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/calculate/mining-yield": {
@@ -7986,9 +7451,7 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/search": {
@@ -8003,10 +7466,8 @@
             "in": "query",
             "schema": {
               "type": "string",
-              "maxLength": 10,
-              "pattern": "^(?:live|ptu|eptu|tech-preview|custom|\\d+\\.\\d+(?:\\.\\d+)?)$"
+              "enum": ["live", "ptu", "custom"]
             },
-            "required": true,
             "description": "Game environment"
           },
           {
@@ -8053,9 +7514,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/game-versions": {
@@ -8082,7 +7541,6 @@
               "minimum": 1,
               "default": 20
             },
-            "required": true,
             "description": "Items per page"
           },
           {
@@ -8092,8 +7550,7 @@
               "type": "integer",
               "minimum": 0,
               "default": 0
-            },
-            "required": true
+            }
           }
         ],
         "responses": {
@@ -8121,9 +7578,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/game-versions/default": {
@@ -8153,9 +7608,7 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/galactapedia": {
@@ -8165,53 +7618,21 @@
         "operationId": "getGalactapediaEntries",
         "parameters": [
           {
+            "$ref": "#/components/parameters/search"
+          },
+          {
             "name": "category",
             "in": "query",
             "schema": {
-              "type": "string",
-              "maxLength": 200
+              "type": "string"
             },
-            "description": "Game component category. New slugs are utility, ordnance-racks and cm; legacy slugs mining, missile-racks and cm-launchers are still accepted."
+            "description": "Filter by category name"
           },
           {
-            "name": "letter",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "maxLength": 200
-            }
+            "$ref": "#/components/parameters/page"
           },
           {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "maximum": 100,
-              "type": "integer",
-              "minimum": 1,
-              "default": 20
-            },
-            "required": true,
-            "description": "Items per page"
-          },
-          {
-            "name": "page",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "default": 1
-            },
-            "required": true,
-            "description": "Page number"
-          },
-          {
-            "name": "search",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "maxLength": 200
-            },
-            "description": "Full-text search query"
+            "$ref": "#/components/parameters/limit"
           }
         ],
         "responses": {
@@ -8245,9 +7666,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/galactapedia/{id}": {
@@ -8288,9 +7707,7 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/comm-links/categories": {
@@ -8320,9 +7737,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/comm-links": {
@@ -8332,45 +7747,21 @@
         "operationId": "getCommLinks",
         "parameters": [
           {
+            "$ref": "#/components/parameters/search"
+          },
+          {
             "name": "category",
             "in": "query",
             "schema": {
-              "type": "string",
-              "maxLength": 200
+              "type": "string"
             },
-            "description": "Game component category. New slugs are utility, ordnance-racks and cm; legacy slugs mining, missile-racks and cm-launchers are still accepted."
+            "description": "Filter by category"
           },
           {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "maximum": 100,
-              "type": "integer",
-              "minimum": 1,
-              "default": 20
-            },
-            "required": true,
-            "description": "Items per page"
+            "$ref": "#/components/parameters/page"
           },
           {
-            "name": "page",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "default": 1
-            },
-            "required": true,
-            "description": "Page number"
-          },
-          {
-            "name": "search",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "maxLength": 200
-            },
-            "description": "Full-text search query"
+            "$ref": "#/components/parameters/limit"
           }
         ],
         "responses": {
@@ -8404,9 +7795,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/comm-links/{id}": {
@@ -8447,9 +7836,7 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/starmap/systems": {
@@ -8459,53 +7846,13 @@
         "operationId": "getStarmapSystems",
         "parameters": [
           {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "maximum": 100,
-              "type": "integer",
-              "minimum": 1,
-              "default": 20
-            },
-            "required": true,
-            "description": "Items per page"
+            "$ref": "#/components/parameters/search"
           },
           {
-            "name": "page",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "default": 1
-            },
-            "required": true,
-            "description": "Page number"
+            "$ref": "#/components/parameters/page"
           },
           {
-            "name": "q",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "maxLength": 200
-            },
-            "description": "Search query"
-          },
-          {
-            "name": "query",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "maxLength": 200
-            }
-          },
-          {
-            "name": "search",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "maxLength": 200
-            },
-            "description": "Full-text search query"
+            "$ref": "#/components/parameters/limit"
           }
         ],
         "responses": {
@@ -8539,9 +7886,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/starmap/systems/{code}": {
@@ -8582,9 +7927,371 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
+      }
+    },
+    "/api/v2/missions/brokers": {
+      "get": {
+        "tags": ["Missions"],
+        "summary": "Mission broker offers — what a mission pays and on what terms",
+        "description": "/api/v1/missions comes from ContractTemplate and carries no reward at all: \"how much does it pay\" had no answer. MissionBrokerEntry holds 1 978 releasable offers, 1 858 of them with a reward, plus legality, difficulty and the giver. `title_is_template` matters: the game composes some titles at runtime — \"Secure Bounty: ~mission(TargetName) (VHRT)\" — and showing those verbatim would put code in front of a reader. Single /api/v2 envelope: data, meta, page.",
+        "operationId": "v2ListMissionBrokers",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/env"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "lawful",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["true", "false"]
+            }
+          },
+          {
+            "name": "min_reward",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "readable_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["true", "false"]
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated broker offers, best paid first"
+          }
+        }
+      }
+    },
+    "/api/v2/ships": {
+      "get": {
+        "tags": ["Ships"],
+        "summary": "List ships (v2 envelope)",
+        "description": "Single `/api/v2` envelope: `data`, `meta`, and `page` on lists. In v1 pagination sits under `meta` for ships but at the root for components, locations and shops — a consumer reading `response.total` gets a number for three resources and `undefined` for the fourth, with nothing to signal it. `meta.data_version` names the extraction the values come from.",
+        "operationId": "v2ListShips",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/env"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "manufacturer",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "role",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["asc", "desc"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated ships"
+          }
+        }
+      }
+    },
+    "/api/v2/ships/{uuid}": {
+      "get": {
+        "tags": ["Ships"],
+        "summary": "Get one ship (v2 envelope)",
+        "description": "Single `/api/v2` envelope: `data`, `meta`, and `page` on lists. In v1 pagination sits under `meta` for ships but at the root for components, locations and shops — a consumer reading `response.total` gets a number for three resources and `undefined` for the fourth, with nothing to signal it. `meta.data_version` names the extraction the values come from.",
+        "operationId": "v2GetShip",
+        "parameters": [
+          {
+            "name": "uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/env"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ship detail"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v2/locations": {
+      "get": {
+        "tags": ["Locations"],
+        "summary": "List locations (v2 envelope)",
+        "description": "Single `/api/v2` envelope: `data`, `meta`, and `page` on lists. In v1 pagination sits under `meta` for ships but at the root for components, locations and shops — a consumer reading `response.total` gets a number for three resources and `undefined` for the fourth, with nothing to signal it. `meta.data_version` names the extraction the values come from.",
+        "operationId": "v2ListLocations",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/env"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated locations"
+          }
+        }
+      }
+    },
+    "/api/v2/locations/{uuid}": {
+      "get": {
+        "tags": ["Locations"],
+        "summary": "Get one location, amenities included",
+        "description": "On-site services come with the record rather than a second call. Single `/api/v2` envelope: `data`, `meta`, and `page` on lists. In v1 pagination sits under `meta` for ships but at the root for components, locations and shops — a consumer reading `response.total` gets a number for three resources and `undefined` for the fourth, with nothing to signal it. `meta.data_version` names the extraction the values come from.",
+        "operationId": "v2GetLocation",
+        "parameters": [
+          {
+            "name": "uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/env"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Location with its amenities"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v2/components/families": {
+      "get": {
+        "tags": ["Components"],
+        "summary": "List component families and their counts (v2 envelope)",
+        "description": "Part of `/api/v2`, which carries a single envelope — `data`, `meta`, and `page` on lists — with no `success` field: the HTTP status already says whether the call worked. `meta.data_version` names the extraction the values come from. `/api/v1` is unchanged and stays served.",
+        "operationId": "v2ListComponentFamilies",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/env"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Families holding at least one component"
+          }
+        }
+      }
+    },
+    "/api/v2/components/families/{family}": {
+      "get": {
+        "tags": ["Components"],
+        "summary": "List one family's components, with that family's statistics only",
+        "description": "Part of `/api/v2`, which carries a single envelope — `data`, `meta`, and `page` on lists — with no `success` field: the HTTP status already says whether the call worked. `meta.data_version` names the extraction the values come from. `/api/v1` is unchanged and stays served.",
+        "operationId": "v2ListComponentFamily",
+        "parameters": [
+          {
+            "name": "family",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/env"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated components of that family"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v2/components/{uuid}": {
+      "get": {
+        "tags": ["Components"],
+        "summary": "One component, carrying only its own family's statistics",
+        "description": "Where /api/v1/components/{uuid} returns 124 columns — 104 of them null for a shield — this returns the shared identity plus the statistics that mean something for that kind of part. Six types have no family of their own (missile racks, tractor beams, life support, jump modules, mining modifiers): the game gives them no specific statistics, so they answer 404 here and are read from v1 instead. Part of `/api/v2`, which carries a single envelope — `data`, `meta`, and `page` on lists — with no `success` field: the HTTP status already says whether the call worked. `meta.data_version` names the extraction the values come from. `/api/v1` is unchanged and stays served.",
+        "operationId": "v2GetComponent",
+        "parameters": [
+          {
+            "name": "uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/env"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Component with its family statistics"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
       }
     },
     "/api/v1/version": {
@@ -8596,9 +8303,7 @@
           "200": {
             "description": "Current game version string"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/stats/overview": {
@@ -8686,9 +8391,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/canonical/by-uuid/{uuid}": {
@@ -8717,9 +8420,7 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/changelog/summary": {
@@ -8757,19 +8458,9 @@
             "in": "query",
             "schema": {
               "type": "string",
-              "maxLength": 10,
-              "pattern": "^(?:live|ptu|eptu|tech-preview|custom|\\d+\\.\\d+(?:\\.\\d+)?)$"
+              "enum": ["live", "ptu", "custom"]
             },
-            "required": true,
             "description": "Game environment"
-          },
-          {
-            "name": "game_version",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "maxLength": 200
-            }
           },
           {
             "name": "limit",
@@ -8796,9 +8487,7 @@
               "maxLength": 200
             }
           }
-        ],
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        ]
       }
     },
     "/api/v1/changelog": {
@@ -8830,19 +8519,9 @@
             "in": "query",
             "schema": {
               "type": "string",
-              "maxLength": 10,
-              "pattern": "^(?:live|ptu|eptu|tech-preview|custom|\\d+\\.\\d+(?:\\.\\d+)?)$"
+              "enum": ["live", "ptu", "custom"]
             },
-            "required": true,
             "description": "Game environment"
-          },
-          {
-            "name": "game_version",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "maxLength": 200
-            }
           },
           {
             "name": "limit",
@@ -8874,9 +8553,7 @@
           "200": {
             "description": "Recent data changes (added/removed ships, components, etc.)"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/health": {
@@ -8992,9 +8669,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/locations/systems": {
@@ -9029,9 +8704,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/locations/all": {
@@ -9069,9 +8742,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/locations/tree": {
@@ -9113,9 +8784,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/missions/types": {
@@ -9150,9 +8819,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/missions/factions": {
@@ -9187,9 +8854,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/missions/systems": {
@@ -9224,9 +8889,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/missions/categories": {
@@ -9261,9 +8924,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/ship-matrix/stats": {
@@ -9290,9 +8951,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/ship-matrix/{id}": {
@@ -9333,9 +8992,7 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/loadout/calculate": {
@@ -9394,178 +9051,14 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
-    "/auth/register": {
+    "/api/v1/chat": {
       "post": {
-        "tags": ["Auth"],
-        "summary": "Register a new user account",
-        "operationId": "register",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": ["email", "username", "password"],
-                "properties": {
-                  "email": {
-                    "type": "string",
-                    "format": "email"
-                  },
-                  "username": {
-                    "type": "string",
-                    "minLength": 3,
-                    "maxLength": 50,
-                    "pattern": "^[a-zA-Z0-9_-]+$"
-                  },
-                  "password": {
-                    "type": "string",
-                    "minLength": 8,
-                    "description": "Must contain uppercase, lowercase, digit and special character"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true
-                }
-              }
-            }
-          },
-          "201": {
-            "description": "Account created — verification email sent",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "requiresVerification": {
-                      "type": "boolean",
-                      "example": true,
-                      "description": "Always true — user must verify their email before logging in"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "409": {
-            "description": "Email or username already taken"
-          }
-        }
-      }
-    },
-    "/auth/login": {
-      "post": {
-        "tags": ["Auth"],
-        "summary": "Log in and receive a JWT",
-        "operationId": "login",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": ["emailOrUsername", "password"],
-                "properties": {
-                  "emailOrUsername": {
-                    "type": "string",
-                    "description": "Email address or username"
-                  },
-                  "password": {
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Authenticated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "token": {
-                      "type": "string",
-                      "description": "JWT Bearer token (24h)"
-                    },
-                    "user": {
-                      "$ref": "#/components/schemas/User"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          }
-        }
-      }
-    },
-    "/auth/me": {
-      "get": {
-        "tags": ["Auth"],
-        "summary": "Get current user profile",
-        "operationId": "getMe",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Current user",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "user": {
-                      "$ref": "#/components/schemas/User"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          }
-        }
-      },
-      "put": {
-        "tags": ["Auth"],
-        "summary": "Update current user profile",
-        "operationId": "updateMe",
+        "tags": ["Chat"],
+        "summary": "Chat with the Starvis AI assistant (SSE streaming)",
+        "operationId": "chat",
         "security": [
           {
             "bearerAuth": []
@@ -9577,15 +9070,23 @@
             "application/json": {
               "schema": {
                 "type": "object",
+                "required": ["messages"],
                 "properties": {
-                  "username": {
-                    "type": "string",
-                    "minLength": 3,
-                    "maxLength": 50
-                  },
-                  "avatarUrl": {
-                    "type": "string",
-                    "format": "uri"
+                  "messages": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": ["role", "content"],
+                      "properties": {
+                        "role": {
+                          "type": "string",
+                          "enum": ["user", "assistant"]
+                        },
+                        "content": {
+                          "type": "string"
+                        }
+                      }
+                    }
                   }
                 }
               }
@@ -9594,63 +9095,63 @@
         },
         "responses": {
           "200": {
-            "description": "Updated user",
+            "description": "Server-Sent Events stream. Each event is JSON: `{type:\"chunk\",text}`, `{type:\"done\"}`, or `{type:\"error\",message}`",
             "content": {
-              "application/json": {
+              "text/event-stream": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "user": {
-                      "$ref": "#/components/schemas/User"
-                    }
-                  }
+                  "type": "string"
                 }
               }
             }
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
-          }
-        }
-      },
-      "delete": {
-        "tags": ["Auth"],
-        "summary": "Delete own account",
-        "operationId": "deleteMe",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Account deleted"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
           }
         }
       }
     },
-    "/auth/api-token": {
+    "/api/v1/chat/ask": {
       "post": {
-        "tags": ["Auth"],
-        "summary": "Generate a long-lived API token (1 year)",
-        "operationId": "generateApiToken",
+        "tags": ["Chat"],
+        "summary": "Ask the Starvis AI assistant (synchronous JSON response)",
+        "operationId": "chatAsk",
         "security": [
           {
             "bearerAuth": []
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["messages"],
+                "properties": {
+                  "messages": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": ["role", "content"],
+                      "properties": {
+                        "role": {
+                          "type": "string",
+                          "enum": ["user", "assistant"]
+                        },
+                        "content": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
-            "description": "Generated token",
+            "description": "AI reply",
             "content": {
               "application/json": {
                 "schema": {
@@ -9659,25 +9160,8 @@
                     "success": {
                       "type": "boolean"
                     },
-                    "token": {
+                    "reply": {
                       "type": "string"
-                    },
-                    "expiresIn": {
-                      "type": "string",
-                      "example": "1y"
-                    },
-                    "note": {
-                      "type": "string"
-                    },
-                    "tokenId": {
-                      "type": "integer"
-                    },
-                    "name": {
-                      "type": "string"
-                    },
-                    "expiresAt": {
-                      "type": "string",
-                      "format": "date-time"
                     }
                   }
                 }
@@ -9686,28 +9170,6 @@
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
-          }
-        },
-        "requestBody": {
-          "required": false,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "maxLength": 120,
-                    "description": "Human-readable project or integration name."
-                  },
-                  "description": {
-                    "type": "string",
-                    "maxLength": 500,
-                    "nullable": true
-                  }
-                }
-              }
-            }
           }
         }
       }
@@ -9730,7 +9192,12 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           }
-        }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ]
       }
     },
     "/admin/maintenance/prune-old-env": {
@@ -9739,12 +9206,6 @@
         "summary": "Prune old environments",
         "description": "Deletes all rows in the game database schema where env is not 'live' or 'ptu'. Cascade deletes related records.",
         "security": [
-          {
-            "bearerAuth": []
-          },
-          {
-            "cookieAuth": []
-          },
           {
             "apiKey": []
           }
@@ -9780,9 +9241,6 @@
         "summary": "Admin statistics (ship matrix + game data counts)",
         "operationId": "adminStats",
         "security": [
-          {
-            "bearerAuth": []
-          },
           {
             "apiKey": []
           }
@@ -9824,9 +9282,6 @@
         "operationId": "adminExtractionLog",
         "security": [
           {
-            "bearerAuth": []
-          },
-          {
             "apiKey": []
           }
         ],
@@ -9862,9 +9317,6 @@
         "description": "Returns persisted admin-only request history when the database migration is applied, with an in-memory fallback during tests/startup. Request bodies and query values are not stored.",
         "operationId": "adminRequestLogs",
         "security": [
-          {
-            "bearerAuth": []
-          },
           {
             "apiKey": []
           }
@@ -10001,975 +9453,6 @@
         }
       }
     },
-    "/admin/users": {
-      "get": {
-        "tags": ["Admin"],
-        "summary": "List all users (admin only)",
-        "operationId": "adminListUsers",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "User list",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/User"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          }
-        }
-      },
-      "post": {
-        "tags": ["Admin"],
-        "summary": "Create a user (admin only)",
-        "operationId": "adminCreateUser",
-        "security": [
-          {
-            "bearerAuth": []
-          },
-          {
-            "apiKey": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": ["email", "username", "password"],
-                "properties": {
-                  "email": {
-                    "type": "string",
-                    "format": "email"
-                  },
-                  "username": {
-                    "type": "string",
-                    "minLength": 3,
-                    "maxLength": 50
-                  },
-                  "password": {
-                    "type": "string",
-                    "format": "password",
-                    "description": "Must be 8+ chars with uppercase, lowercase, digit and special character"
-                  },
-                  "role": {
-                    "$ref": "#/components/schemas/UserRole"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true
-                }
-              }
-            }
-          },
-          "201": {
-            "description": "User created",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "user": {
-                      "$ref": "#/components/schemas/User"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          }
-        }
-      }
-    },
-    "/admin/users/{id}/role": {
-      "put": {
-        "tags": ["Admin"],
-        "summary": "Update a user's role (admin only)",
-        "operationId": "adminSetUserRole",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "User ID"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": ["role"],
-                "properties": {
-                  "role": {
-                    "$ref": "#/components/schemas/UserRole"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Updated user",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "user": {
-                      "$ref": "#/components/schemas/User"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          }
-        }
-      }
-    },
-    "/admin/users/{id}": {
-      "put": {
-        "tags": ["Admin"],
-        "summary": "Update any user's profile (admin only)",
-        "operationId": "adminUpdateUser",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "username": {
-                    "type": "string",
-                    "minLength": 3,
-                    "maxLength": 50,
-                    "pattern": "^[a-zA-Z0-9_-]+$"
-                  },
-                  "email": {
-                    "type": "string",
-                    "format": "email"
-                  },
-                  "avatarUrl": {
-                    "type": "string",
-                    "format": "uri"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Updated user"
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "409": {
-            "description": "Email or username already taken"
-          }
-        }
-      },
-      "delete": {
-        "tags": ["Admin"],
-        "summary": "Delete a user (admin only)",
-        "operationId": "adminDeleteUser",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "User deleted"
-          },
-          "400": {
-            "description": "Cannot delete your own account"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          }
-        }
-      }
-    },
-    "/admin/users/{id}/reset-password": {
-      "post": {
-        "tags": ["Admin"],
-        "summary": "Force-reset a user's password (admin only)",
-        "operationId": "adminResetUserPassword",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": ["password"],
-                "properties": {
-                  "password": {
-                    "type": "string",
-                    "minLength": 8,
-                    "description": "Must contain uppercase, lowercase, digit and special character"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Password reset"
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          }
-        }
-      }
-    },
-    "/admin/bug-reports": {
-      "get": {
-        "tags": ["Admin"],
-        "summary": "List all bug reports (admin only)",
-        "operationId": "adminListBugReports",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "status",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": ["open", "in_progress", "resolved", "closed"]
-            }
-          },
-          {
-            "$ref": "#/components/parameters/page"
-          },
-          {
-            "$ref": "#/components/parameters/limit"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Paginated bug report list with user info",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "total": {
-                      "type": "integer"
-                    },
-                    "page": {
-                      "type": "integer"
-                    },
-                    "limit": {
-                      "type": "integer"
-                    },
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/BugReport"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          }
-        }
-      }
-    },
-    "/admin/bug-reports/{id}": {
-      "get": {
-        "tags": ["Admin"],
-        "summary": "Get one bug report (admin only)",
-        "operationId": "adminGetBugReport",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Bug report detail with attachments",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/BugReport"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          }
-        }
-      },
-      "patch": {
-        "tags": ["Admin"],
-        "summary": "Update bug report status (admin only)",
-        "operationId": "adminUpdateBugReport",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": ["status"],
-                "properties": {
-                  "status": {
-                    "type": "string",
-                    "enum": ["open", "in_progress", "resolved", "closed"]
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Updated bug report"
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          }
-        }
-      }
-    },
-    "/api/v1/bug-reports": {
-      "get": {
-        "tags": ["Bug Reports"],
-        "summary": "List own bug reports",
-        "operationId": "listMyBugReports",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/page"
-          },
-          {
-            "$ref": "#/components/parameters/limit"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Paginated list of the authenticated user's reports",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "total": {
-                      "type": "integer"
-                    },
-                    "page": {
-                      "type": "integer"
-                    },
-                    "limit": {
-                      "type": "integer"
-                    },
-                    "pages": {
-                      "type": "integer"
-                    },
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "integer"
-                          },
-                          "title": {
-                            "type": "string"
-                          },
-                          "status": {
-                            "type": "string"
-                          },
-                          "createdAt": {
-                            "type": "string",
-                            "format": "date-time"
-                          },
-                          "updatedAt": {
-                            "type": "string",
-                            "format": "date-time"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
-      },
-      "post": {
-        "tags": ["Bug Reports"],
-        "summary": "Submit a bug report",
-        "operationId": "createBugReport",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": ["title", "description"],
-                "properties": {
-                  "title": {
-                    "type": "string",
-                    "maxLength": 200
-                  },
-                  "description": {
-                    "type": "string",
-                    "maxLength": 20000
-                  },
-                  "attachments": {
-                    "type": "array",
-                    "maxItems": 5,
-                    "description": "Optional attachments (max 5, 4 MB each)",
-                    "items": {
-                      "type": "object",
-                      "required": ["name", "type", "data"],
-                      "properties": {
-                        "name": {
-                          "type": "string"
-                        },
-                        "type": {
-                          "type": "string",
-                          "description": "MIME type"
-                        },
-                        "data": {
-                          "type": "string",
-                          "description": "base64-encoded file content"
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true
-                }
-              }
-            }
-          },
-          "201": {
-            "description": "Report created — confirmation email sent to user and notification to admin",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "integer"
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
-      }
-    },
-    "/auth/verify-email": {
-      "post": {
-        "tags": ["Auth"],
-        "summary": "Verify email address",
-        "operationId": "verifyEmail",
-        "description": "Validates the email verification token sent after registration. Returns a JWT on success — the user is now logged in.",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": ["token"],
-                "properties": {
-                  "token": {
-                    "type": "string",
-                    "description": "Token received in the verification email"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Email verified — JWT issued",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "token": {
-                      "type": "string"
-                    },
-                    "user": {
-                      "$ref": "#/components/schemas/User"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid or expired verification token"
-          }
-        }
-      }
-    },
-    "/auth/forgot-password": {
-      "post": {
-        "tags": ["Auth"],
-        "summary": "Request a password reset email",
-        "operationId": "forgotPassword",
-        "description": "Always returns success to prevent email enumeration. If the account exists a reset link is emailed.",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": ["email"],
-                "properties": {
-                  "email": {
-                    "type": "string",
-                    "format": "email"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Success (regardless of whether the email exists)"
-          }
-        }
-      }
-    },
-    "/auth/reset-password": {
-      "post": {
-        "tags": ["Auth"],
-        "summary": "Reset password with token",
-        "operationId": "resetPassword",
-        "description": "Validates the reset token (valid 1 hour) and sets a new password.",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": ["token", "password"],
-                "properties": {
-                  "token": {
-                    "type": "string"
-                  },
-                  "password": {
-                    "type": "string",
-                    "minLength": 8,
-                    "description": "Must contain uppercase, lowercase, digit and special character"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Password reset successfully"
-          },
-          "400": {
-            "description": "Invalid or expired reset token"
-          }
-        }
-      }
-    },
-    "/auth/2fa/setup": {
-      "post": {
-        "tags": ["Auth"],
-        "summary": "Set up 2FA — generate TOTP secret",
-        "operationId": "setup2FA",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "description": "Generates a TOTP secret and returns the QR code URL. Call `/auth/2fa/enable` with a valid code to activate.",
-        "responses": {
-          "200": {
-            "description": "TOTP secret and QR code",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "secret": {
-                      "type": "string"
-                    },
-                    "qrCodeUrl": {
-                      "type": "string",
-                      "description": "otpauth:// URL to encode as QR code"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          }
-        }
-      }
-    },
-    "/auth/2fa/enable": {
-      "post": {
-        "tags": ["Auth"],
-        "summary": "Enable 2FA — confirm with TOTP code",
-        "operationId": "enable2FA",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": ["code"],
-                "properties": {
-                  "code": {
-                    "type": "string",
-                    "minLength": 6,
-                    "maxLength": 6,
-                    "description": "6-digit TOTP code"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "2FA enabled"
-          },
-          "400": {
-            "description": "Invalid TOTP code or 2FA not set up"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          }
-        }
-      }
-    },
-    "/auth/2fa/disable": {
-      "post": {
-        "tags": ["Auth"],
-        "summary": "Disable 2FA",
-        "operationId": "disable2FA",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": ["code"],
-                "properties": {
-                  "code": {
-                    "type": "string",
-                    "minLength": 6,
-                    "maxLength": 6,
-                    "description": "6-digit TOTP code to confirm"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "2FA disabled"
-          },
-          "400": {
-            "description": "Invalid TOTP code or 2FA not enabled"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          }
-        }
-      }
-    },
-    "/auth/2fa/verify": {
-      "post": {
-        "tags": ["Auth"],
-        "summary": "Complete 2FA login",
-        "operationId": "verify2FA",
-        "description": "Called after a login that returned `requires2FA: true`. Supply the pending token and the TOTP code to receive a full JWT.",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": ["pendingToken", "code"],
-                "properties": {
-                  "pendingToken": {
-                    "type": "string",
-                    "description": "Short-lived token returned by POST /auth/login when 2FA is required"
-                  },
-                  "code": {
-                    "type": "string",
-                    "minLength": 6,
-                    "maxLength": 6
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Authenticated — full JWT issued",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "token": {
-                      "type": "string"
-                    },
-                    "user": {
-                      "$ref": "#/components/schemas/User"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid TOTP code or session expired"
-          }
-        }
-      }
-    },
     "/api/v1/ships/{uuid}/stats": {
       "get": {
         "tags": ["Ships"],
@@ -11037,9 +9520,7 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/ships/{uuid}/hardpoints": {
@@ -11067,9 +9548,7 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/ships/{uuid}/similar": {
@@ -11107,9 +9586,7 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/ships/{uuid}/variants": {
@@ -11137,9 +9614,7 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/ships/{uuid}/model": {
@@ -11185,28 +9660,13 @@
                           "type": "string",
                           "example": "ctm"
                         },
-                        "formats": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          },
-                          "example": ["ctm", "glb", "obj"]
-                        },
                         "url": {
                           "type": "string",
                           "description": "Original RSI CDN URL"
                         },
                         "proxy_url": {
                           "type": "string",
-                          "description": "Starvis proxy URL (.ctm cached)"
-                        },
-                        "glb_url": {
-                          "type": "string",
-                          "description": "Standard glTF 2.0 binary (.glb) URL"
-                        },
-                        "obj_url": {
-                          "type": "string",
-                          "description": "Standard Wavefront (.obj) URL"
+                          "description": "Starvis proxy URL (cached)"
                         }
                       }
                     }
@@ -11218,17 +9678,15 @@
           "404": {
             "description": "Ship not found or no 3D model available"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/ships/{uuid}/model/file": {
       "get": {
         "tags": ["Ships"],
-        "summary": "Download 3D model binary (.ctm, .glb, or .obj)",
+        "summary": "Download 3D model binary (.ctm)",
         "operationId": "getShipModelFile",
-        "description": "Serves the 3D model in `.ctm` (default), `.glb` (`?format=glb`), or `.obj` (`?format=obj`). First request downloads from RSI and caches/converts to disk; subsequent requests are served from cache.",
+        "description": "Serves the binary `.ctm` file. First request downloads from RSI and caches to disk; subsequent requests are served from cache. Supports `If-None-Match` / ETag for browser caching.",
         "parameters": [
           {
             "name": "uuid",
@@ -11240,17 +9698,6 @@
           },
           {
             "$ref": "#/components/parameters/env"
-          },
-          {
-            "name": "format",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "enum": ["ctm", "glb", "obj"],
-              "default": "ctm"
-            },
-            "description": "3D mesh export format: ctm (OpenCTM), glb (glTF 2.0 binary), or obj (Wavefront OBJ)"
           }
         ],
         "responses": {
@@ -11279,9 +9726,7 @@
           "404": {
             "description": "Ship not found or no 3D model available"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/items/{uuid}/buy-locations": {
@@ -11433,9 +9878,7 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/ships/audit": {
@@ -11478,9 +9921,7 @@
             }
           }
         },
-        "operationId": "getPublicShipsAudit",
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        "operationId": "getPublicShipsAudit"
       }
     },
     "/api/v1/starmap/filters": {
@@ -11492,9 +9933,7 @@
             "description": "OK"
           }
         },
-        "operationId": "getPublicStarmapFilters",
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        "operationId": "getPublicStarmapFilters"
       }
     },
     "/api/v1/starmap/positions": {
@@ -11527,9 +9966,7 @@
             }
           }
         },
-        "operationId": "getPublicStarmapPositions",
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        "operationId": "getPublicStarmapPositions"
       }
     },
     "/api/v1/starmap/jump-points": {
@@ -11562,9 +9999,7 @@
             }
           }
         },
-        "operationId": "getPublicStarmapJumpPoints",
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        "operationId": "getPublicStarmapJumpPoints"
       }
     },
     "/api/v1/starmap/locations": {
@@ -11573,96 +10008,63 @@
         "summary": "List RSI starmap locations and celestial objects",
         "parameters": [
           {
-            "name": "affiliation",
+            "name": "search",
             "in": "query",
+            "required": false,
             "schema": {
-              "type": "string",
-              "maxLength": 200
+              "type": "string"
             }
           },
           {
-            "name": "faction",
+            "name": "filter[query]",
             "in": "query",
+            "required": false,
             "schema": {
-              "type": "string",
-              "maxLength": 200
-            },
-            "description": "Faction name (e.g. `UEE`, `Vanduul`, `Xenothreat`)"
+              "type": "string"
+            }
           },
           {
-            "name": "limit",
+            "name": "filter[type]",
             "in": "query",
+            "required": false,
             "schema": {
-              "maximum": 200,
-              "type": "integer",
-              "minimum": 1,
-              "default": 50
-            },
-            "required": true,
-            "description": "Items per page"
+              "type": "string"
+            }
+          },
+          {
+            "name": "filter[system]",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "filter[affiliation]",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           },
           {
             "name": "page",
             "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
             "schema": {
               "type": "integer",
               "minimum": 1,
-              "default": 1
-            },
-            "required": true,
-            "description": "Page number"
-          },
-          {
-            "name": "q",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "maxLength": 200
-            },
-            "description": "Search query"
-          },
-          {
-            "name": "query",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "maxLength": 200
+              "maximum": 200
             }
-          },
-          {
-            "name": "search",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "maxLength": 200
-            },
-            "description": "Full-text search query"
-          },
-          {
-            "name": "system",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "maxLength": 200
-            },
-            "description": "Star system filter"
-          },
-          {
-            "name": "system_code",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "maxLength": 200
-            }
-          },
-          {
-            "name": "type",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "maxLength": 200
-            },
-            "description": "Component type (WeaponGun, Shield, QuantumDrive, …)"
           }
         ],
         "responses": {
@@ -11703,9 +10105,7 @@
             }
           }
         },
-        "operationId": "getPublicStarmapLocations",
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        "operationId": "getPublicStarmapLocations"
       }
     },
     "/api/v1/starmap/locations/{identifier}": {
@@ -11745,9 +10145,7 @@
             "description": "Not found"
           }
         },
-        "operationId": "getPublicStarmapLocationsIdentifier",
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        "operationId": "getPublicStarmapLocationsIdentifier"
       }
     },
     "/api/v1/factions": {
@@ -11786,9 +10184,7 @@
               }
             }
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/factions/registry": {
@@ -11875,9 +10271,7 @@
             }
           }
         },
-        "operationId": "getPublicFactionsRegistry",
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        "operationId": "getPublicFactionsRegistry"
       }
     },
     "/api/v1/factions/reputation-standings": {
@@ -11964,9 +10358,7 @@
             }
           }
         },
-        "operationId": "getPublicFactionsReputationStandings",
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        "operationId": "getPublicFactionsReputationStandings"
       }
     },
     "/api/v1/factions/reputation-scopes": {
@@ -12053,9 +10445,7 @@
             }
           }
         },
-        "operationId": "getPublicFactionsReputationScopes",
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        "operationId": "getPublicFactionsReputationScopes"
       }
     },
     "/api/v1/factions/{faction}": {
@@ -12100,9 +10490,7 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/search/{query}": {
@@ -12145,48 +10533,7 @@
             "description": "Invalid search query"
           }
         },
-        "operationId": "getPublicSearchQuery",
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
-      }
-    },
-    "/api/v1/system/sitemap-entries": {
-      "get": {
-        "tags": ["System"],
-        "summary": "Lightweight list of entity identifiers for sitemap generation",
-        "parameters": [
-          {
-            "name": "env",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "data": {
-                      "type": "object"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "operationId": "getSystemSitemapEntries",
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        "operationId": "getPublicSearchQuery"
       }
     },
     "/api/v1/stats/latest": {
@@ -12231,9 +10578,7 @@
             }
           }
         },
-        "operationId": "getPublicStatsLatest",
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        "operationId": "getPublicStatsLatest"
       }
     },
     "/api/v1/game-versions/{version}/changelog": {
@@ -12279,9 +10624,7 @@
             "description": "OK"
           }
         },
-        "operationId": "getPublicGameVersionsVersionChangelog",
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        "operationId": "getPublicGameVersionsVersionChangelog"
       }
     },
     "/api/v1/game-versions/{version}/changelog/changes": {
@@ -12327,9 +10670,7 @@
             "description": "OK"
           }
         },
-        "operationId": "getPublicGameVersionsVersionChangelogChanges",
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        "operationId": "getPublicGameVersionsVersionChangelogChanges"
       }
     },
     "/api/v1/comm-link-images": {
@@ -12338,53 +10679,39 @@
         "summary": "List Comm-Link thumbnail images available in Starvis",
         "parameters": [
           {
-            "name": "limit",
+            "name": "search",
             "in": "query",
+            "required": false,
             "schema": {
-              "maximum": 100,
-              "type": "integer",
-              "minimum": 1,
-              "default": 20
-            },
-            "required": true,
-            "description": "Items per page"
+              "type": "string"
+            }
+          },
+          {
+            "name": "filter[query]",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           },
           {
             "name": "page",
             "in": "query",
+            "required": false,
             "schema": {
               "type": "integer",
-              "minimum": 1,
-              "default": 1
-            },
-            "required": true,
-            "description": "Page number"
-          },
-          {
-            "name": "q",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "maxLength": 200
-            },
-            "description": "Search query"
-          },
-          {
-            "name": "query",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "maxLength": 200
+              "minimum": 1
             }
           },
           {
-            "name": "search",
+            "name": "limit",
             "in": "query",
+            "required": false,
             "schema": {
-              "type": "string",
-              "maxLength": 200
-            },
-            "description": "Full-text search query"
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
           }
         ],
         "responses": {
@@ -12413,9 +10740,7 @@
             }
           }
         },
-        "operationId": "getPublicCommLinkImages",
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        "operationId": "getPublicCommLinkImages"
       }
     },
     "/api/v1/comm-link-images/search": {
@@ -12424,53 +10749,39 @@
         "summary": "Search Comm-Link thumbnail images",
         "parameters": [
           {
-            "name": "limit",
+            "name": "search",
             "in": "query",
+            "required": false,
             "schema": {
-              "maximum": 100,
-              "type": "integer",
-              "minimum": 1,
-              "default": 20
-            },
-            "required": true,
-            "description": "Items per page"
+              "type": "string"
+            }
+          },
+          {
+            "name": "filter[query]",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           },
           {
             "name": "page",
             "in": "query",
+            "required": false,
             "schema": {
               "type": "integer",
-              "minimum": 1,
-              "default": 1
-            },
-            "required": true,
-            "description": "Page number"
-          },
-          {
-            "name": "q",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "maxLength": 200
-            },
-            "description": "Search query"
-          },
-          {
-            "name": "query",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "maxLength": 200
+              "minimum": 1
             }
           },
           {
-            "name": "search",
+            "name": "limit",
             "in": "query",
+            "required": false,
             "schema": {
-              "type": "string",
-              "maxLength": 200
-            },
-            "description": "Full-text search query"
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
           }
         ],
         "responses": {
@@ -12499,9 +10810,7 @@
             }
           }
         },
-        "operationId": "getPublicCommLinkImagesSearch",
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        "operationId": "getPublicCommLinkImagesSearch"
       }
     },
     "/api/v1/comm-link-images/random": {
@@ -12531,9 +10840,7 @@
             "description": "Not found"
           }
         },
-        "operationId": "getPublicCommLinkImagesRandom",
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        "operationId": "getPublicCommLinkImagesRandom"
       }
     },
     "/api/v1/comm-link-images/{id}": {
@@ -12573,9 +10880,7 @@
             "description": "Not found"
           }
         },
-        "operationId": "getPublicCommLinkImagesId",
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        "operationId": "getPublicCommLinkImagesId"
       }
     },
     "/api/v1/ammo/stats": {
@@ -12662,9 +10967,7 @@
             }
           }
         },
-        "operationId": "getPublicAmmoStats",
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        "operationId": "getPublicAmmoStats"
       }
     },
     "/api/v1/armor/inventory-containers": {
@@ -12751,9 +11054,7 @@
             }
           }
         },
-        "operationId": "getPublicArmorInventoryContainers",
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        "operationId": "getPublicArmorInventoryContainers"
       }
     },
     "/api/v1/utility/inventory-containers": {
@@ -12840,9 +11141,7 @@
             }
           }
         },
-        "operationId": "getPublicUtilityInventoryContainers",
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        "operationId": "getPublicUtilityInventoryContainers"
       }
     },
     "/api/v1/blueprints/rewards": {
@@ -12929,9 +11228,7 @@
             }
           }
         },
-        "operationId": "getPublicBlueprintsRewards",
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        "operationId": "getPublicBlueprintsRewards"
       }
     },
     "/api/v1/blueprints/loot-tables": {
@@ -13018,529 +11315,7 @@
             }
           }
         },
-        "operationId": "getPublicBlueprintsLootTables",
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
-      }
-    },
-    "/admin/api-supervision": {
-      "get": {
-        "tags": ["Admin"],
-        "summary": "External API, active user and generated token supervision",
-        "description": "Aggregates recent in-memory request logs with generated API token metadata for admin monitoring.",
-        "operationId": "adminApiSupervision",
-        "security": [
-          {
-            "bearerAuth": []
-          },
-          {
-            "apiKey": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "External API supervision snapshot",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "generatedAt": {
-                          "type": "string",
-                          "format": "date-time"
-                        },
-                        "summary": {
-                          "type": "object",
-                          "properties": {
-                            "externalApiRequests15m": {
-                              "type": "integer"
-                            },
-                            "externalApiRequests24h": {
-                              "type": "integer"
-                            },
-                            "serverKeyRequests15m": {
-                              "type": "integer"
-                            },
-                            "activeUsers15m": {
-                              "type": "integer"
-                            },
-                            "generatedTokens": {
-                              "type": "integer"
-                            },
-                            "activeTokens": {
-                              "type": "integer"
-                            },
-                            "revokedTokens": {
-                              "type": "integer"
-                            },
-                            "expiredTokens": {
-                              "type": "integer"
-                            },
-                            "tokensUsed24h": {
-                              "type": "integer"
-                            },
-                            "connectedProjects": {
-                              "type": "integer"
-                            }
-                          }
-                        },
-                        "activeUsers": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "userId": {
-                                "type": "integer"
-                              },
-                              "username": {
-                                "type": "string",
-                                "nullable": true
-                              },
-                              "role": {
-                                "type": "string",
-                                "nullable": true
-                              },
-                              "lastSeenAt": {
-                                "type": "string",
-                                "format": "date-time"
-                              },
-                              "requestCount": {
-                                "type": "integer"
-                              },
-                              "externalApiRequests": {
-                                "type": "integer"
-                              },
-                              "webRequests": {
-                                "type": "integer"
-                              }
-                            }
-                          }
-                        },
-                        "projects": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "tokenId": {
-                                "type": "integer"
-                              },
-                              "name": {
-                                "type": "string"
-                              },
-                              "description": {
-                                "type": "string",
-                                "nullable": true
-                              },
-                              "owner": {
-                                "type": "object",
-                                "nullable": true,
-                                "properties": {
-                                  "id": {
-                                    "type": "integer"
-                                  },
-                                  "username": {
-                                    "type": "string"
-                                  },
-                                  "email": {
-                                    "type": "string"
-                                  },
-                                  "role": {
-                                    "type": "string"
-                                  }
-                                }
-                              },
-                              "status": {
-                                "type": "string",
-                                "enum": ["active", "expired", "revoked"]
-                              },
-                              "connected": {
-                                "type": "boolean"
-                              },
-                              "createdAt": {
-                                "type": "string",
-                                "format": "date-time"
-                              },
-                              "expiresAt": {
-                                "type": "string",
-                                "format": "date-time"
-                              },
-                              "revokedAt": {
-                                "type": "string",
-                                "format": "date-time",
-                                "nullable": true
-                              },
-                              "lastUsedAt": {
-                                "type": "string",
-                                "format": "date-time",
-                                "nullable": true
-                              },
-                              "usageCount": {
-                                "type": "integer"
-                              },
-                              "requestsInBuffer": {
-                                "type": "integer"
-                              },
-                              "recentRequests": {
-                                "type": "integer"
-                              },
-                              "lastUsedIp": {
-                                "type": "string",
-                                "nullable": true
-                              },
-                              "lastUserAgent": {
-                                "type": "string",
-                                "nullable": true
-                              }
-                            }
-                          }
-                        },
-                        "recentExternalRequests": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "id": {
-                                "type": "integer"
-                              },
-                              "timestamp": {
-                                "type": "string",
-                                "format": "date-time"
-                              },
-                              "method": {
-                                "type": "string"
-                              },
-                              "path": {
-                                "type": "string"
-                              },
-                              "statusCode": {
-                                "type": "integer"
-                              },
-                              "durationMs": {
-                                "type": "integer"
-                              },
-                              "isExternalApi": {
-                                "type": "boolean"
-                              },
-                              "authMethod": {
-                                "type": "string",
-                                "enum": ["admin_key", "api_token", "session", "anonymous", "unknown"]
-                              },
-                              "clientType": {
-                                "type": "string",
-                                "enum": ["external_api", "web_session", "internal_web_proxy", "server_key", "anonymous_web", "unknown"]
-                              },
-                              "apiTokenId": {
-                                "type": "integer",
-                                "nullable": true
-                              },
-                              "apiTokenName": {
-                                "type": "string",
-                                "nullable": true
-                              },
-                              "userId": {
-                                "type": "integer",
-                                "nullable": true
-                              },
-                              "username": {
-                                "type": "string",
-                                "nullable": true
-                              },
-                              "role": {
-                                "type": "string",
-                                "nullable": true
-                              },
-                              "ip": {
-                                "type": "string",
-                                "nullable": true
-                              },
-                              "userAgent": {
-                                "type": "string",
-                                "nullable": true
-                              },
-                              "internalClient": {
-                                "type": "string",
-                                "nullable": true
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          }
-        }
-      }
-    },
-    "/auth/developer-access-request": {
-      "get": {
-        "tags": ["Auth"],
-        "summary": "Get the current user external API access request",
-        "operationId": "getDeveloperAccessRequest",
-        "security": [
-          {
-            "bearerAuth": []
-          },
-          {
-            "cookieAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Latest request or null",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "data": {
-                      "nullable": true,
-                      "allOf": [
-                        {
-                          "$ref": "#/components/schemas/ExternalApiAccessRequest"
-                        }
-                      ]
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          }
-        }
-      },
-      "post": {
-        "tags": ["Auth"],
-        "summary": "Request developer role and external API access",
-        "operationId": "createDeveloperAccessRequest",
-        "security": [
-          {
-            "bearerAuth": []
-          },
-          {
-            "cookieAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "motivation": {
-                    "type": "string",
-                    "minLength": 40,
-                    "maxLength": 2000
-                  }
-                },
-                "required": ["motivation"]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Request created",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/ExternalApiAccessRequest"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "201": {
-            "description": "Request created",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/ExternalApiAccessRequest"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "409": {
-            "description": "Request already pending or access already enabled"
-          }
-        }
-      }
-    },
-    "/admin/developer-access-requests": {
-      "get": {
-        "tags": ["Admin"],
-        "summary": "List external API access requests",
-        "operationId": "listDeveloperAccessRequests",
-        "security": [
-          {
-            "bearerAuth": []
-          },
-          {
-            "apiKey": []
-          },
-          {
-            "cookieAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "status",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "enum": ["pending", "approved", "rejected"]
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Requests",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/ExternalApiAccessRequest"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          }
-        }
-      }
-    },
-    "/admin/developer-access-requests/{id}": {
-      "patch": {
-        "tags": ["Admin"],
-        "summary": "Approve or reject an external API access request",
-        "operationId": "reviewDeveloperAccessRequest",
-        "security": [
-          {
-            "bearerAuth": []
-          },
-          {
-            "apiKey": []
-          },
-          {
-            "cookieAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "status": {
-                    "type": "string",
-                    "enum": ["approved", "rejected"]
-                  },
-                  "adminNote": {
-                    "type": "string",
-                    "maxLength": 2000
-                  }
-                },
-                "required": ["status"]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Reviewed request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/ExternalApiAccessRequest"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          }
-        }
+        "operationId": "getPublicBlueprintsLootTables"
       }
     },
     "/api/v1/objects/{type}/{id}": {
@@ -13646,125 +11421,7 @@
             "$ref": "#/components/responses/NotFound"
           }
         },
-        "operationId": "getObjectDetail",
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
-      }
-    },
-    "/auth/api-tokens": {
-      "get": {
-        "tags": ["Auth"],
-        "summary": "List API tokens generated by the current developer account",
-        "operationId": "listOwnApiTokens",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "includeRevoked",
-            "in": "query",
-            "schema": {
-              "type": "boolean",
-              "default": true
-            },
-            "description": "Include revoked tokens in the supervision list."
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 500,
-              "default": 100
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Own API tokens",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/ApiToken"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          }
-        }
-      }
-    },
-    "/auth/api-tokens/{id}": {
-      "delete": {
-        "tags": ["Auth"],
-        "summary": "Revoke one of the current developer account API tokens",
-        "operationId": "revokeOwnApiToken",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Revoked token",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/ApiToken"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          }
-        }
+        "operationId": "getObjectDetail"
       }
     },
     "/admin/api-tokens": {
@@ -13773,9 +11430,6 @@
         "summary": "List all generated API tokens with owner metadata",
         "operationId": "adminListApiTokens",
         "security": [
-          {
-            "bearerAuth": []
-          },
           {
             "apiKey": []
           }
@@ -13816,9 +11470,87 @@
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": ["Admin"],
+        "summary": "Issue an API token for a named third party",
+        "description": "There are no user accounts: third parties receive their token from an administrator. The plain token is returned once and never stored.",
+        "operationId": "adminIssueApiToken",
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["owner"],
+                "properties": {
+                  "owner": {
+                    "type": "string",
+                    "maxLength": 120,
+                    "description": "Who the token belongs to (project or person)."
+                  },
+                  "name": {
+                    "type": "string",
+                    "maxLength": 120
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 500
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Issued API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "token": {
+                          "type": "string"
+                        },
+                        "tokenId": {
+                          "type": "integer"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "owner": {
+                          "type": "string"
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
           },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
+          "400": {
+            "description": "Missing owner"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
           }
         }
       }
@@ -13829,9 +11561,6 @@
         "summary": "Revoke any generated API token",
         "operationId": "adminRevokeApiToken",
         "security": [
-          {
-            "bearerAuth": []
-          },
           {
             "apiKey": []
           }
@@ -13870,9 +11599,6 @@
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
@@ -13920,9 +11646,7 @@
           "403": {
             "$ref": "#/components/responses/Forbidden"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/correlations/summary": {
@@ -13960,9 +11684,7 @@
           "403": {
             "$ref": "#/components/responses/Forbidden"
           }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
+        }
       }
     },
     "/api/v1/correlations/{domain}": {
@@ -14036,1055 +11758,6 @@
           },
           "403": {
             "$ref": "#/components/responses/Forbidden"
-          }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
-      }
-    },
-    "/api/v1/missions/brokers": {
-      "get": {
-        "tags": ["Missions"],
-        "summary": "Mission broker offers — what a mission pays and on what terms",
-        "description": "/api/v1/missions comes from ContractTemplate and carries no reward at all: \"how much does it pay\" had no answer. MissionBrokerEntry holds 1 978 releasable offers, 1 858 of them with a reward, plus legality, difficulty and the giver. `title_is_template` matters: the game composes some titles at runtime — \"Secure Bounty: ~mission(TargetName) (VHRT)\" — and showing those verbatim would put code in front of a reader. Single /api/v2 envelope: data, meta, page.",
-        "operationId": "listMissionBrokers",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/env"
-          },
-          {
-            "name": "page",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "default": 1
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 200,
-              "default": 50
-            }
-          },
-          {
-            "name": "lawful",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "enum": ["true", "false"]
-            }
-          },
-          {
-            "name": "min_reward",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 0
-            }
-          },
-          {
-            "name": "readable_only",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "enum": ["true", "false"]
-            }
-          },
-          {
-            "name": "search",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Paginated broker offers, best paid first"
-          }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
-      }
-    },
-    "/api/v1/translations": {
-      "get": {
-        "tags": ["System"],
-        "summary": "List bilingual (EN + FR) entity translations",
-        "operationId": "listTranslations",
-        "parameters": [
-          {
-            "name": "domain",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "maxLength": 200
-            },
-            "description": "Entity domain filter (ship, component, item, commodity, mission, crafting, location, mining, faction)"
-          },
-          {
-            "name": "env",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "maxLength": 10,
-              "pattern": "^(?:live|ptu|eptu|tech-preview|custom|\\d+\\.\\d+(?:\\.\\d+)?)$"
-            },
-            "required": true,
-            "description": "Game environment"
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "maximum": 200,
-              "type": "integer",
-              "minimum": 1,
-              "default": 50
-            },
-            "required": true,
-            "description": "Items per page"
-          },
-          {
-            "name": "page",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "default": 1
-            },
-            "required": true,
-            "description": "Page number"
-          },
-          {
-            "name": "search",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "maxLength": 200
-            },
-            "description": "Full-text search query"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Paginated bilingual translations"
-          }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
-      }
-    },
-    "/api/v1/translations/{id}": {
-      "get": {
-        "tags": ["System"],
-        "summary": "Get bilingual (EN + FR) translation by entity UUID or class_name",
-        "operationId": "getTranslationById",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "env",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "default": "live"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Bilingual translation record"
-          },
-          "404": {
-            "description": "Translation not found"
-          }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
-      }
-    },
-    "/api/v1/refineries": {
-      "get": {
-        "tags": ["System"],
-        "summary": "List refinery stations and ore yield bonuses",
-        "operationId": "getRefineries",
-        "parameters": [
-          {
-            "name": "env",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "default": "live"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Refinery terminals and yield bonuses"
-          }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
-      }
-    },
-    "/api/v1/datasets": {
-      "get": {
-        "tags": ["System"],
-        "summary": "Get bulk dataset manifest for community tools",
-        "operationId": "getDatasetManifest",
-        "parameters": [
-          {
-            "name": "env",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "default": "live"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Available bulk JSON dataset packs and counts"
-          }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
-      }
-    },
-    "/api/v1/datasets/{pack}": {
-      "get": {
-        "tags": ["System"],
-        "summary": "Download a complete bulk dataset pack (ships, components, items, commodities, shops, manufacturers, translations, refineries)",
-        "operationId": "getDatasetPack",
-        "parameters": [
-          {
-            "name": "pack",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "env",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "default": "live"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Complete dataset pack JSON"
-          },
-          "404": {
-            "description": "Dataset pack not found"
-          }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
-      }
-    },
-    "/api/v1/rsi/roadmap": {
-      "get": {
-        "tags": ["System"],
-        "summary": "Get Official RSI Roadmap Release View releases and cards",
-        "operationId": "getRsiRoadmap",
-        "responses": {
-          "200": {
-            "description": "Official RSI Roadmap releases and deliverables"
-          }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
-      }
-    },
-    "/api/v1/rsi/status": {
-      "get": {
-        "tags": ["System"],
-        "summary": "Get Official RSI Live / Platform / Persistent Universe server status",
-        "operationId": "getRsiStatus",
-        "responses": {
-          "200": {
-            "description": "Official RSI status snapshot"
-          }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
-      }
-    },
-    "/api/v1/rsi/organizations/{symbol}": {
-      "get": {
-        "tags": ["System"],
-        "summary": "Lookup an official Star Citizen organization by SID/symbol on RSI",
-        "operationId": "getRsiOrganization",
-        "parameters": [
-          {
-            "name": "symbol",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Official RSI organization profile"
-          },
-          "404": {
-            "description": "Organization not found"
-          }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
-      }
-    },
-    "/api/v2/universe/omni-search": {
-      "get": {
-        "tags": ["Universe Nexus"],
-        "summary": "Omni-Search across all Star Citizen entities",
-        "operationId": "universeOmniSearch",
-        "description": "Fast multi-domain global search traversing ships, components, items, locations and commodities. Strips all placeholders and dev prefixes.",
-        "parameters": [
-          {
-            "name": "q",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            },
-            "description": "Search query"
-          },
-          {
-            "name": "env",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "default": "live"
-            },
-            "description": "Game environment"
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "default": 20
-            },
-            "description": "Maximum items to return"
-          },
-          {
-            "name": "lang",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": ["fr", "en"],
-              "default": "fr"
-            },
-            "description": "Output localization language"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Omni-search results with rich badges and in-game names",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "type": "object"
-                      }
-                    },
-                    "count": {
-                      "type": "integer"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
-      }
-    },
-    "/api/v2/universe/taxonomy": {
-      "get": {
-        "tags": ["Universe Nexus"],
-        "summary": "Live universe taxonomy tree with real entity counts",
-        "operationId": "universeGetTaxonomy",
-        "description": "Returns all official categories and subcategories with dynamic in-game item counts.",
-        "parameters": [
-          {
-            "name": "env",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "default": "live"
-            },
-            "description": "Game environment"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Taxonomy tree with categories, subcategories and counts",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "type": "object"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
-      }
-    },
-    "/api/v2/universe/explore": {
-      "get": {
-        "tags": ["Universe Nexus"],
-        "summary": "Unified exploration across the universe",
-        "operationId": "universeExplore",
-        "description": "Unified pagination and dynamic facets across universe entity categories.",
-        "parameters": [
-          {
-            "name": "category",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "all",
-                "ships",
-                "fleet",
-                "vehicles",
-                "components",
-                "armor",
-                "clothing",
-                "weapons",
-                "utility",
-                "ammo",
-                "sustenance",
-                "locations",
-                "commodities",
-                "items"
-              ],
-              "default": "all"
-            },
-            "description": "Category to explore"
-          },
-          {
-            "name": "sub_category",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            },
-            "description": "Specific subcategory filter (e.g. helmets, quantum_drives, primary...)"
-          },
-          {
-            "name": "search",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            },
-            "description": "Full-text filter"
-          },
-          {
-            "name": "page",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "default": 1
-            },
-            "description": "Page number"
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "default": 24
-            },
-            "description": "Page size"
-          },
-          {
-            "name": "env",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "default": "live"
-            },
-            "description": "Game environment"
-          },
-          {
-            "name": "status",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": ["all", "flight-ready", "in-concept", "lore"],
-              "default": "all"
-            },
-            "description": "Production status filter (flight-ready, in-concept, lore)"
-          },
-          {
-            "name": "manufacturer",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            },
-            "description": "Manufacturer code filter"
-          },
-          {
-            "name": "type",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            },
-            "description": "Entity type filter"
-          },
-          {
-            "name": "system",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            },
-            "description": "Star system filter"
-          },
-          {
-            "name": "lang",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": ["fr", "en"],
-              "default": "fr"
-            },
-            "description": "Output localization language"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Paginated universe exploration with facets",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "type": "object"
-                      }
-                    },
-                    "total": {
-                      "type": "integer"
-                    },
-                    "page": {
-                      "type": "integer"
-                    },
-                    "limit": {
-                      "type": "integer"
-                    },
-                    "pages": {
-                      "type": "integer"
-                    },
-                    "facets": {
-                      "type": "object"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
-      }
-    },
-    "/api/v2/universe/entities/{category}/{id}": {
-      "get": {
-        "tags": ["Universe Nexus"],
-        "summary": "360° Pivot Nexus Sheet for an entity",
-        "operationId": "universeGetEntityNexus",
-        "description": "Returns an entity with its complete connected universe graph (loadouts, shops, locations, compatible vessels, price spreads).",
-        "parameters": [
-          {
-            "name": "category",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "enum": [
-                "ships",
-                "fleet",
-                "vehicles",
-                "components",
-                "armor",
-                "clothing",
-                "weapons",
-                "utility",
-                "ammo",
-                "sustenance",
-                "locations",
-                "commodities",
-                "items"
-              ]
-            },
-            "description": "Entity category"
-          },
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "UUID or class name identifier"
-          },
-          {
-            "name": "env",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "default": "live"
-            },
-            "description": "Game environment"
-          },
-          {
-            "name": "lang",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": ["fr", "en"],
-              "default": "fr"
-            },
-            "description": "Output localization language"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Complete 360° nexus entity with graph connections",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "data": {
-                      "type": "object"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Entity not found"
-          }
-        },
-        "deprecated": true,
-        "x-starvis-layer": "compatibility"
-      }
-    },
-    "/api/universe/omni-search": {
-      "get": {
-        "tags": ["Universe Nexus"],
-        "summary": "Omni-Search across all Star Citizen entities",
-        "operationId": "universeOmniSearchCanonical",
-        "description": "Fast multi-domain global search traversing ships, components, items, locations and commodities. Strips all placeholders and dev prefixes.",
-        "parameters": [
-          {
-            "name": "q",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            },
-            "description": "Search query"
-          },
-          {
-            "name": "env",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "default": "live"
-            },
-            "description": "Game environment"
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "default": 20
-            },
-            "description": "Maximum items to return"
-          },
-          {
-            "name": "lang",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": ["fr", "en"],
-              "default": "fr"
-            },
-            "description": "Output localization language"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Omni-search results with rich badges and in-game names",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "type": "object"
-                      }
-                    },
-                    "count": {
-                      "type": "integer"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/universe/taxonomy": {
-      "get": {
-        "tags": ["Universe Nexus"],
-        "summary": "Live universe taxonomy tree with real entity counts",
-        "operationId": "universeGetTaxonomyCanonical",
-        "description": "Returns all official categories and subcategories with dynamic in-game item counts.",
-        "parameters": [
-          {
-            "name": "env",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "default": "live"
-            },
-            "description": "Game environment"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Taxonomy tree with categories, subcategories and counts",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "type": "object"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/universe/explore": {
-      "get": {
-        "tags": ["Universe Nexus"],
-        "summary": "Unified exploration across the universe",
-        "operationId": "universeExploreCanonical",
-        "description": "Unified pagination and dynamic facets across universe entity categories.",
-        "parameters": [
-          {
-            "name": "category",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "all",
-                "ships",
-                "fleet",
-                "vehicles",
-                "components",
-                "armor",
-                "clothing",
-                "weapons",
-                "utility",
-                "ammo",
-                "sustenance",
-                "locations",
-                "commodities",
-                "items"
-              ],
-              "default": "all"
-            },
-            "description": "Category to explore"
-          },
-          {
-            "name": "sub_category",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            },
-            "description": "Specific subcategory filter (e.g. helmets, quantum_drives, primary...)"
-          },
-          {
-            "name": "search",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            },
-            "description": "Full-text filter"
-          },
-          {
-            "name": "page",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "default": 1
-            },
-            "description": "Page number"
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "default": 24
-            },
-            "description": "Page size"
-          },
-          {
-            "name": "env",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "default": "live"
-            },
-            "description": "Game environment"
-          },
-          {
-            "name": "status",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": ["all", "flight-ready", "in-concept", "lore"],
-              "default": "all"
-            },
-            "description": "Production status filter (flight-ready, in-concept, lore)"
-          },
-          {
-            "name": "manufacturer",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            },
-            "description": "Manufacturer code filter"
-          },
-          {
-            "name": "type",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            },
-            "description": "Entity type filter"
-          },
-          {
-            "name": "system",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            },
-            "description": "Star system filter"
-          },
-          {
-            "name": "lang",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": ["fr", "en"],
-              "default": "fr"
-            },
-            "description": "Output localization language"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Paginated universe exploration with facets",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "type": "object"
-                      }
-                    },
-                    "total": {
-                      "type": "integer"
-                    },
-                    "page": {
-                      "type": "integer"
-                    },
-                    "limit": {
-                      "type": "integer"
-                    },
-                    "pages": {
-                      "type": "integer"
-                    },
-                    "facets": {
-                      "type": "object"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/universe/entities/{category}/{id}": {
-      "get": {
-        "tags": ["Universe Nexus"],
-        "summary": "360° Pivot Nexus Sheet for an entity",
-        "operationId": "universeGetEntityNexusCanonical",
-        "description": "Returns an entity with its complete connected universe graph (loadouts, shops, locations, compatible vessels, price spreads).",
-        "parameters": [
-          {
-            "name": "category",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "enum": [
-                "ships",
-                "fleet",
-                "vehicles",
-                "components",
-                "armor",
-                "clothing",
-                "weapons",
-                "utility",
-                "ammo",
-                "sustenance",
-                "locations",
-                "commodities",
-                "items"
-              ]
-            },
-            "description": "Entity category"
-          },
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "UUID or class name identifier"
-          },
-          {
-            "name": "env",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "default": "live"
-            },
-            "description": "Game environment"
-          },
-          {
-            "name": "lang",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": ["fr", "en"],
-              "default": "fr"
-            },
-            "description": "Output localization language"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Complete 360° nexus entity with graph connections",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "data": {
-                      "type": "object"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Entity not found"
           }
         }
       }

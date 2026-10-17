@@ -1,11 +1,11 @@
-/**
+﻿/**
  * STARVIS v2.0 - Star Citizen Ships & Components API
  *
  * Architecture (PostgreSQL multi-schema):
  *   Single PostgreSQL database with schemas:
- *     game  ← ships, components, items, etc. (env column: 'live' | 'ptu')
- *     rsi   ← ship_matrix, galactapedia, comm_links, starmap_locations
- *     meta  ← extraction_log, changelog, manufacturers
+ *     game  â† ships, components, items, etc. (env column: 'live' | 'ptu')
+ *     rsi   â† ship_matrix, galactapedia, comm_links, starmap_locations
+ *     meta  â† extraction_log, changelog, manufacturers
  *
  * Features: Pagination, ETag caching, CSV export, Rate limiting, Swagger docs
  */
@@ -22,18 +22,17 @@ import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import slowDown from 'express-slow-down';
 import helmet from 'helmet';
 import swaggerUi from 'swagger-ui-express';
-import { requireExternalApiAccess } from './src/middleware/auth.js';
+import { resolveExternalApiAccess } from './src/middleware/auth.js';
 import { prometheusMiddleware } from './src/middleware/prometheus.js';
 import { responseShapeMiddleware } from './src/middleware/response-shape.js';
 import { healthRouter } from './src/routes/health.js';
 import { createRoutes } from './src/routes/index.js';
-import { verifyAuthToken } from './src/services/auth-service.js';
 import { GameDataService } from './src/services/game-data-service.js';
 import { redis, refreshDataVersion, setDataVersionResolver } from './src/services/redis.js';
 import { configureRequestLogPersistence, recordRequestLog } from './src/services/request-log-service.js';
 import { RsiWebsiteService } from './src/services/rsi-website-service.js';
 import { ShipMatrixService } from './src/services/ship-matrix-service.js';
-import { AUTH_COOKIE_NAME, buildDatabaseUrl, RATE_LIMITS } from './src/utils/config.js';
+import { buildDatabaseUrl, RATE_LIMITS } from './src/utils/config.js';
 import logger from './src/utils/logger.js';
 import { resolveClientIp } from './src/utils/request-ip.js';
 
@@ -90,25 +89,17 @@ const apiLimiter = rateLimit({
   skip: () => isTest,
 });
 
-function adminRateLimitKey(req: Request): string {
-  const token = getBearerToken(req) ?? getCookieToken(req);
-  if (token) {
-    try {
-      const payload = verifyAuthToken(token);
-      if (payload?.sub) return `admin:user:${payload.sub}`;
-    } catch {
-      // Invalid tokens fall back to the client IP bucket.
-    }
-  }
-
-  const clientIp = resolveClientIp(req) ?? req.ip ?? req.socket.remoteAddress;
-  return clientIp ? `admin:ip:${ipKeyGenerator(clientIp)}` : 'admin:ip:unknown';
+function clientIpRateLimitKey(prefix: string) {
+  return (req: Request): string => {
+    const clientIp = resolveClientIp(req) ?? req.ip ?? req.socket.remoteAddress;
+    return clientIp ? `${prefix}:ip:${ipKeyGenerator(clientIp)}` : `${prefix}:ip:unknown`;
+  };
 }
 
 const adminLimiter = rateLimit({
   windowMs: RATE_LIMITS.windowMs,
   max: RATE_LIMITS.adminMax,
-  keyGenerator: adminRateLimitKey,
+  keyGenerator: clientIpRateLimitKey('admin'),
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, error: 'Admin rate limit exceeded' },
@@ -124,25 +115,22 @@ const burstLimiter = rateLimit({
   skip: () => isTest,
 });
 
-// Strict limiter for credential-sensitive endpoints (password brute-force,
-// TOTP guessing, reset-email spam). Successful requests are not counted so
-// legitimate users are unaffected.
-const authLimiter = rateLimit({
+// L'accÃ¨s anonyme Ã  `/api/v1` (dÃ©cision D2) a sa propre limite, plus stricte :
+// un jeton ou la clÃ© serveur s'en affranchissent. Le compteur se lit aprÃ¨s
+// l'identification de l'appelant, d'oÃ¹ son montage derriÃ¨re
+// `resolveExternalApiAccess`.
+const anonymousApiLimiter = rateLimit({
   windowMs: RATE_LIMITS.windowMs,
-  max: RATE_LIMITS.authMax,
+  max: RATE_LIMITS.anonymousMax,
+  keyGenerator: clientIpRateLimitKey('anonymous'),
   standardHeaders: true,
   legacyHeaders: false,
-  message: { success: false, error: 'Too many authentication attempts, please try again later' },
-  skipSuccessfulRequests: true,
-  skip: () => isTest,
+  message: { success: false, error: 'Anonymous rate limit exceeded â€” ask for an API token to go further' },
+  skip: (req) => isTest || req.authMethod !== 'anonymous',
 });
 
 app.use('/api', burstLimiter, speedLimiter, apiLimiter);
 app.use('/admin', adminLimiter);
-app.use(
-  ['/auth/login', '/auth/register', '/auth/forgot-password', '/auth/reset-password', '/auth/verify-email', '/auth/2fa/verify'],
-  authLimiter,
-);
 
 app.use((req, res, next) => {
   if (req.path === '/health') return next();
@@ -152,12 +140,12 @@ app.use((req, res, next) => {
     const status = res.statusCode;
     recordRequestLog(req, status, ms);
     const color = status >= 400 ? 'warn' : 'info';
-    logger[color](`${req.method} ${req.path} → ${status}`, { module: 'HTTP', duration: `${ms}ms` });
+    logger[color](`${req.method} ${req.path} â†’ ${status}`, { module: 'HTTP', duration: `${ms}ms` });
   });
   next();
 });
 
-app.use(['/api/v1', '/api/v2', '/api/universe'], requireExternalApiAccess);
+app.use(['/api/v1', '/api/v2', '/api/universe'], resolveExternalApiAccess, anonymousApiLimiter);
 
 // ===== SWAGGER / OPENAPI =====
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -223,18 +211,6 @@ function makeSwaggerHtml(specUrl: string, assetBasePath: string): string {
 </html>`;
 }
 
-function getBearerToken(req: Request): string | null {
-  const auth = req.headers.authorization;
-  return auth?.startsWith('Bearer ') ? auth.slice(7) : null;
-}
-
-function getCookieToken(req: Request): string | null {
-  const cookie = req.headers.cookie;
-  if (!cookie) return null;
-  const match = cookie.split(';').find((c) => c.trim().startsWith(`${AUTH_COOKIE_NAME}=`));
-  return match ? (match.split('=')[1]?.trim() ?? null) : null;
-}
-
 const fullSwaggerSpec = JSON.parse(readFileSync(path.join(__dirname, 'openapi.json'), 'utf-8')) as OpenApiSpec;
 fullSwaggerSpec.servers = [{ url: '/', description: 'Current host' }];
 const publicSwaggerSpec = withoutAdminRoutes(fullSwaggerSpec);
@@ -242,23 +218,14 @@ const publicSwaggerSpec = withoutAdminRoutes(fullSwaggerSpec);
 // swagger-ui-express uses relative paths (./swagger-ui.css) by default, which break when
 // the browser URL has no trailing slash (./foo resolves to /foo instead of /api-docs/foo).
 const swaggerHtml = makeSwaggerHtml('/api-docs/openapi.json', '/api-docs');
+// La documentation est publique, comme l'API qu'elle dÃ©crit (dÃ©cision D2).
 app.get('/api-docs', (_, res) => {
   res.setHeader('Cache-Control', 'no-store');
   res.type('html').send(swaggerHtml);
 });
-app.get('/api-docs/openapi.json', (req, res) => {
+app.get('/api-docs/openapi.json', (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');
-  const token = getBearerToken(req) ?? getCookieToken(req);
-  let isAdmin = false;
-  if (token && process.env.JWT_SECRET) {
-    try {
-      const payload = verifyAuthToken(token);
-      isAdmin = payload?.role === 'admin';
-    } catch {
-      isAdmin = false;
-    }
-  }
-  res.json(isAdmin ? fullSwaggerSpec : publicSwaggerSpec);
+  res.json(publicSwaggerSpec);
 });
 app.use('/api-docs', swaggerUi.serve);
 
@@ -307,12 +274,12 @@ async function start() {
   for (let i = 0; i < 30; i++) {
     try {
       await prisma.$queryRawUnsafe('SELECT 1');
-      logger.info('✅ Database ready', { module: 'DB' });
+      logger.info('âœ… Database ready', { module: 'DB' });
       dbReady = true;
       break;
     } catch (e) {
       logger.warn(String(e), { module: 'DB' });
-      logger.warn(`DB retry ${i + 1}/30…`, { module: 'DB' });
+      logger.warn(`DB retry ${i + 1}/30â€¦`, { module: 'DB' });
       await new Promise((r) => setTimeout(r, 1000));
     }
   }
@@ -333,7 +300,7 @@ async function start() {
         stdio: 'pipe',
         env: { ...process.env, DATABASE_URL: buildDatabaseUrl() },
       });
-      logger.info('✅ Migrations applied → PostgreSQL', { module: 'DB' });
+      logger.info('âœ… Migrations applied â†’ PostgreSQL', { module: 'DB' });
     } catch (e: any) {
       logger.error(`Migration deploy failed: ${e.stderr?.toString() || e.message}`, { module: 'DB' });
       process.exit(1);
@@ -348,12 +315,12 @@ async function start() {
     .then(() => true)
     .catch(() => false);
   if (redisReady) {
-    logger.info('✅ Redis ready', { module: 'Redis' });
+    logger.info('âœ… Redis ready', { module: 'Redis' });
   } else {
-    logger.warn('⚠️  Redis unavailable, cache disabled', { module: 'Redis' });
+    logger.warn('âš ï¸  Redis unavailable, cache disabled', { module: 'Redis' });
   }
 
-  // 4. Services — all use the same single Prisma client
+  // 4. Services â€” all use the same single Prisma client
   configureRequestLogPersistence(prisma);
   const shipMatrixService = new ShipMatrixService(prisma);
   const rsiWebsiteService = new RsiWebsiteService(prisma);
@@ -361,7 +328,7 @@ async function start() {
 
   // Le cache suit la donnee : la cle Redis porte l'empreinte de la derniere
   // extraction. Une extraction change l'empreinte, les anciennes cles
-  // deviennent inatteignables et expirent seules — plus besoin d'invalider a
+  // deviennent inatteignables et expirent seules â€” plus besoin d'invalider a
   // la main, ce que personne ne faisait.
   setDataVersionResolver(async () => {
     const latest = await gameDataService?.getLatestExtraction('live');
@@ -369,9 +336,9 @@ async function start() {
     return typeof hash === 'string' && hash ? hash.slice(0, 12) : null;
   });
 
-  // Un premier relevé tout de suite : la version de donnée figure dans chaque
-  // réponse `/api/v2`, et « v0 » y serait un mensonge. L'échec est sans
-  // conséquence — la valeur se rattrapera au premier accès au cache.
+  // Un premier relevÃ© tout de suite : la version de donnÃ©e figure dans chaque
+  // rÃ©ponse `/api/v2`, et Â« v0 Â» y serait un mensonge. L'Ã©chec est sans
+  // consÃ©quence â€” la valeur se rattrapera au premier accÃ¨s au cache.
   await refreshDataVersion().catch(() => undefined);
 
   // 5. Mount routes
@@ -382,12 +349,12 @@ async function start() {
   app.use(rfc7807ErrorHandler);
 
   // 7. Start listening
-  httpServer = app.listen(PORT, () => logger.info(`✅ Starvis v2.0 listening on :${PORT}`, { module: 'Server' }));
+  httpServer = app.listen(PORT, () => logger.info(`âœ… Starvis v2.0 listening on :${PORT}`, { module: 'Server' }));
 }
 
 // Graceful shutdown
 async function shutdown(signal: string) {
-  logger.info(`${signal} received — shutting down…`, { module: 'Server' });
+  logger.info(`${signal} received â€” shutting downâ€¦`, { module: 'Server' });
   if (httpServer) httpServer.close();
 
   try {

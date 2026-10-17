@@ -1,7 +1,6 @@
 import type { Router } from 'express';
-import { requireJwtAdmin } from '../middleware/index.js';
-import { buildApiSupervisionSnapshot } from '../services/api-supervision-service.js';
-import { ApiTokenService } from '../services/api-token-service.js';
+import { requireAdminKey } from '../middleware/index.js';
+import { ApiTokenService, normalizeApiTokenOwner } from '../services/api-token-service.js';
 import { listPersistedRequestHistory } from '../services/request-log-service.js';
 import { asyncHandler, makeGameDataGuard } from './helpers.js';
 import type { RouteDependencies } from './types.js';
@@ -10,8 +9,8 @@ export function mountAdminRoutes(router: Router, deps: RouteDependencies): void 
   const { prisma, shipMatrixService, gameDataService } = deps;
   const requireGameData = makeGameDataGuard(gameDataService);
 
-  // Admin routes — accepte ADMIN_API_KEY (X-Api-Key) OU JWT avec role=admin
-  router.use('/admin', requireJwtAdmin);
+  // Admin routes — ADMIN_API_KEY (X-Api-Key) seulement : il n'y a plus de comptes.
+  router.use('/admin', requireAdminKey);
 
   router.get(
     '/admin/stats',
@@ -37,24 +36,7 @@ export function mountAdminRoutes(router: Router, deps: RouteDependencies): void 
       const limit = Number.parseInt(String(req.query.limit ?? '100'), 10);
       const requestedScope = String(req.query.scope ?? 'all');
       const scope = requestedScope === 'external' || requestedScope === 'web' ? requestedScope : 'all';
-      const role = String(req.query.role ?? '');
-      const userId = Number.parseInt(String(req.query.userId ?? ''), 10);
-      res.json({
-        success: true,
-        data: await listPersistedRequestHistory({
-          scope,
-          limit,
-          userId: Number.isInteger(userId) && userId > 0 ? userId : undefined,
-          role: role === 'user' || role === 'developer' || role === 'admin' ? role : undefined,
-        }),
-      });
-    }),
-  );
-
-  router.get(
-    '/admin/api-supervision',
-    asyncHandler(async (_req, res) => {
-      res.json({ success: true, data: await buildApiSupervisionSnapshot(prisma) });
+      res.json({ success: true, data: await listPersistedRequestHistory({ scope, limit }) });
     }),
   );
 
@@ -63,6 +45,24 @@ export function mountAdminRoutes(router: Router, deps: RouteDependencies): void 
     asyncHandler(async (req, res) => {
       const limit = Number.parseInt(String(req.query.limit ?? '200'), 10);
       res.json({ success: true, data: await new ApiTokenService(prisma).listForAdmin(limit) });
+    }),
+  );
+
+  // Les tiers n'ont plus de compte pour se générer un jeton : l'administration
+  // l'émet pour eux, et le jeton en clair n'est rendu qu'une fois.
+  router.post(
+    '/admin/api-tokens',
+    asyncHandler(async (req, res) => {
+      const ownerName = normalizeApiTokenOwner(req.body?.owner);
+      if (!ownerName) return void res.status(400).json({ success: false, error: 'owner is required' });
+      const { token, row } = await new ApiTokenService(prisma).issue({
+        ownerName,
+        name: req.body?.name,
+        description: req.body?.description,
+      });
+      res
+        .status(201)
+        .json({ success: true, data: { token, tokenId: row.id, name: row.name, owner: row.ownerName, expiresAt: row.expiresAt } });
     }),
   );
 
