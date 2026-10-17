@@ -11,14 +11,11 @@ import request from 'supertest';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../src/middleware/auth.js', () => ({
-  requireJwt: (_req: any, _res: any, next: any) => next(),
-  requireJwtAdmin: (_req: any, _res: any, next: any) => next(),
-  requireJwtBetaOrAdmin: (_req: any, _res: any, next: any) => next(),
-  requireJwtDeveloperOrAdmin: (_req: any, _res: any, next: any) => next(),
-  // La persistance canonique s'authentifie par cle serveur autant que par JWT :
-  // c'est une operation d'apres extraction, appelable de serveur a serveur.
+  requireAdminKey: (_req: any, _res: any, next: any) => next(),
+  // La persistance canonique s'authentifie par cle serveur : c'est une
+  // operation d'apres extraction, appelable de serveur a serveur.
   requireInternalOrAdmin: (_req: any, _res: any, next: any) => next(),
-  authMiddleware: (_req: any, _res: any, next: any) => next(),
+  resolveExternalApiAccess: (_req: any, _res: any, next: any) => next(),
 }));
 
 import { mountCommodityRoutes } from '../src/routes/commodities.js';

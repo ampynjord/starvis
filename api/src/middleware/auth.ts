@@ -1,65 +1,36 @@
 import { timingSafeEqual } from 'node:crypto';
 import { getPrisma } from '@starvis/db';
 import type { NextFunction, Request, Response } from 'express';
-import { ApiTokenService } from '../services/api-token-service.js';
-import { type JwtPayload, verifyAuthToken } from '../services/auth-service.js';
-import { ADMIN_ROLE, AUTH_COOKIE_NAME, DEVELOPER_ACCESS_ROLES } from '../utils/config.js';
+import { ApiTokenService, verifyApiTokenClaims } from '../services/api-token-service.js';
 import { resolveClientIp } from '../utils/request-ip.js';
 
-// ── Admin API Key ─────────────────────────────────────────────────────────────
-
-// ── JWT Auth ──────────────────────────────────────────────────────────────────
+/**
+ * Trois façons d'appeler l'API, et aucune ne passe par un compte :
+ *
+ *  - `ADMIN_API_KEY` : l'administration (`/admin/*`), et rien d'autre ;
+ *  - `SERVER_API_KEY` : les appelants internes de confiance (proxy de l'IHM,
+ *    audits de la CI) ;
+ *  - un jeton API émis par l'administration, pour les intégrations tierces.
+ *
+ * `/api/v1` accepte aussi l'appel anonyme, en lecture et sous une limite de
+ * débit plus stricte (docs/renaissance.md, décision D2).
+ */
 
 function extractBearer(req: Request): string | null {
   const auth = req.headers.authorization;
-  if (auth?.startsWith('Bearer ')) return auth.slice(7);
-  return null;
+  if (!auth?.startsWith('Bearer ')) return null;
+  return auth.slice(7).trim() || null;
 }
 
-function extractCookieToken(req: Request): string | null {
-  const cookie = req.headers.cookie;
-  if (!cookie) return null;
-  const match = cookie.split(';').find((c) => c.trim().startsWith(`${AUTH_COOKIE_NAME}=`));
-  return match ? (match.split('=')[1]?.trim() ?? null) : null;
+function matchesSecret(candidate: string, secret: string | undefined): boolean {
+  if (!candidate || !secret) return false;
+  const a = Buffer.from(candidate);
+  const b = Buffer.from(secret);
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
-function hasValidAdminApiKey(req: Request): boolean {
-  const ADMIN_API_KEY = process.env.ADMIN_API_KEY;
-  if (!ADMIN_API_KEY) return false;
-  const apiKey = String(req.headers['x-api-key'] || '');
-  if (!apiKey) return false;
-  const k = Buffer.from(apiKey);
-  const e = Buffer.from(ADMIN_API_KEY);
-  return k.length === e.length && timingSafeEqual(k, e);
-}
-
-async function resolveCurrentPayload(token: string): Promise<JwtPayload> {
-  const payload = verifyAuthToken(token);
-  const currentUser = await getPrisma().user.findUnique({
-    where: { id: payload.sub },
-    select: { uuid: true, email: true, username: true, role: true },
-  });
-  if (!currentUser) return payload;
-  return {
-    ...payload,
-    uuid: currentUser.uuid,
-    email: currentUser.email,
-    username: currentUser.username,
-    role: currentUser.role,
-  };
-}
-
-async function applyApiTokenState(req: Request, payload: JwtPayload, token: string): Promise<void> {
-  if (payload.type !== 'api_token' || !payload.jti) {
-    req.authMethod = 'session';
-    return;
-  }
-  const tokenService = new ApiTokenService(getPrisma());
-  const tokenRow = await tokenService.validateActive(payload.jti, token);
-  if (!tokenRow) throw new Error('INVALID_API_TOKEN');
-  req.apiToken = { id: tokenRow.id, jti: tokenRow.jti, name: tokenRow.name, userId: tokenRow.userId };
-  req.authMethod = 'api_token';
-  await tokenService.touch(payload.jti, { ip: resolveClientIp(req) ?? req.ip, userAgent: requestUserAgent(req) });
+function apiKeyHeader(req: Request): string {
+  return String(req.headers['x-api-key'] || '');
 }
 
 function requestUserAgent(req: Request): string | null {
@@ -74,174 +45,70 @@ function applyInternalClientMarker(req: Request): void {
   if (/^[a-z0-9_-]{1,40}$/i.test(internalClient)) req.internalClient = internalClient;
 }
 
-/**
- * requireJwt — verifies Bearer JWT, injects req.jwtPayload.
- * Accepts any role (user, admin).
- */
-export async function requireJwt(req: Request, res: Response, next: NextFunction) {
-  if (!process.env.JWT_SECRET) return res.status(500).json({ success: false, error: 'Server misconfiguration: JWT_SECRET not set' });
-
-  const token = extractBearer(req) ?? extractCookieToken(req);
-  if (!token) {
-    return res.status(401).json({ success: false, error: 'Authentication required' });
-  }
-  try {
-    req.jwtPayload = await resolveCurrentPayload(token);
-    await applyApiTokenState(req, req.jwtPayload, token);
-    next();
-  } catch {
-    res.status(401).json({ success: false, error: 'Invalid or expired token' });
-  }
+/** Valide un jeton API et l'attache à la requête ; lève une erreur s'il est refusé. */
+async function attachApiToken(req: Request, token: string): Promise<void> {
+  const claims = verifyApiTokenClaims(token);
+  const tokenService = new ApiTokenService(getPrisma());
+  const row = await tokenService.validateActive(claims.jti, token);
+  if (!row) throw new Error('INVALID_API_TOKEN');
+  req.apiToken = { id: row.id, jti: row.jti, name: row.name, owner: row.ownerName };
+  req.authMethod = 'api_token';
+  await tokenService.touch(claims.jti, { ip: resolveClientIp(req) ?? req.ip, userAgent: requestUserAgent(req) });
 }
 
 /**
- * requireExternalApiAccess — protects the documented external /api/v1 surface.
- * Accepted callers:
- *  - Bearer JWT (web session or generated API token)
- *  - X-API-Key: SERVER_API_KEY — trusted internal callers (IHM proxy, CI audit)
- * ADMIN_API_KEY is intentionally NOT accepted here.
+ * resolveExternalApiAccess — identifie l'appelant de `/api/v1` sans exiger
+ * d'identité. Un jeton présenté doit être valide : un jeton refusé ne retombe
+ * jamais en accès anonyme, pour qu'un tiers voie que le sien a expiré.
+ * `ADMIN_API_KEY` n'est volontairement pas accepté ici.
  */
-export async function requireExternalApiAccess(req: Request, res: Response, next: NextFunction) {
+export async function resolveExternalApiAccess(req: Request, res: Response, next: NextFunction) {
   applyInternalClientMarker(req);
 
-  // Allow trusted internal callers that already share SERVER_API_KEY (IHM, CI audit).
-  const apiKey = String(req.headers['x-api-key'] || '');
-  if (apiKey && process.env.SERVER_API_KEY) {
-    const a = Buffer.from(apiKey);
-    const b = Buffer.from(process.env.SERVER_API_KEY);
-    if (a.length === b.length && timingSafeEqual(a, b)) {
-      req.authMethod = 'admin_key';
-      return next();
-    }
-  }
-
-  if (!process.env.JWT_SECRET) {
-    return res.status(500).json({ success: false, error: 'Server misconfiguration: JWT_SECRET not set' });
-  }
-
-  const token = extractBearer(req) ?? extractCookieToken(req);
-  if (token) {
-    try {
-      const payload = await resolveCurrentPayload(token);
-      await applyApiTokenState(req, payload, token);
-      req.jwtPayload = payload;
-      return next();
-    } catch {
-      return res.status(401).json({ success: false, error: 'Invalid or expired token' });
-    }
-  }
-
-  return res.status(401).json({ success: false, error: 'Starvis account session or API token required' });
-}
-
-/**
- * requireJwtDeveloperOrAdmin — verifies Bearer JWT AND that role is developer or admin.
- * Grants access to API token generation and other developer features.
- */
-export async function requireJwtDeveloperOrAdmin(req: Request, res: Response, next: NextFunction) {
-  if (!process.env.JWT_SECRET) {
-    return res.status(401).json({ success: false, error: 'Unauthorized' });
-  }
-  const token = extractBearer(req) ?? extractCookieToken(req);
-  if (!token) {
-    return res.status(401).json({ success: false, error: 'Authentication required' });
-  }
-  try {
-    const payload = await resolveCurrentPayload(token);
-    const currentRole = payload.role;
-    if (!DEVELOPER_ACCESS_ROLES.includes(currentRole as (typeof DEVELOPER_ACCESS_ROLES)[number])) {
-      return res.status(403).json({ success: false, error: 'Developer or admin role required' });
-    }
-    req.jwtPayload = { ...payload, role: currentRole };
-    await applyApiTokenState(req, req.jwtPayload, token);
-    next();
-  } catch {
-    res.status(401).json({ success: false, error: 'Invalid or expired token' });
-  }
-}
-
-/** @deprecated use requireJwtDeveloperOrAdmin */
-export const requireJwtBetaOrAdmin = requireJwtDeveloperOrAdmin;
-
-/**
- * requireInternalOrAdmin — protects cost-sensitive routes (AI chat).
- *
- * Accepted callers:
- *  - X-API-Key: SERVER_API_KEY  → IHM server-side proxy (all logged-in users)
- *  - X-API-Key: ADMIN_API_KEY   → Discord bot
- *  - Bearer JWT with admin role  → admin direct access
- *
- * Rejected: developer JWT, user JWT, external API tokens.
- */
-export async function requireInternalOrAdmin(req: Request, res: Response, next: NextFunction) {
-  const apiKey = String(req.headers['x-api-key'] || '');
-
-  if (apiKey) {
-    const matchesKey = (envKey: string | undefined) => {
-      if (!envKey) return false;
-      const a = Buffer.from(apiKey);
-      const b = Buffer.from(envKey);
-      return a.length === b.length && timingSafeEqual(a, b);
-    };
-
-    if (matchesKey(process.env.SERVER_API_KEY) || matchesKey(process.env.ADMIN_API_KEY)) {
-      applyInternalClientMarker(req);
-      return next();
-    }
-
-    return res.status(403).json({ success: false, error: 'Forbidden' });
-  }
-
-  if (!process.env.JWT_SECRET) {
-    return res.status(500).json({ success: false, error: 'Server misconfiguration: JWT_SECRET not set' });
-  }
-
-  const token = extractBearer(req) ?? extractCookieToken(req);
-  if (!token) {
-    return res.status(401).json({ success: false, error: 'Authentication required' });
-  }
-
-  try {
-    const payload = await resolveCurrentPayload(token);
-    if (payload.role !== ADMIN_ROLE) {
-      return res.status(403).json({ success: false, error: 'Admin role required' });
-    }
-    req.jwtPayload = payload;
-    return next();
-  } catch {
-    res.status(401).json({ success: false, error: 'Invalid or expired token' });
-  }
-}
-
-/**
- * requireJwtAdmin — verifies Bearer JWT AND that role === 'admin'.
- * Also accepts ADMIN_API_KEY (X-Api-Key) for server-to-server compatibility.
- */
-export async function requireJwtAdmin(req: Request, res: Response, next: NextFunction) {
-  // 1. Always accept admin key (backward compat, server scripts)
-  if (hasValidAdminApiKey(req)) {
+  if (matchesSecret(apiKeyHeader(req), process.env.SERVER_API_KEY)) {
     req.authMethod = 'admin_key';
     return next();
   }
 
-  // 2. Otherwise validate JWT with admin role
-  if (!process.env.JWT_SECRET) {
-    return res.status(401).json({ success: false, error: 'Unauthorized' });
-  }
-  const token = extractBearer(req) ?? extractCookieToken(req);
+  const token = extractBearer(req);
   if (!token) {
-    return res.status(401).json({ success: false, error: 'Authentication required' });
+    req.authMethod = 'anonymous';
+    return next();
+  }
+
+  if (!process.env.JWT_SECRET) {
+    return res.status(500).json({ success: false, error: 'Server misconfiguration: JWT_SECRET not set' });
   }
   try {
-    const payload = await resolveCurrentPayload(token);
-    const currentRole = payload.role;
-    if (currentRole !== ADMIN_ROLE) {
-      return res.status(403).json({ success: false, error: 'Admin role required' });
-    }
-    req.jwtPayload = { ...payload, role: currentRole };
-    await applyApiTokenState(req, req.jwtPayload, token);
-    next();
+    await attachApiToken(req, token);
+    return next();
   } catch {
-    res.status(401).json({ success: false, error: 'Invalid or expired token' });
+    return res.status(401).json({ success: false, error: 'Invalid, revoked or expired API token' });
   }
+}
+
+/**
+ * requireInternalOrAdmin — protège les routes coûteuses (assistant IA).
+ * Acceptés : `SERVER_API_KEY` (proxy de l'IHM) et `ADMIN_API_KEY` (bot Discord).
+ */
+export function requireInternalOrAdmin(req: Request, res: Response, next: NextFunction) {
+  const apiKey = apiKeyHeader(req);
+  if (!apiKey) return res.status(401).json({ success: false, error: 'Authentication required' });
+  if (matchesSecret(apiKey, process.env.SERVER_API_KEY) || matchesSecret(apiKey, process.env.ADMIN_API_KEY)) {
+    applyInternalClientMarker(req);
+    req.authMethod = 'admin_key';
+    return next();
+  }
+  return res.status(403).json({ success: false, error: 'Forbidden' });
+}
+
+/** requireAdminKey — `/admin/*`, accessible avec `ADMIN_API_KEY` seulement. */
+export function requireAdminKey(req: Request, res: Response, next: NextFunction) {
+  const apiKey = apiKeyHeader(req);
+  if (!apiKey) return res.status(401).json({ success: false, error: 'Authentication required' });
+  if (!matchesSecret(apiKey, process.env.ADMIN_API_KEY)) {
+    return res.status(401).json({ success: false, error: 'Invalid admin API key' });
+  }
+  req.authMethod = 'admin_key';
+  return next();
 }

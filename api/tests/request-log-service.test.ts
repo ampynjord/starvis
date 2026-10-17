@@ -11,8 +11,8 @@ describe('request-log-service', () => {
         originalUrl: '/api/v1/search?search=private',
         url: '/api/v1/search?search=private',
         ip: '192.168.1.42',
+        authMethod: 'anonymous',
         get: (name: string) => (name === 'user-agent' ? 'Vitest' : undefined),
-        jwtPayload: { sub: 7, role: 'admin' },
       } as any,
       200,
       12.4,
@@ -25,35 +25,31 @@ describe('request-log-service', () => {
       path: '/api/v1/search',
       statusCode: 200,
       durationMs: 12,
-      userId: 7,
+      userId: null,
       username: null,
-      role: 'admin',
-      isExternalApi: false,
-      authMethod: 'session',
-      clientType: 'web_session',
+      role: null,
+      isExternalApi: true,
+      authMethod: 'anonymous',
+      clientType: 'external_api',
       internalClient: null,
       ip: '192.168.1.0',
       userAgent: 'Vitest',
     });
   });
 
-  it('resolves authenticated actors from bearer tokens on public routes', async () => {
+  it('no longer reads an actor from a bearer token the middleware did not accept', () => {
     process.env.JWT_SECRET = 'request-log-test-secret';
     clearRequestLogsForTests();
 
-    const token = jwt.sign(
-      { sub: 42, uuid: 'user-uuid', email: 'user@example.test', username: 'ampynjord', role: 'user' },
-      process.env.JWT_SECRET,
-      { expiresIn: '5m' },
-    );
+    // A web session JWT from before the accounts were removed.
+    const token = jwt.sign({ sub: 42, username: 'ampynjord', role: 'user' }, process.env.JWT_SECRET, { expiresIn: '5m' });
 
     recordRequestLog(
       {
         method: 'GET',
-        originalUrl: '/api/v1/ships',
-        url: '/api/v1/ships',
+        originalUrl: '/manufacturers',
+        url: '/manufacturers',
         headers: { authorization: `Bearer ${token}` },
-        authMethod: 'session',
         ip: '10.0.0.55',
         get: (name: string) => (name === 'user-agent' ? 'Vitest' : undefined),
       } as any,
@@ -62,11 +58,11 @@ describe('request-log-service', () => {
     );
 
     expect(listRequestLogs(1)[0]).toMatchObject({
-      userId: 42,
-      username: 'ampynjord',
-      role: 'user',
-      isExternalApi: false,
-      clientType: 'web_session',
+      userId: null,
+      username: null,
+      role: null,
+      authMethod: 'anonymous',
+      clientType: 'anonymous_web',
     });
   });
 
@@ -112,8 +108,7 @@ describe('request-log-service', () => {
         url: '/api/v1/ships',
         headers: {},
         authMethod: 'api_token',
-        apiToken: { id: 5, jti: 'token-jti', name: 'Partner app', userId: 42 },
-        jwtPayload: { sub: 42, username: 'developer', role: 'developer', type: 'api_token', jti: 'token-jti' },
+        apiToken: { id: 5, jti: 'token-jti', name: 'Partner app', owner: 'Partner' },
         ip: '203.0.113.10',
         get: () => 'External SDK',
       } as any,
@@ -126,7 +121,7 @@ describe('request-log-service', () => {
       clientType: 'external_api',
       apiTokenId: 5,
       apiTokenName: 'Partner app',
-      username: 'developer',
+      username: 'Partner',
     });
   });
 
@@ -139,7 +134,7 @@ describe('request-log-service', () => {
         url: '/admin/request-logs?limit=80',
         ip: '172.19.0.4',
         get: () => 'Vitest',
-        jwtPayload: { sub: 2, role: 'admin' },
+        authMethod: 'admin_key',
       } as any,
       200,
       6,

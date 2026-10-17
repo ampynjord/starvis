@@ -30,8 +30,10 @@ export const RATE_LIMITS = {
   // Admin screens poll several supervision endpoints; keep this protective but
   // high enough for normal dashboard usage.
   adminMax: parseInt(process.env.RATE_LIMIT_ADMIN_MAX || '1000', 10),
-  // Strict limit for failed authentication attempts (login, reset, 2FA)
-  authMax: parseInt(process.env.RATE_LIMIT_AUTH_MAX || '10', 10),
+  // Anonymous /api/v1 callers (no API token): requests per window per IP
+  anonymousMax: parseInt(process.env.RATE_LIMIT_ANONYMOUS_MAX || '300', 10),
+  // AI assistant questions per window per website visitor
+  chatMax: parseInt(process.env.RATE_LIMIT_CHAT_MAX || '30', 10),
   // Burst: max requests per minute per IP
   burstWindowMs: 60 * 1000,
   burst: parseInt(process.env.RATE_LIMIT_BURST || '240', 10),
@@ -46,18 +48,7 @@ export const RATE_LIMITS = {
  */
 export const CTM_CACHE_DIR = process.env.CTM_CACHE_DIR ?? '/tmp/ctm-cache';
 
-export const AUTH_COOKIE_NAME = process.env.AUTH_COOKIE_NAME ?? 'starvis_token';
-
-export const USER_ROLE = 'user';
-export const DEVELOPER_ROLE = 'developer';
-export const ADMIN_ROLE = 'admin';
-export const USER_ROLES = [USER_ROLE, DEVELOPER_ROLE, ADMIN_ROLE] as const;
-export const DEVELOPER_ACCESS_ROLES = [DEVELOPER_ROLE, ADMIN_ROLE] as const;
-
-export const JWT_EXPIRES = (process.env.JWT_EXPIRES ?? '7d') as SignOptions['expiresIn'];
 export const JWT_API_TOKEN_EXPIRES = (process.env.JWT_API_TOKEN_EXPIRES ?? '1y') as SignOptions['expiresIn'];
-export const JWT_2FA_PENDING_EXPIRES = (process.env.JWT_2FA_PENDING_EXPIRES ?? '5m') as SignOptions['expiresIn'];
-export const RESET_TOKEN_TTL_MS = parseInt(process.env.RESET_TOKEN_TTL_MS ?? String(60 * 60 * 1000), 10);
 
 export const CHAT_TOOL_MODEL = process.env.CHAT_TOOL_MODEL ?? 'mistral-small-latest';
 export const CHAT_RESPONSE_MODEL = process.env.CHAT_RESPONSE_MODEL ?? 'mistral-large-latest';

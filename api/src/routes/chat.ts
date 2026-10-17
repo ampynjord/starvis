@@ -6,10 +6,32 @@
  *   { messages: [{ role: 'user'|'assistant', content: string }] }
  */
 
-import type { Router } from 'express';
+import type { Request, Router } from 'express';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { requireInternalOrAdmin } from '../middleware/index.js';
 import { ChatService } from '../services/chat-service.js';
+import { RATE_LIMITS } from '../utils/config.js';
+import { resolveClientIp } from '../utils/request-ip.js';
 import type { RouteDependencies } from './types.js';
+
+/**
+ * Sans comptes, l'assistant est ouvert à tout visiteur du site, et chaque
+ * question se paie. La limite porte sur le visiteur final, dont le proxy de
+ * l'IHM transmet l'adresse ; le bot Discord, qui appelle sans ce proxy, n'y est
+ * pas soumis.
+ */
+const chatVisitorLimiter = rateLimit({
+  windowMs: RATE_LIMITS.windowMs,
+  max: RATE_LIMITS.chatMax,
+  keyGenerator: (req: Request) => {
+    const clientIp = resolveClientIp(req);
+    return clientIp ? `chat:ip:${ipKeyGenerator(clientIp)}` : 'chat:ip:unknown';
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: 'Too many questions, please try again later' },
+  skip: (req) => process.env.NODE_ENV === 'test' || !req.internalClient,
+});
 
 function sanitize(messages: { role: string; content: string }[]) {
   return messages
@@ -25,8 +47,8 @@ export function mountChatRoutes(router: Router, deps: RouteDependencies): void {
 
   const chatService = new ChatService(deps.gameDataService, deps.shipMatrixService, deps.rsiWebsiteService, deps.prisma);
 
-  // ── SSE streaming (web widget — beta testers & admins only) ─────────────
-  router.post('/api/v1/chat', requireInternalOrAdmin, (req, res) => {
+  // ── SSE streaming (web widget, through the IHM proxy) ───────────────────
+  router.post('/api/v1/chat', requireInternalOrAdmin, chatVisitorLimiter, (req, res) => {
     const { messages } = req.body as { messages?: { role: string; content: string }[] };
 
     if (!Array.isArray(messages) || messages.length === 0) {
@@ -68,8 +90,8 @@ export function mountChatRoutes(router: Router, deps: RouteDependencies): void {
     );
   });
 
-  // ── JSON sync (Discord bot / external — beta testers & admins only) ─────
-  router.post('/api/v1/chat/ask', requireInternalOrAdmin, async (req, res) => {
+  // ── JSON sync (Discord bot) ─────────────────────────────────────────────
+  router.post('/api/v1/chat/ask', requireInternalOrAdmin, chatVisitorLimiter, async (req, res) => {
     const { messages } = req.body as { messages?: { role: string; content: string }[] };
 
     if (!Array.isArray(messages) || messages.length === 0) {

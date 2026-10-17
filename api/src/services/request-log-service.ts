@@ -1,7 +1,5 @@
 import type { Request } from 'express';
-import { AUTH_COOKIE_NAME } from '../utils/config.js';
 import { anonymizeIp, resolveClientIp } from '../utils/request-ip.js';
-import { type JwtPayload, verifyAuthToken } from './auth-service.js';
 
 export interface RequestLogEntry {
   id: number;
@@ -59,7 +57,7 @@ function requestUserAgent(req: Request): string | null {
 }
 
 function shouldRecordRequestLog(path: string): boolean {
-  return path !== '/admin/request-logs' && path !== '/admin/api-supervision';
+  return path !== '/admin/request-logs';
 }
 
 function isExternalApiPath(path: string): boolean {
@@ -70,23 +68,18 @@ function requestInternalClient(req: Request): string | null {
   return req.internalClient ?? null;
 }
 
-function resolveAuthMethod(req: Request, payload: JwtPayload | null): RequestLogEntry['authMethod'] {
-  if (req.authMethod) return req.authMethod;
-  if (payload) return payload.type === 'api_token' ? 'api_token' : 'session';
-  return 'anonymous';
+function resolveAuthMethod(req: Request): RequestLogEntry['authMethod'] {
+  return req.authMethod ?? 'anonymous';
 }
 
 function resolveClientType(
   path: string,
   authMethod: RequestLogEntry['authMethod'],
-  payload: JwtPayload | null,
   internalClient: string | null,
 ): RequestLogEntry['clientType'] {
   if (internalClient) return 'internal_web_proxy';
   if (authMethod === 'admin_key') return 'server_key';
-  if (isExternalApiPath(path) && authMethod === 'api_token') return 'external_api';
-  if (payload || authMethod === 'session') return 'web_session';
-  if (isExternalApiPath(path)) return 'external_api'; // Anonymous external API call
+  if (isExternalApiPath(path)) return 'external_api';
   return 'anonymous_web';
 }
 
@@ -94,43 +87,12 @@ function isExternalApiLog(path: string, clientType: RequestLogEntry['clientType'
   return isExternalApiPath(path) && (clientType === 'external_api' || clientType === 'server_key');
 }
 
-function extractBearer(req: Request): string | null {
-  const auth = req.headers.authorization;
-  if (!auth?.startsWith('Bearer ')) return null;
-  return auth.slice(7).trim() || null;
-}
-
-function extractCookieToken(req: Request): string | null {
-  const cookie = req.headers.cookie;
-  if (!cookie) return null;
-  const match = cookie.split(';').find((c) => c.trim().startsWith(`${AUTH_COOKIE_NAME}=`));
-  const rawToken = match?.split('=').slice(1).join('=').trim();
-  if (!rawToken) return null;
-  try {
-    return decodeURIComponent(rawToken);
-  } catch {
-    return rawToken;
-  }
-}
-
-function resolveRequestActor(req: Request): JwtPayload | null {
-  if (req.jwtPayload?.sub) return req.jwtPayload;
-  const token = extractBearer(req) ?? extractCookieToken(req);
-  if (!token || !process.env.JWT_SECRET) return null;
-  try {
-    return verifyAuthToken(token);
-  } catch {
-    return null;
-  }
-}
-
 export function recordRequestLog(req: Request, statusCode: number, durationMs: number): void {
   const path = requestPath(req);
   if (!shouldRecordRequestLog(path)) return;
-  const payload = resolveRequestActor(req);
-  const authMethod = resolveAuthMethod(req, payload);
+  const authMethod = resolveAuthMethod(req);
   const internalClient = requestInternalClient(req);
-  const clientType = resolveClientType(path, authMethod, payload, internalClient);
+  const clientType = resolveClientType(path, authMethod, internalClient);
   const entry: RequestLogEntry = {
     id: nextId++,
     timestamp: new Date().toISOString(),
@@ -144,9 +106,10 @@ export function recordRequestLog(req: Request, statusCode: number, durationMs: n
     internalClient,
     apiTokenId: req.apiToken?.id ?? null,
     apiTokenName: req.apiToken?.name ?? null,
-    userId: typeof payload?.sub === 'number' ? payload.sub : null,
-    username: payload?.username ?? null,
-    role: payload?.role ?? null,
+    // Plus de comptes : l'acteur nommé est le propriétaire du jeton.
+    userId: null,
+    username: req.apiToken?.owner ?? null,
+    role: null,
     ip: anonymizeIp(resolveClientIp(req)),
     userAgent: requestUserAgent(req),
   };
@@ -209,8 +172,6 @@ export function listRequestLogsByScope(scope: 'external' | 'web' | 'all', limit 
 interface RequestHistoryFilters {
   scope?: 'external' | 'web' | 'all';
   limit?: number;
-  userId?: number;
-  role?: string;
 }
 
 interface RequestHistoryRow {
@@ -243,18 +204,12 @@ export async function listPersistedRequestHistory(filters: RequestHistoryFilters
 
   const where: string[] = [];
   const values: unknown[] = [];
-  const add = (sql: string, value: unknown) => {
-    where.push(sql.replace('?', `$${values.length + 1}`));
-    values.push(value);
-  };
 
   if (scope === 'external') {
     where.push('is_external_api = true');
   } else if (scope === 'web') {
     where.push('is_external_api = false');
   }
-  if (filters.userId) add('user_id = ?', filters.userId);
-  if (filters.role) add('role = ?::meta."UserRole"', filters.role);
 
   values.push(limit);
   const limitRef = `$${values.length}`;
