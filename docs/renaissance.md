@@ -124,6 +124,70 @@ réécrit ni testé ensuite.
 **Fini quand :** chaque page et route restante sert le wiki, l'API, les outils,
 le bot ou l'IA. Mesure attendue : moins de 40 pages, moins de 120 routes.
 
+#### État au 17/10/2026
+
+**Fait** (même PR que ce plan) :
+
+- Jetons découplés (étapes 1 et 2) : migration `20261017230000_decouple_api_tokens_from_users`,
+  additive — `owner_name` repris depuis `users.username`, `user_id` nullable en
+  `ON DELETE SET NULL`. Éprouvée sur une base locale : un jeton existant garde
+  son propriétaire, et supprimer son compte ne le supprime plus. Les jetons émis
+  avant le retrait des comptes restent valides sans changement côté tiers.
+- Plus de comptes ni de sessions : routes `/auth/*`, utilisateurs, 2FA,
+  signalements, demandes d'accès et supervision retirées de l'API (24 chemins du
+  contrat OpenAPI) ; pages de connexion, profil, signalement et administration
+  retirées de l'IHM, avec redirection de leurs anciennes adresses. Pages : 59 → 44.
+- `/admin/*` n'accepte plus que `ADMIN_API_KEY`. Les jetons s'émettent par
+  `POST /admin/api-tokens` (D2).
+- `/api/v1` lisible anonymement sous `RATE_LIMIT_ANONYMOUS_MAX` (300 requêtes par
+  15 minutes et par IP en production). Un jeton présenté doit être valide : un
+  jeton révoqué reçoit une 401, il ne retombe jamais en accès anonyme.
+- Swagger et `/developer` publics.
+- L'assistant est ouvert à tout visiteur du site, sous `RATE_LIMIT_CHAT_MAX`
+  (30 questions par 15 minutes et par visiteur), puisque chaque question se paie.
+  Le bot Discord n'y est pas soumis.
+- Le site ne pose plus aucun cookie ; bannière de consentement retirée, page
+  légale réécrite en conséquence.
+- `notebooks/` et les dépendances `bcryptjs`, `otplib`, `qrcode`, `nodemailer`
+  retirés ; variables SMTP, 2FA et cookie retirées des exemples et des compose.
+
+Effet de bord à vérifier en production : le bot appelait l'assistant avec la
+seule clé d'admin, que le contrôle d'accès de `/api/v1` rejetait en 401 avant
+même d'atteindre la route. L'accès anonyme en lecture lève ce blocage ; la
+commande `/starvis` devrait remarcher.
+
+**Reste, et demande la production :**
+
+1. **Étape 3 — vérifier les jetons existants contre une copie de la base de
+   production**, après déploiement de la migration :
+
+   ```sql
+   SELECT id, owner_name, name, user_id, last_used_at, usage_count
+   FROM meta.api_tokens
+   WHERE revoked_at IS NULL AND expires_at > now()
+   ORDER BY last_used_at DESC NULLS LAST;
+   ```
+
+   Chaque intégration active doit y figurer avec un `owner_name` lisible, et ses
+   appels continuer à répondre 200 avec son jeton.
+2. **Étape 4 — la migration qui supprime les tables de comptes** (`users`,
+   `bug_reports`, `external_api_access_requests`, la colonne
+   `api_tokens.user_id`, et `user_request_history.user_id`), seulement après le
+   point 1 et une sauvegarde vérifiée. Elle n'est volontairement pas dans cette
+   PR : supprimer est la seule étape qu'on ne peut pas défaire.
+3. **Les routes v1 sans appel depuis 90 jours** : la mesure se lit dans
+   `meta.user_request_history`, en production :
+
+   ```sql
+   SELECT split_part(path, '/', 4) AS ressource, count(*) AS appels
+   FROM meta.user_request_history
+   WHERE timestamp > now() - interval '90 days' AND path LIKE '/api/v1/%'
+   GROUP BY 1 ORDER BY 2 DESC;
+   ```
+
+   C'est la seule voie vers l'objectif de moins de 120 routes : le retrait des
+   comptes en a enlevé 24, il en reste 169 au contrat.
+
 ### Phase 2 — Une seule API (1 à 2 sessions)
 
 - Étendre `/api/v2` à toutes les ressources que la v1 sert encore et qui ont un
@@ -213,9 +277,11 @@ données de la base.
 - Mesurer : visiteurs du wiki, appels API par jeton, questions à l'IA. Un chiffre
   par surface, relu à chaque patch.
 
-## 5. Les décisions qui te reviennent
+## 5. Les décisions
 
-| # | Question | Recommandation |
+Les cinq recommandations ont été **validées le 17/10/2026**.
+
+| # | Question | Décision |
 |---|---|---|
 | D1 | Supprimer les comptes utilisateurs ? | **Oui, mais après avoir découplé les jetons** (phase 1). Rien dans le wiki, l'API ni les outils n'a besoin de comptes. Les favoris ou loadouts sauvegardés peuvent vivre dans le navigateur. |
 | D2 | Comment ouvrir l'API publique ? | **Lecture anonyme avec limite de débit, plus des clés pour les gros consommateurs**, délivrées par une commande d'admin. Les trois tiers actuels gardent leur jeton. |
