@@ -74,6 +74,12 @@ Rien de nouveau, seulement pouvoir travailler à nouveau sans surprise.
   de `@types/node` imbriquées sous `api/`, `ihm/` et `extractor/`, que npm jugeait
   invalides face à `^22`, sont retirées ; il n'en reste qu'une, à la racine.
   Elles faisaient échouer `npm ci` à chaque nouveau patch de `@types/node` 22.
+- ~~Vulnérabilité critique~~ — **fait** avec ce plan : `proxy-addr` 2.0.8
+  (usurpation d'IP derrière un proxy de confiance, donc contournement possible
+  de la limite de débit). Restent 15 vulnérabilités *high* en production,
+  toutes corrigeables par `npm audit fix` sans saut de version majeure, dont
+  Next.js (empoisonnement du cache SSG/ISR, qui touche directement la phase 3),
+  `undici`, `nodemailer` et Prisma. À passer en un lot vérifié, pas en vrac.
 - Vérifier l'état réel de la production (services up, dernière extraction,
   patch servi) et le consigner ici.
 - Nettoyer `.agents/AGENTS.md` : le chemin Windows absolu, et la mention d'un
