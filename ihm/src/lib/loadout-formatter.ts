@@ -15,6 +15,20 @@ export interface RawLoadoutSlot {
   component_size?: number | string | null;
   component_grade?: string | null;
   component_manufacturer?: string | null;
+  weapon_dps?: number | null;
+  weapon_damage?: number | null;
+  weapon_fire_rate?: number | null;
+  weapon_range?: number | null;
+  weapon_damage_type?: string | null;
+  weapon_ammo_count?: number | null;
+  shield_hp?: number | null;
+  shield_regen?: number | null;
+  quantum_speed?: number | null;
+  quantum_range?: number | null;
+  quantum_spool_time?: number | null;
+  cooler_cooling_rate?: number | null;
+  power_output?: number | null;
+  children?: RawLoadoutSlot[];
   [key: string]: any;
 }
 
@@ -27,12 +41,26 @@ export interface LoadoutNode {
   port_type: string;
   humanPortName: string;
   component_uuid?: string | null;
+  component_class_name?: string | null;
   component_name?: string | null;
   component_type?: string | null;
   component_sub_type?: string | null;
   component_size?: number | string | null;
   component_grade?: string | null;
   component_manufacturer?: string | null;
+  weapon_dps?: number | null;
+  weapon_damage?: number | null;
+  weapon_fire_rate?: number | null;
+  weapon_range?: number | null;
+  weapon_damage_type?: string | null;
+  weapon_ammo_count?: number | null;
+  shield_hp?: number | null;
+  shield_regen?: number | null;
+  quantum_speed?: number | null;
+  quantum_range?: number | null;
+  quantum_spool_time?: number | null;
+  cooler_cooling_rate?: number | null;
+  power_output?: number | null;
   count?: number;
   children: LoadoutNode[];
 }
@@ -42,7 +70,6 @@ export interface GroupedLoadoutSection {
   title: string;
   iconName: 'crosshair' | 'shield' | 'zap' | 'wrench' | 'navigation' | 'rocket';
   nodes: LoadoutNode[];
-  // For backward compatibility with flat rendering if needed
   slots?: Array<RawLoadoutSlot & { humanPortName: string }>;
 }
 
@@ -86,12 +113,40 @@ const POSITION_WORDS_EN: Record<string, string> = {
   copilot: 'Copilot',
 };
 
+export function isNoisyPort(portName?: string | null, componentClassName?: string | null, componentName?: string | null): boolean {
+  const p = (portName || '').toLowerCase();
+  const c = (componentClassName || '').toLowerCase();
+  const n = (componentName || '').toLowerCase();
+
+  if (n.includes('placeholder') || c.includes('placeholder')) return true;
+  if (p.includes('controller_') || p.includes('_controller')) return true;
+  if (p.includes('radar_helper') || p.includes('display_hud') || p.includes('screen_mfd')) return true;
+  if (p.includes('screen_annunciator') || p.includes('dashboard_pilot')) return true;
+  if (p.includes('self_destruct') || p.includes('seat_') || p.includes('cockpit_flair')) return true;
+  if (p.includes('airlock') || p.includes('door') || p.includes('ladder') || p.includes('toilet') || p.includes('bed')) return true;
+  if (p.includes('light') || p.includes('hatch') || p.includes('fuse') || p.includes('relay')) return true;
+  if (p.includes('landingpad') || p.includes('fuel_port') || p.includes('air_traffic')) return true;
+  if (p.startsWith('$slot') || p.startsWith('bar') || p.startsWith('mec') || p.startsWith('pow') || p.startsWith('ven')) return true;
+  return false;
+}
+
 /**
- * Transforms technical hardpoint identifiers like `hardpoint_weapon_pilot_s4_left`
- * or `item_port_cooler_01` into clean human-readable labels.
+ * Transforms technical hardpoint identifiers into clean human-readable labels.
  */
 export function humanizePortName(portName: string, portType: string, lang: SupportedLanguage): string {
   if (!portName) return portType || '';
+
+  const isFr = lang === 'fr';
+  const lowerName = portName.toLowerCase();
+
+  // Child slots should not expose cryptic class names
+  if (/^hardpoint_class_\d+/i.test(portName)) {
+    return isFr ? 'Arme montée' : 'Mounted Weapon';
+  }
+  if (/^missile_\d+_attach/i.test(portName)) {
+    const num = portName.match(/\d+/)?.[0] ?? '1';
+    return isFr ? `Emplacement missile #${parseInt(num, 10)}` : `Missile Slot #${parseInt(num, 10)}`;
+  }
 
   // Clean raw prefixes
   let cleaned = portName
@@ -114,19 +169,16 @@ export function humanizePortName(portName: string, portType: string, lang: Suppo
     .replace(/\s+/g, ' ')
     .trim();
 
-  const isFr = lang === 'fr';
-
   // Base label mapping based on portType or portName keywords
   let baseLabel = '';
   const lowerType = (portType || '').toLowerCase();
-  const lowerName = portName.toLowerCase();
 
   // Distinguish Jump Module and Quantum Drive explicitly (Erkul standard)
   if (lowerType.includes('jump') || lowerName.includes('jump')) {
     baseLabel = isFr ? 'Module de saut' : 'Jump Module';
   } else if (lowerType === 'quantumdrive' || lowerName.includes('quantum')) {
     baseLabel = isFr ? 'Moteur quantique' : 'Quantum Drive';
-  } else if (lowerType === 'weapongun' || lowerName.includes('weapon')) {
+  } else if (lowerType === 'weapongun' || lowerName.includes('weapon') || lowerName.includes('gun')) {
     baseLabel = isFr ? 'Point d’arme' : 'Weapon Hardpoint';
   } else if (lowerType === 'turret' || lowerName.includes('turret')) {
     baseLabel = isFr ? 'Tourelle' : 'Turret';
@@ -179,10 +231,12 @@ export function determineGroup(slot: {
   port_name?: string | null;
   port_type?: string | null;
   component_type?: string | null;
+  component_class_name?: string | null;
 }): LoadoutGroupKey {
   const compType = (slot.component_type || '').toLowerCase();
   const portType = (slot.port_type || '').toLowerCase();
   const name = (slot.port_name || '').toLowerCase();
+  const className = (slot.component_class_name || '').toUpperCase();
 
   // 1. Jump Module (strictly separate from Quantum Drive as in Erkul)
   if (
@@ -191,7 +245,8 @@ export function determineGroup(slot: {
     portType === 'jumpmodule' ||
     portType === 'jumpdrive' ||
     name.includes('jump_drive') ||
-    name.includes('jump')
+    name.includes('jump') ||
+    className.startsWith('JDRV')
   ) {
     return 'jump';
   }
@@ -260,6 +315,20 @@ export function determineGroup(slot: {
   return 'utility';
 }
 
+function flattenSlots(slots: RawLoadoutSlot[], parentId: number | null = null, idCounter = { current: 1 }): RawLoadoutSlot[] {
+  const result: RawLoadoutSlot[] = [];
+  for (const s of slots) {
+    const id = s.id != null ? Number(s.id) : idCounter.current++;
+    const actualParentId = s.parent_id != null ? Number(s.parent_id) : parentId;
+    const flatSlot: RawLoadoutSlot = { ...s, id, parent_id: actualParentId };
+    result.push(flatSlot);
+    if (Array.isArray(s.children) && s.children.length > 0) {
+      result.push(...flattenSlots(s.children, id, idCounter));
+    }
+  }
+  return result;
+}
+
 /**
  * Builds a hierarchical tree of loadout nodes (e.g. Turret -> Gimbal -> Gun, or Rack -> Missiles),
  * strictly separating Quantum Drive and Jump Module, matching Erkul.games architecture.
@@ -267,11 +336,18 @@ export function determineGroup(slot: {
 export function buildLoadoutTree(slots: RawLoadoutSlot[], lang: SupportedLanguage): GroupedLoadoutSection[] {
   const isFr = lang === 'fr';
 
+  // Support both flat array and nested pre-structured arrays
+  const flat = flattenSlots(slots);
+
   const nodeMap = new Map<number, LoadoutNode>();
   const allNodes: LoadoutNode[] = [];
 
-  for (let idx = 0; idx < slots.length; idx++) {
-    const s = slots[idx];
+  for (let idx = 0; idx < flat.length; idx++) {
+    const s = flat[idx];
+    if (isNoisyPort(s.port_name, s.component_class_name, s.component_name)) {
+      continue;
+    }
+
     const id = s.id != null ? Number(s.id) : idx + 1000;
     const parentId = s.parent_id != null ? Number(s.parent_id) : null;
     const humanPort = humanizePortName(s.port_name || '', s.component_type || s.port_type || '', lang);
@@ -283,12 +359,26 @@ export function buildLoadoutTree(slots: RawLoadoutSlot[], lang: SupportedLanguag
       port_type: s.port_type || '',
       humanPortName: humanPort,
       component_uuid: s.component_uuid,
+      component_class_name: s.component_class_name,
       component_name: s.component_name,
       component_type: s.component_type,
       component_sub_type: s.component_sub_type,
       component_size: s.component_size ?? s.port_max_size ?? s.port_min_size,
       component_grade: s.component_grade,
       component_manufacturer: s.component_manufacturer,
+      weapon_dps: s.weapon_dps,
+      weapon_damage: s.weapon_damage,
+      weapon_fire_rate: s.weapon_fire_rate,
+      weapon_range: s.weapon_range,
+      weapon_damage_type: s.weapon_damage_type,
+      weapon_ammo_count: s.weapon_ammo_count,
+      shield_hp: s.shield_hp,
+      shield_regen: s.shield_regen,
+      quantum_speed: s.quantum_speed,
+      quantum_range: s.quantum_range,
+      quantum_spool_time: s.quantum_spool_time,
+      cooler_cooling_rate: s.cooler_cooling_rate,
+      power_output: s.power_output,
       children: [],
     };
     nodeMap.set(id, node);
@@ -303,6 +393,33 @@ export function buildLoadoutTree(slots: RawLoadoutSlot[], lang: SupportedLanguag
       parent.children.push(node);
     } else {
       rootNodes.push(node);
+    }
+  }
+
+  // Lift Jump Module if it was nested inside Quantum Drive (standard Erkul architecture)
+  for (const root of [...rootNodes]) {
+    if (
+      root.port_type === 'QuantumDrive' ||
+      (root.component_type || '').toLowerCase() === 'quantumdrive' ||
+      root.port_name.toLowerCase().includes('quantum')
+    ) {
+      const jumpChildIdx = root.children.findIndex(
+        (c) =>
+          c.port_name.toLowerCase().includes('jump') ||
+          (c.component_type || '').toLowerCase().includes('jump') ||
+          (c.component_class_name || '').toUpperCase().startsWith('JDRV'),
+      );
+      if (jumpChildIdx >= 0) {
+        const jumpChild = root.children[jumpChildIdx];
+        const standaloneJump: LoadoutNode = {
+          ...jumpChild,
+          parentId: null,
+          port_type: 'JumpDrive',
+          humanPortName: isFr ? 'Module de saut' : 'Jump Module',
+          children: [...jumpChild.children],
+        };
+        rootNodes.push(standaloneJump);
+      }
     }
   }
 

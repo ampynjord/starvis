@@ -68,9 +68,9 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       { url: '/favicon.svg', type: 'image/svg+xml' },
-      { url: '/brand/starvis.png', type: 'image/png', sizes: '1254x1254' },
+      { url: '/favicon.png', type: 'image/png', sizes: '192x192' },
     ],
-    apple: [{ url: '/favicon.svg', type: 'image/svg+xml' }],
+    apple: [{ url: '/favicon.png', type: 'image/png' }],
   },
   robots: { index: true, follow: true },
 };
