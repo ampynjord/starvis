@@ -47,6 +47,64 @@ export function mountSystemRoutes(router: Router, deps: RouteDependencies): void
   mountEnvDataRoute(router, '/api/v1/stats/overview', requireGameData, (env) => gameDataService!.getPublicStats(env));
 
   router.get(
+    '/api/v1/system/sitemap-entries',
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const env = getQueryEnv(req);
+      const [ships, commodities, locations, commLinks, galactapedia, minerals, components, items] = await Promise.all([
+        deps.prisma.ship.findMany({
+          where: { env },
+          select: { uuid: true, extractedAt: true },
+          orderBy: { name: 'asc' },
+        }),
+        deps.prisma.commodity.findMany({
+          where: { env },
+          select: { uuid: true, updatedAt: true },
+          orderBy: { name: 'asc' },
+        }),
+        deps.prisma.location.findMany({
+          where: { env, hideInStarmap: false },
+          select: { uuid: true, extractedAt: true },
+          orderBy: { name: 'asc' },
+        }),
+        deps.prisma.commLink.findMany({
+          select: { id: true, slug: true, publishedAt: true },
+          orderBy: { id: 'desc' },
+        }),
+        deps.prisma.galactapedia.findMany({
+          select: { id: true, slug: true, updatedAt: true },
+          orderBy: { title: 'asc' },
+        }),
+        deps.prisma.miningElement.findMany({
+          where: { env },
+          select: { uuid: true },
+        }),
+        deps.prisma.component.findMany({
+          where: { env },
+          select: { uuid: true, updatedAt: true },
+          orderBy: { name: 'asc' },
+        }),
+        deps.prisma.item.findMany({
+          where: { env },
+          select: { uuid: true, updatedAt: true },
+          orderBy: { name: 'asc' },
+        }),
+      ]);
+
+      sendDataWithETag(req, res, {
+        ships,
+        commodities,
+        locations,
+        commLinks,
+        galactapedia,
+        minerals,
+        components,
+        items,
+      });
+    }),
+  );
+
+  router.get(
     '/api/v1/stats/latest',
     requireGameData,
     asyncHandler(async (req, res) => {

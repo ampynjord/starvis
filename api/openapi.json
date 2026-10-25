@@ -11739,6 +11739,43 @@
         "operationId": "getPublicSearchQuery"
       }
     },
+    "/api/v1/system/sitemap-entries": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Lightweight list of entity identifiers for sitemap generation",
+        "parameters": [
+          {
+            "name": "env",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "getSystemSitemapEntries"
+      }
+    },
     "/api/v1/stats/latest": {
       "get": {
         "tags": ["Stats"],
