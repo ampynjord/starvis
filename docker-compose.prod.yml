@@ -44,6 +44,10 @@ services:
 
   api:
     image: ${API_IMAGE}
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+      target: production
     container_name: ${COMPOSE_PROJECT_NAME}-api
     volumes:
       - ctm_cache:/app/ctm-cache
@@ -106,6 +110,10 @@ services:
 
   ihm:
     image: ${IHM_IMAGE}
+    build:
+      context: .
+      dockerfile: ihm/Dockerfile
+      target: production
     container_name: ${COMPOSE_PROJECT_NAME}-ihm
     environment:
       NODE_ENV: ${IHM_NODE_ENV}
@@ -156,28 +164,6 @@ services:
       traefik.http.routers.starvis-ihm.entrypoints: "${TRAEFIK_ENTRYPOINT}"
       traefik.http.routers.starvis-ihm.tls.certresolver: "${TRAEFIK_CERT_RESOLVER}"
       traefik.http.services.starvis-ihm.loadbalancer.server.port: "${IHM_INTERNAL_PORT}"
-    depends_on:
-      api:
-        condition: service_healthy
-
-  bot:
-    image: ${BOT_IMAGE}
-    container_name: ${COMPOSE_PROJECT_NAME}-bot
-    environment:
-      NODE_ENV: ${BOT_NODE_ENV}
-      DISCORD_TOKEN: ${DISCORD_TOKEN}
-      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
-      DISCORD_GUILD_ID: ${DISCORD_GUILD_ID}
-      DISCORD_PRESENCE_INTERVAL_MS: ${DISCORD_PRESENCE_INTERVAL_MS}
-      DISCORD_PRESENCE_STATUS: ${DISCORD_PRESENCE_STATUS}
-      API_URL: http://${API_HOST}:${API_INTERNAL_PORT}
-      SITE_URL: ${SITE_URL}
-      API_TOKEN: ${API_TOKEN}
-    restart: ${RESTART_POLICY}
-    deploy:
-      resources:
-        limits:
-          memory: ${BOT_MEMORY_LIMIT}
     depends_on:
       api:
         condition: service_healthy

@@ -179,6 +179,8 @@ function makeGameDataService() {
     getLatestStats: fn({}),
     getLatestExtraction: fn(null),
     getVersionChangelog: fn({ data: [], total: 0, version: '4.8.1', env: 'live' }),
+    getTranslations: fn(paginated),
+    getTranslationById: fn(null),
     getStats: fn({}),
     getExtractionLog: fn([]),
   };
@@ -198,6 +200,10 @@ function makeShipMatrixService() {
 function makePrisma() {
   return {
     $queryRawUnsafe: vi.fn().mockResolvedValue([]),
+    missionBroker: {
+      count: vi.fn().mockResolvedValue(0),
+      findMany: vi.fn().mockResolvedValue([]),
+    },
   } as unknown as PrismaClient;
 }
 
@@ -673,6 +679,15 @@ describe('GET /api/v1/factions/reputation-scopes', () => {
   });
 });
 
+describe('GET /api/v1/missions/brokers', () => {
+  it('returns 200 with paginated mission brokers', async () => {
+    const res = await request(app).get('/api/v1/missions/brokers');
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
+});
+
 describe('GET /api/v1/missions/filters', () => {
   it('returns 200', async () => {
     const res = await request(app).get('/api/v1/missions/filters');
@@ -936,6 +951,22 @@ describe('GET /api/v1/game-versions/:version/changelog', () => {
     const res = await request(app).get('/api/v1/game-versions/4.8.1/changelog');
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
+  });
+});
+
+describe('GET /api/v1/translations', () => {
+  it('returns 200 with paginated translations', async () => {
+    const res = await request(app).get('/api/v1/translations?domain=ship');
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+  });
+});
+
+describe('GET /api/v1/translations/:id (not found)', () => {
+  it('returns 404 when translation is not found', async () => {
+    const res = await request(app).get('/api/v1/translations/AEGS_Gladius');
+    expect(res.status).toBe(404);
+    expect(res.body.success).toBe(false);
   });
 });
 

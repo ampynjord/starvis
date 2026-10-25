@@ -105,7 +105,7 @@ const API_USE_CASES = [
   { icon: Bot, title: 'Bots and overlays', text: 'Power Discord commands, widgets, companion tools or public utilities with normalized Starvis data.' },
   { icon: Database, title: 'Data products', text: 'Query ships, loadouts, economy, items, missions, lore and changelog data without rebuilding an extractor.' },
   { icon: Radar, title: 'Operations', text: 'Feed corporation dashboards, fleet tools, quality audits or monitoring with authenticated API access.' },
-  { icon: BrainCircuit, title: 'AI workflows', text: 'Use the Starvis chat endpoints as a tool-using Star Citizen assistant connected to the same database.' },
+  { icon: BrainCircuit, title: 'Multi-source & localization', text: 'Cross-reference P4K DataForge, RSI Matrix, UEX 2.0 and bilingual EN/FR translations from a single REST API.' },
 ];
 
 export default function DeveloperPage() {
@@ -633,10 +633,11 @@ ${apiBaseUrl}/components
 ${apiBaseUrl}/items
 ${apiBaseUrl}/commodities
 ${apiBaseUrl}/missions
+${apiBaseUrl}/missions/brokers
 ${apiBaseUrl}/locations
 ${apiBaseUrl}/starmap/positions
-${apiBaseUrl}/search?search=aurora
-${apiBaseUrl}/chat/ask`}</CodeBlock>
+${apiBaseUrl}/translations
+${apiBaseUrl}/search?search=aurora`}</CodeBlock>
           </Section>
         </div>
       </div>

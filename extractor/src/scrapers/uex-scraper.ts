@@ -91,6 +91,8 @@ export interface UexGenericMarketPrice {
 export interface UexEconomyMarketSnapshot {
   commodities: UexGenericMarketPrice[];
   items: UexGenericMarketPrice[];
+  refineryYields: UexGenericMarketPrice[];
+  refineryMethods: UexGenericMarketPrice[];
 }
 
 async function fetchUex<T>(resource: string): Promise<T[]> {
@@ -115,13 +117,14 @@ export async function fetchUexVehicleMarket(onProgress?: (msg: string) => void):
   onProgress?.('UEX: fetching vehicles…');
   const vehicles = await fetchUex<UexVehicle>('vehicles');
 
-  onProgress?.('UEX: fetching vehicle terminals…');
-  const [buyTerminals, rentTerminals] = await Promise.all([
+  onProgress?.('UEX: fetching terminals…');
+  const [allTerminals, buyTerminals, rentTerminals] = await Promise.all([
+    fetchUex<UexTerminal>('terminals').catch(() => [] as UexTerminal[]),
     fetchUex<UexTerminal>('terminals?type=vehicle_buy'),
     fetchUex<UexTerminal>('terminals?type=vehicle_rent'),
   ]);
   const terminalById = new Map<number, UexTerminal>();
-  for (const terminal of [...buyTerminals, ...rentTerminals]) {
+  for (const terminal of [...allTerminals, ...buyTerminals, ...rentTerminals]) {
     if (terminal?.id != null) terminalById.set(terminal.id, terminal);
   }
 
@@ -144,7 +147,7 @@ export async function fetchUexEconomyMarket(onProgress?: (msg: string) => void):
   // l'avalait en silence depuis. Chez UEX les composants sont des « items » :
   // leurs prix arrivent dans `items_prices_all`, et c'est le persister qui les
   // rapproche de `game.components`.
-  const [commodities, items] = await Promise.all([
+  const [commodities, items, refineryYields, refineryMethods] = await Promise.all([
     fetchUex<UexGenericMarketPrice>('commodities_prices_all').catch((error) => {
       onProgress?.(`UEX: commodities_prices_all indisponible — ${(error as Error).message}`);
       return [] as UexGenericMarketPrice[];
@@ -153,8 +156,12 @@ export async function fetchUexEconomyMarket(onProgress?: (msg: string) => void):
       onProgress?.(`UEX: items_prices_all indisponible — ${(error as Error).message}`);
       return [] as UexGenericMarketPrice[];
     }),
+    fetchUex<UexGenericMarketPrice>('refineries_yields').catch(() => [] as UexGenericMarketPrice[]),
+    fetchUex<UexGenericMarketPrice>('refineries_methods').catch(() => [] as UexGenericMarketPrice[]),
   ]);
 
-  onProgress?.(`UEX: ${commodities.length} commodity, ${items.length} item price rows`);
-  return { commodities, items };
+  onProgress?.(
+    `UEX: ${commodities.length} commodity, ${items.length} item price rows, ${refineryYields.length} refinery yields, ${refineryMethods.length} refinery methods`,
+  );
+  return { commodities, items, refineryYields, refineryMethods };
 }

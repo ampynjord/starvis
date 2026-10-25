@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import { Orbitron, Rajdhani, Share_Tech_Mono } from 'next/font/google';
-import { ChatWidget } from '@/components/ui/ChatWidget';
 import { CookieBanner } from '@/components/ui/CookieBanner';
 import { PUBLIC_SITE_URL } from '@/lib/server-config';
 import { Providers } from './providers';
@@ -30,26 +29,40 @@ const shareTechMono = Share_Tech_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL(PUBLIC_SITE_URL),
   title: {
-    default: 'Starvis - Star Citizen Database & Toolset',
+    default: 'Starvis - Open Star Citizen Data Engine & Public API',
     template: '%s — STARVIS',
   },
   description:
-    'Starvis is an unofficial Star Citizen Database & Toolset in active development: extracted game data, calculators, external API, Discord bot, AI assistant and corporation tools.',
-  keywords: ['star citizen', 'star citizen ships', 'star citizen database', 'sc ships', 'star citizen components', 'star citizen API', 'star citizen AI', 'star citizen tools', 'starvis', 'star citizen data', 'ship stats', 'galactapedia'],
+    'Starvis is an open Star Citizen Data Engine & Public REST API cross-referencing official P4K/DataForge, RSI Ship Matrix, Starmap, Galactapedia, SC Wiki, UEX 2.0 and bilingual EN/FR datasets.',
+  keywords: [
+    'star citizen',
+    'star citizen ships',
+    'star citizen database',
+    'sc ships',
+    'star citizen components',
+    'star citizen API',
+    'star citizen tools',
+    'starvis',
+    'star citizen data',
+    'ship stats',
+    'galactapedia',
+  ],
   authors: [{ name: 'ampynjord' }],
   openGraph: {
     type: 'website',
     locale: 'en_US',
     url: PUBLIC_SITE_URL,
     siteName: 'STARVIS',
-    title: 'Starvis - Star Citizen Database & Toolset',
-    description: 'Unofficial Star Citizen Database & Toolset with external API, Discord bot and AI assistant. Not affiliated with Cloud Imperium Games.',
+    title: 'Starvis - Open Star Citizen Data Engine & Public API',
+    description:
+      'Open Star Citizen Database & Public API cross-referencing official P4K, RSI and community sources. Not affiliated with Cloud Imperium Games.',
     images: [{ url: '/brand/starvis.png', width: 1254, height: 1254, alt: 'STARVIS logo' }],
   },
   twitter: {
     card: 'summary',
-    title: 'Starvis - Star Citizen Database & Toolset',
-    description: 'Unofficial Star Citizen Database & Toolset with external API, Discord bot and AI assistant. Not affiliated with Cloud Imperium Games.',
+    title: 'Starvis - Open Star Citizen Data Engine & Public API',
+    description:
+      'Open Star Citizen Database & Public API cross-referencing official P4K, RSI and community sources. Not affiliated with Cloud Imperium Games.',
     images: ['/brand/starvis.png'],
   },
   icons: {
@@ -68,7 +81,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="bg-void text-slate-200">
         <Providers>
           {children}
-          <ChatWidget />
           <CookieBanner />
         </Providers>
       </body>

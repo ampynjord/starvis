@@ -95,32 +95,37 @@ export async function requireJwt(req: Request, res: Response, next: NextFunction
 }
 
 /**
- * requireExternalApiAccess — protects the documented external /api/v1 surface.
+ * requireExternalApiAccess — public read surface for /api/v1.
  * Accepted callers:
- *  - Bearer JWT (web session or generated API token)
+ *  - Anonymous public requests (rate-limited by IP)
+ *  - Bearer JWT (web session or generated API token, validated if provided)
  *  - X-API-Key: SERVER_API_KEY — trusted internal callers (IHM proxy, CI audit)
- * ADMIN_API_KEY is intentionally NOT accepted here.
  */
 export async function requireExternalApiAccess(req: Request, res: Response, next: NextFunction) {
+  if (req.query.env === undefined && typeof req.query.version === 'string' && req.query.version.trim() !== '') {
+    req.query.env = req.query.version.trim();
+  }
   applyInternalClientMarker(req);
 
   // Allow trusted internal callers that already share SERVER_API_KEY (IHM, CI audit).
   const apiKey = String(req.headers['x-api-key'] || '');
-  if (apiKey && process.env.SERVER_API_KEY) {
-    const a = Buffer.from(apiKey);
-    const b = Buffer.from(process.env.SERVER_API_KEY);
-    if (a.length === b.length && timingSafeEqual(a, b)) {
-      req.authMethod = 'admin_key';
-      return next();
+  if (apiKey) {
+    if (process.env.SERVER_API_KEY) {
+      const a = Buffer.from(apiKey);
+      const b = Buffer.from(process.env.SERVER_API_KEY);
+      if (a.length === b.length && timingSafeEqual(a, b)) {
+        req.authMethod = 'admin_key';
+        return next();
+      }
     }
-  }
-
-  if (!process.env.JWT_SECRET) {
-    return res.status(500).json({ success: false, error: 'Server misconfiguration: JWT_SECRET not set' });
+    return res.status(401).json({ success: false, error: 'Invalid API key' });
   }
 
   const token = extractBearer(req) ?? extractCookieToken(req);
   if (token) {
+    if (!process.env.JWT_SECRET) {
+      return res.status(500).json({ success: false, error: 'Server misconfiguration: JWT_SECRET not set' });
+    }
     try {
       const payload = await resolveCurrentPayload(token);
       await applyApiTokenState(req, payload, token);
@@ -131,7 +136,7 @@ export async function requireExternalApiAccess(req: Request, res: Response, next
     }
   }
 
-  return res.status(401).json({ success: false, error: 'Starvis account session or API token required' });
+  return next();
 }
 
 /**

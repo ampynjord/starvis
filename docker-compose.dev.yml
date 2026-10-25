@@ -135,34 +135,10 @@ services:
       api:
         condition: service_healthy
 
-  bot:
-    image: ${NODE_DEV_IMAGE}
-    container_name: ${COMPOSE_PROJECT_NAME}-bot
-    working_dir: /app
-    volumes:
-      - ./:/app
-      - bot_node_modules:/app/node_modules
-    command: sh -c "npm install --prefer-offline --silent && npm run dev --workspace=@starvis/bot"
-    environment:
-      NODE_ENV: ${BOT_NODE_ENV}
-      DISCORD_TOKEN: ${DISCORD_TOKEN}
-      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
-      DISCORD_GUILD_ID: ${DISCORD_GUILD_ID}
-      DISCORD_PRESENCE_INTERVAL_MS: ${DISCORD_PRESENCE_INTERVAL_MS}
-      DISCORD_PRESENCE_STATUS: ${DISCORD_PRESENCE_STATUS}
-      API_URL: http://${API_HOST}:${API_INTERNAL_PORT}
-      SITE_URL: ${SITE_URL}
-      API_TOKEN: ${API_TOKEN}
-    restart: ${RESTART_POLICY}
-    depends_on:
-      api:
-        condition: service_healthy
-
 volumes:
   postgres_data:
   redis_data:
   api_node_modules:
   ihm_node_modules:
   ihm_next_cache:
-  bot_node_modules:
   ctm_cache:

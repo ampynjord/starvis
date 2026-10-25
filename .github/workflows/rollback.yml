@@ -60,12 +60,12 @@ jobs:
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
           echo "Cible : sha-$sha"
 
-      - name: Confirmer que les trois images existent
+      - name: Confirmer que les images existent
         run: |
           set -e
           echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ampynjord --password-stdin
           missing=0
-          for service in api ihm bot; do
+          for service in api ihm; do
             ref="${{ env.IMAGE_PREFIX }}-$service:sha-${{ steps.target.outputs.sha }}"
             if docker manifest inspect "$ref" > /dev/null 2>&1; then
               echo "présente : $ref"
@@ -112,7 +112,6 @@ jobs:
             # que ce soit ici.
             export API_IMAGE="ghcr.io/ampynjord/starvis-api:${TAG}"
             export IHM_IMAGE="ghcr.io/ampynjord/starvis-ihm:${TAG}"
-            export BOT_IMAGE="ghcr.io/ampynjord/starvis-bot:${TAG}"
 
             compose() {
               docker compose -f docker-compose.prod.yml --env-file .env.prod "$@"
@@ -122,7 +121,7 @@ jobs:
             compose config --quiet
 
             echo "==> Récupérer les images visées..."
-            compose pull api ihm bot
+            compose pull api ihm
 
             wait_for_health() {
               container="$1"
@@ -148,9 +147,8 @@ jobs:
             fi
             wait_for_health starvis-api API
 
-            if ! compose up -d --remove-orphans ihm bot; then
+            if ! compose up -d --remove-orphans ihm; then
               docker logs --tail=200 starvis-ihm || true
-              docker logs --tail=200 starvis-bot || true
               exit 1
             fi
             wait_for_health starvis-ihm IHM

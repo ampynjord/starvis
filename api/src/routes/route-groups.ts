@@ -2,7 +2,6 @@ import { mountAdminRoutes } from './admin.js';
 import { mountAuthRoutes } from './auth.js';
 import { mountBugReportRoutes } from './bug-reports.js';
 import { mountCalculateRoutes } from './calculate.js';
-import { mountChatRoutes } from './chat.js';
 import { mountCommodityRoutes } from './commodities.js';
 import { mountComponentFamilyRoutes } from './component-families.js';
 import { mountComponentRoutes } from './components.js';
@@ -26,7 +25,6 @@ import { mountShopRoutes } from './shops.js';
 import { mountSystemRoutes } from './system.js';
 import { mountTradeRoutes } from './trade.js';
 import type { RouteDependencies } from './types.js';
-import { mountV2Routes } from './v2/index.js';
 
 export type RouteMount = (router: import('express').Router, deps: RouteDependencies) => void;
 
@@ -48,7 +46,6 @@ export const routeGroups = [
     mounts: [
       mountShipMatrixRoutes,
       mountShipRoutes,
-      mountV2Routes,
       mountComponentFamilyRoutes,
       mountComponentRoutes,
       mountManufacturerRoutes,
@@ -74,11 +71,6 @@ export const routeGroups = [
     id: 'rsi-network-data',
     description: 'RSI website, SC Wiki and community-facing network data.',
     mounts: [mountRsiWebsiteRoutes],
-  },
-  {
-    id: 'user-features',
-    description: 'Assistant/chat features.',
-    mounts: [mountChatRoutes],
   },
 ] as const satisfies readonly RouteGroup[];
 

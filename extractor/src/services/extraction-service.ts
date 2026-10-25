@@ -34,6 +34,7 @@ import { updateShipMarketSummaries } from '../persisters/ship-market-summaries.j
 import { saveShips } from '../persisters/ships.js';
 import { saveShopsData } from '../persisters/shops.js';
 import { saveStarmapAssets } from '../persisters/starmap-assets.js';
+import { saveTranslations } from '../persisters/translations.js';
 import { saveUexMarket } from '../persisters/uex.js';
 import {
   applyDimensionsFallback,
@@ -44,7 +45,7 @@ import {
   pruneExcludedVariants,
   tagVariantTypes,
 } from './crossref.js';
-import { captureExtractionSnapshot, cleanStaleGameData, restoreCtmUrls } from './extraction-state.js';
+import { archiveVersionSnapshot, captureExtractionSnapshot, cleanStaleGameData, restoreCtmUrls } from './extraction-state.js';
 import { LocalizationService } from './localization-service.js';
 import { RsiSyncService } from './rsi-sync-service.js';
 import { nameShipsFromCommunityWiki } from './sc-wiki-ship-names.js';
@@ -516,6 +517,20 @@ export class ExtractionService {
         await recordFieldCoverage(conn, env, extractionId, onProgress);
       } catch (e) {
         logger.warn('Field coverage measurement failed', { error: String(e) });
+      }
+
+      // 8b. Persist bilingual (EN + FR) entity translations
+      try {
+        await saveTranslations(ctx);
+      } catch (e) {
+        logger.warn('Bilingual translation persistence failed', { error: String(e) });
+      }
+
+      // 8c. Archive historical patch snapshot (e.g. env = '4.7.2') when gameVersion is known
+      try {
+        await archiveVersionSnapshot(conn, env, this.dfService?.getVersion?.() ?? null, onProgress);
+      } catch (e) {
+        logger.warn('Patch snapshot archiving failed', { error: String(e) });
       }
 
       onProgress?.(

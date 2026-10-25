@@ -98,7 +98,9 @@ export function mountAdminRoutes(router: Router, deps: RouteDependencies): void 
 
       for (const table of tables) {
         try {
-          const count = await prisma.$executeRawUnsafe(`DELETE FROM game.${table} WHERE env NOT IN ('live', 'ptu');`);
+          const count = await prisma.$executeRawUnsafe(
+            `DELETE FROM game.${table} WHERE env NOT IN ('live', 'ptu') AND env !~ '^[0-9]+\\.[0-9]+';`,
+          );
           results[table] = count;
         } catch (_e) {
           // ignore if table doesn't have env or doesn't exist

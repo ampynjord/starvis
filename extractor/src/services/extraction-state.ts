@@ -95,3 +95,101 @@ export async function restoreCtmUrls(conn: PoolClient, env: GameEnv, savedCtmUrl
 
   return savedCtmUrls.length;
 }
+
+const SNAPSHOT_TABLES: ReadonlyArray<{
+  table: string;
+  envCols: readonly string[];
+}> = [
+  { table: 'ships', envCols: ['env'] },
+  { table: 'ship_modules', envCols: ['env'] },
+  { table: 'ship_paints', envCols: ['env'] },
+  { table: 'components', envCols: ['env'] },
+  { table: 'items', envCols: ['env'] },
+  { table: 'commodities', envCols: ['env'] },
+  { table: 'mining_elements', envCols: ['env'] },
+  { table: 'mining_compositions', envCols: ['env'] },
+  { table: 'mining_composition_parts', envCols: ['composition_env', 'element_env'] },
+  { table: 'crafting_recipes', envCols: ['env'] },
+  { table: 'crafting_ingredients', envCols: ['recipe_env'] },
+  { table: 'crafting_slot_modifiers', envCols: ['recipe_env'] },
+  { table: 'missions', envCols: ['env', 'blueprint_reward_env'] },
+  { table: 'mission_brokers', envCols: ['env'] },
+  { table: 'locations', envCols: ['env'] },
+  { table: 'location_amenity_types', envCols: ['env'] },
+  { table: 'location_amenities', envCols: ['env'] },
+  { table: 'game_insights', envCols: ['env'] },
+  { table: 'factions', envCols: ['env'] },
+  { table: 'reputation_standings', envCols: ['env'] },
+  { table: 'reputation_scopes', envCols: ['env'] },
+  { table: 'loot_tables', envCols: ['env'] },
+  { table: 'loot_table_entries', envCols: ['env'] },
+  { table: 'loot_archetypes', envCols: ['env'] },
+  { table: 'blueprint_rewards', envCols: ['env'] },
+  { table: 'ammo', envCols: ['env'] },
+  { table: 'inventory_containers', envCols: ['env'] },
+  { table: 'uex_terminals', envCols: ['env'] },
+  { table: 'uex_vehicle_prices', envCols: ['env'] },
+  { table: 'uex_market_prices', envCols: ['env'] },
+];
+
+/**
+ * Archive an immutable/queryable snapshot of `sourceEnv` under `env = versionTag`
+ * (e.g. `4.7.2`) so historical patches remain queryable via `?env=4.7.2` or `?version=4.7.2`.
+ */
+export async function archiveVersionSnapshot(
+  conn: PoolClient,
+  sourceEnv: GameEnv,
+  rawVersion: string | null | undefined,
+  onProgress?: (msg: string) => void,
+): Promise<string | null> {
+  if (!rawVersion) return null;
+  const match = rawVersion.trim().match(/^(\d+\.\d+(?:\.\d+)?)/);
+  const versionEnv = match?.[1]?.toLowerCase() ?? null;
+  if (!versionEnv || versionEnv === sourceEnv || versionEnv.length > 10) return null;
+
+  await conn.query('SAVEPOINT archive_version_snapshot');
+  try {
+    onProgress?.(`Archiving patch snapshot [${sourceEnv} → ${versionEnv}]…`);
+
+    for (let i = SNAPSHOT_TABLES.length - 1; i >= 0; i--) {
+      const { table, envCols } = SNAPSHOT_TABLES[i];
+      await conn.query(`DELETE FROM game.${table} WHERE ${envCols[0]} = $1`, [versionEnv]);
+    }
+
+    for (const { table, envCols } of SNAPSHOT_TABLES) {
+      const { rows: cols } = await conn.query<{ column_name: string; column_default: string | null }>(
+        `SELECT column_name, column_default
+         FROM information_schema.columns
+         WHERE table_schema = 'game' AND table_name = $1
+         ORDER BY ordinal_position`,
+        [table],
+      );
+      if (!cols.length) continue;
+
+      const insertCols = cols.filter((c) => !(c.column_name === 'id' && c.column_default?.startsWith('nextval'))).map((c) => c.column_name);
+      const selectExprs = insertCols.map((col) => {
+        if (envCols.includes(col)) {
+          return col === 'blueprint_reward_env' ? `CASE WHEN blueprint_reward_uuid IS NOT NULL THEN $2 ELSE NULL END` : '$2';
+        }
+        return `"${col}"`;
+      });
+
+      await conn.query(
+        `INSERT INTO game.${table} (${insertCols.map((c) => `"${c}"`).join(', ')})
+         SELECT ${selectExprs.join(', ')}
+         FROM game.${table}
+         WHERE "${envCols[0]}" = $1
+         ON CONFLICT DO NOTHING`,
+        [sourceEnv, versionEnv],
+      );
+    }
+
+    await conn.query('RELEASE SAVEPOINT archive_version_snapshot');
+    onProgress?.(`✅ Archived patch snapshot for version ${versionEnv}`);
+    return versionEnv;
+  } catch (err) {
+    await conn.query('ROLLBACK TO SAVEPOINT archive_version_snapshot').catch(() => undefined);
+    onProgress?.(`⚠️ Patch snapshot skipped (${versionEnv}): ${(err as Error).message}`);
+    return null;
+  }
+}

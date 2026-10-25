@@ -3,10 +3,12 @@ import { ChangelogQuery, GameVersionsQuery } from '../schemas.js';
 import {
   asyncHandler,
   getQueryEnv,
+  getQueryNumber,
   getQueryString,
   makeGameDataGuard,
   mountEnvDataRoute,
   sendDataWithETag,
+  sendPaginatedWithETag,
   sendWithETag,
 } from './helpers.js';
 import type { RouteDependencies } from './types.js';
@@ -108,6 +110,34 @@ export function mountSystemRoutes(router: Router, deps: RouteDependencies): void
         changesOnly: true,
       });
       sendWithETag(req, res, { success: true, ...result });
+    }),
+  );
+
+  router.get(
+    '/api/v1/translations',
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const startedAt = Date.now();
+      const result = await gameDataService!.getTranslations({
+        env: getQueryEnv(req),
+        domain: getQueryString(req, 'domain'),
+        search: getQueryString(req, 'search'),
+        page: getQueryNumber(req, 'page') ?? 1,
+        limit: getQueryNumber(req, 'limit') ?? 50,
+      });
+      sendPaginatedWithETag(req, res, result, startedAt);
+    }),
+  );
+
+  router.get(
+    '/api/v1/translations/:id',
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const row = await gameDataService!.getTranslationById(req.params.id, getQueryEnv(req));
+      if (!row) {
+        return void res.status(404).json({ success: false, error: 'Translation not found' });
+      }
+      sendDataWithETag(req, res, row);
     }),
   );
 }

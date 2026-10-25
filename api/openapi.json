@@ -3,7 +3,7 @@
   "info": {
     "title": "Starvis API",
     "version": "2.0.0",
-    "description": "Star Citizen game data, RSI website data, accounts, corporations, chat and admin REST API.\n\nData sources:\n- **P4K game data** (ships, components, items, commodities, shops, missions, mining, crafting, locations)\n- **RSI Website** (ship matrix, galactapedia, comm-links, starmap, organizations)\n- **UEX Corp** (live economy prices, terminals, vehicle market data)\n\nStarvis exposes canonical correlation endpoints to link equivalent records across P4K, RSI and UEX without changing existing resource IDs.\n\n### Authentication\nThe documented external `/api/v1` API is protected and requires a Bearer JWT generated from a user session or API token. The public web interface uses an internal server-side proxy and does not expose anonymous `/api/v1` access. Authenticated endpoints support:\n- **Bearer JWT** (`Authorization: Bearer <token>`): obtained via `POST /auth/login` or `POST /auth/api-token`. Required for `/auth/me`, chat, corporation workspace and admin routes.\n- **Auth cookie** (`starvis_token` by default): used by the Starvis web app and accepted by protected API and Swagger routes.\n- **API Key** (`X-API-Key` header): accepted for trusted Starvis server-to-server calls only, including admin tools and the public IHM proxy. Do not expose it to browsers or third-party clients.\n\n### Swagger access\n- Anonymous users and standard `user` accounts cannot access Swagger.\n- `developer` accounts can access `/api-docs` with all non-admin routes.\n- `admin` accounts can access `/api-docs` with all routes, including admin routes.\n\n### User Roles\n| Role | Description |\n|---|---|\n| `user` | Standard account — access to public data and authenticated user features |\n| `developer` | Developer account — can access API documentation and developer tools |\n| `admin` | Full access including user management and admin API |\n\nRoles are assigned by an admin via `PUT /admin/users/{id}/role`.\n\n### Pagination\nList endpoints generally support `page` and `limit` query parameters and return `{ data, total, page, limit, pages }`.\n\n### Filters\nDomain `/filters` endpoints return `{ filters: { fieldName: [{ value, label, count? }] } }` when available.\n\n### Game environments\nUse the `env` query parameter to select the game environment: `live` (default), `ptu`, `eptu`, `tech-preview`, `custom`."
+    "description": "Public Star Citizen Open Data Engine & REST API.\n\nData sources:\n- **P4K / DataForge game data** (ships, components, items, commodities, shops, missions, mission brokers, mining, crafting, locations, amenities, factions, reputations, loot, ammo, inventory containers)\n- **RSI Website** (ship matrix, galactapedia, comm-links, starmap)\n- **UEX Corp 2.0** (live economy prices, all terminal types, vehicle market data, refinery yields)\n- **Star Citizen Wiki & SC-FR** (community ship naming, bilingual EN/FR localization)\n\nStarvis exposes canonical correlation endpoints to link equivalent records across P4K, RSI and UEX without changing existing resource IDs.\n\n### Public Access & Optional Authentication\nThe `/api/v1` API and `/api-docs` OpenAPI documentation are **publicly accessible** (rate-limited by IP). Optional authentication is supported for higher rate limits and administrative endpoints:\n- **Bearer JWT** (`Authorization: Bearer <token>`): optional on `/api/v1`, required for `/auth/me` and `/admin`.\n- **API Key** (`X-API-Key` header): accepted for trusted server-to-server calls.\n\n### Pagination\nList endpoints generally support `page` and `limit` query parameters and return `{ data, total, page, limit, pages }`.\n\n### Game Environments & Patch History\nUse the `env` (or `version`) query parameter to select the active environment (`live` by default, `ptu`, `custom`) or any archived semantic patch version (e.g. `4.7.2`, `4.8.1`).\n\n### Bilingual Localization (`en` + `fr`)\nQuery `/api/v1/translations` or `/api/v1/translations/{id}` for bilingual English/French names and descriptions."
   },
   "components": {
     "securitySchemes": {
@@ -3788,7 +3788,8 @@
             "in": "query",
             "schema": {
               "type": "string",
-              "enum": ["live", "ptu", "custom"]
+              "maxLength": 10,
+              "pattern": "^(?:live|ptu|eptu|tech-preview|custom|\\d+\\.\\d+(?:\\.\\d+)?)$"
             },
             "description": "Game environment"
           },
@@ -4220,7 +4221,8 @@
             "in": "query",
             "schema": {
               "type": "string",
-              "enum": ["live", "ptu", "custom"]
+              "maxLength": 10,
+              "pattern": "^(?:live|ptu|eptu|tech-preview|custom|\\d+\\.\\d+(?:\\.\\d+)?)$"
             },
             "description": "Game environment"
           },
@@ -4912,7 +4914,8 @@
             "in": "query",
             "schema": {
               "type": "string",
-              "enum": ["live", "ptu", "custom"]
+              "maxLength": 10,
+              "pattern": "^(?:live|ptu|eptu|tech-preview|custom|\\d+\\.\\d+(?:\\.\\d+)?)$"
             },
             "description": "Game environment"
           },
@@ -5319,7 +5322,8 @@
             "in": "query",
             "schema": {
               "type": "string",
-              "enum": ["live", "ptu", "custom"]
+              "maxLength": 10,
+              "pattern": "^(?:live|ptu|eptu|tech-preview|custom|\\d+\\.\\d+(?:\\.\\d+)?)$"
             },
             "description": "Game environment"
           },
@@ -5536,7 +5540,8 @@
             "in": "query",
             "schema": {
               "type": "string",
-              "enum": ["live", "ptu", "custom"]
+              "maxLength": 10,
+              "pattern": "^(?:live|ptu|eptu|tech-preview|custom|\\d+\\.\\d+(?:\\.\\d+)?)$"
             },
             "description": "Game environment"
           },
@@ -5768,7 +5773,8 @@
             "in": "query",
             "schema": {
               "type": "string",
-              "enum": ["live", "ptu", "custom"]
+              "maxLength": 10,
+              "pattern": "^(?:live|ptu|eptu|tech-preview|custom|\\d+\\.\\d+(?:\\.\\d+)?)$"
             },
             "description": "Game environment"
           },
@@ -5905,7 +5911,8 @@
             "in": "query",
             "schema": {
               "type": "string",
-              "enum": ["live", "ptu", "custom"]
+              "maxLength": 10,
+              "pattern": "^(?:live|ptu|eptu|tech-preview|custom|\\d+\\.\\d+(?:\\.\\d+)?)$"
             },
             "description": "Game environment"
           },
@@ -6787,7 +6794,8 @@
             "in": "query",
             "schema": {
               "type": "string",
-              "enum": ["live", "ptu", "custom"]
+              "maxLength": 10,
+              "pattern": "^(?:live|ptu|eptu|tech-preview|custom|\\d+\\.\\d+(?:\\.\\d+)?)$"
             },
             "description": "Game environment"
           },
@@ -7803,7 +7811,8 @@
             "in": "query",
             "schema": {
               "type": "string",
-              "enum": ["live", "ptu", "custom"]
+              "maxLength": 10,
+              "pattern": "^(?:live|ptu|eptu|tech-preview|custom|\\d+\\.\\d+(?:\\.\\d+)?)$"
             },
             "description": "Game environment"
           },
@@ -8267,370 +8276,6 @@
         }
       }
     },
-    "/api/v2/missions/brokers": {
-      "get": {
-        "tags": ["Missions"],
-        "summary": "Mission broker offers — what a mission pays and on what terms",
-        "description": "/api/v1/missions comes from ContractTemplate and carries no reward at all: \"how much does it pay\" had no answer. MissionBrokerEntry holds 1 978 releasable offers, 1 858 of them with a reward, plus legality, difficulty and the giver. `title_is_template` matters: the game composes some titles at runtime — \"Secure Bounty: ~mission(TargetName) (VHRT)\" — and showing those verbatim would put code in front of a reader. Single /api/v2 envelope: data, meta, page.",
-        "operationId": "v2ListMissionBrokers",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/env"
-          },
-          {
-            "name": "page",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "default": 1
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 200,
-              "default": 50
-            }
-          },
-          {
-            "name": "lawful",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "enum": ["true", "false"]
-            }
-          },
-          {
-            "name": "min_reward",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 0
-            }
-          },
-          {
-            "name": "readable_only",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "enum": ["true", "false"]
-            }
-          },
-          {
-            "name": "search",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Paginated broker offers, best paid first"
-          }
-        }
-      }
-    },
-    "/api/v2/ships": {
-      "get": {
-        "tags": ["Ships"],
-        "summary": "List ships (v2 envelope)",
-        "description": "Single `/api/v2` envelope: `data`, `meta`, and `page` on lists. In v1 pagination sits under `meta` for ships but at the root for components, locations and shops — a consumer reading `response.total` gets a number for three resources and `undefined` for the fourth, with nothing to signal it. `meta.data_version` names the extraction the values come from.",
-        "operationId": "v2ListShips",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/env"
-          },
-          {
-            "name": "page",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "default": 1
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 200,
-              "default": 50
-            }
-          },
-          {
-            "name": "manufacturer",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "role",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "search",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "sort",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "order",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "enum": ["asc", "desc"]
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Paginated ships"
-          }
-        }
-      }
-    },
-    "/api/v2/ships/{uuid}": {
-      "get": {
-        "tags": ["Ships"],
-        "summary": "Get one ship (v2 envelope)",
-        "description": "Single `/api/v2` envelope: `data`, `meta`, and `page` on lists. In v1 pagination sits under `meta` for ships but at the root for components, locations and shops — a consumer reading `response.total` gets a number for three resources and `undefined` for the fourth, with nothing to signal it. `meta.data_version` names the extraction the values come from.",
-        "operationId": "v2GetShip",
-        "parameters": [
-          {
-            "name": "uuid",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "$ref": "#/components/parameters/env"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Ship detail"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          }
-        }
-      }
-    },
-    "/api/v2/locations": {
-      "get": {
-        "tags": ["Locations"],
-        "summary": "List locations (v2 envelope)",
-        "description": "Single `/api/v2` envelope: `data`, `meta`, and `page` on lists. In v1 pagination sits under `meta` for ships but at the root for components, locations and shops — a consumer reading `response.total` gets a number for three resources and `undefined` for the fourth, with nothing to signal it. `meta.data_version` names the extraction the values come from.",
-        "operationId": "v2ListLocations",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/env"
-          },
-          {
-            "name": "page",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "default": 1
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 200,
-              "default": 50
-            }
-          },
-          {
-            "name": "type",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "search",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Paginated locations"
-          }
-        }
-      }
-    },
-    "/api/v2/locations/{uuid}": {
-      "get": {
-        "tags": ["Locations"],
-        "summary": "Get one location, amenities included",
-        "description": "On-site services come with the record rather than a second call. Single `/api/v2` envelope: `data`, `meta`, and `page` on lists. In v1 pagination sits under `meta` for ships but at the root for components, locations and shops — a consumer reading `response.total` gets a number for three resources and `undefined` for the fourth, with nothing to signal it. `meta.data_version` names the extraction the values come from.",
-        "operationId": "v2GetLocation",
-        "parameters": [
-          {
-            "name": "uuid",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "$ref": "#/components/parameters/env"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Location with its amenities"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          }
-        }
-      }
-    },
-    "/api/v2/components/families": {
-      "get": {
-        "tags": ["Components"],
-        "summary": "List component families and their counts (v2 envelope)",
-        "description": "Part of `/api/v2`, which carries a single envelope — `data`, `meta`, and `page` on lists — with no `success` field: the HTTP status already says whether the call worked. `meta.data_version` names the extraction the values come from. `/api/v1` is unchanged and stays served.",
-        "operationId": "v2ListComponentFamilies",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/env"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Families holding at least one component"
-          }
-        }
-      }
-    },
-    "/api/v2/components/families/{family}": {
-      "get": {
-        "tags": ["Components"],
-        "summary": "List one family's components, with that family's statistics only",
-        "description": "Part of `/api/v2`, which carries a single envelope — `data`, `meta`, and `page` on lists — with no `success` field: the HTTP status already says whether the call worked. `meta.data_version` names the extraction the values come from. `/api/v1` is unchanged and stays served.",
-        "operationId": "v2ListComponentFamily",
-        "parameters": [
-          {
-            "name": "family",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "$ref": "#/components/parameters/env"
-          },
-          {
-            "name": "page",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "default": 1
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 200,
-              "default": 50
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Paginated components of that family"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          }
-        }
-      }
-    },
-    "/api/v2/components/{uuid}": {
-      "get": {
-        "tags": ["Components"],
-        "summary": "One component, carrying only its own family's statistics",
-        "description": "Where /api/v1/components/{uuid} returns 124 columns — 104 of them null for a shield — this returns the shared identity plus the statistics that mean something for that kind of part. Six types have no family of their own (missile racks, tractor beams, life support, jump modules, mining modifiers): the game gives them no specific statistics, so they answer 404 here and are read from v1 instead. Part of `/api/v2`, which carries a single envelope — `data`, `meta`, and `page` on lists — with no `success` field: the HTTP status already says whether the call worked. `meta.data_version` names the extraction the values come from. `/api/v1` is unchanged and stays served.",
-        "operationId": "v2GetComponent",
-        "parameters": [
-          {
-            "name": "uuid",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "$ref": "#/components/parameters/env"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Component with its family statistics"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          }
-        }
-      }
-    },
     "/api/v1/version": {
       "get": {
         "tags": ["Game Versions"],
@@ -8795,7 +8440,8 @@
             "in": "query",
             "schema": {
               "type": "string",
-              "enum": ["live", "ptu", "custom"]
+              "maxLength": 10,
+              "pattern": "^(?:live|ptu|eptu|tech-preview|custom|\\d+\\.\\d+(?:\\.\\d+)?)$"
             },
             "description": "Game environment"
           },
@@ -8856,7 +8502,8 @@
             "in": "query",
             "schema": {
               "type": "string",
-              "enum": ["live", "ptu", "custom"]
+              "maxLength": 10,
+              "pattern": "^(?:live|ptu|eptu|tech-preview|custom|\\d+\\.\\d+(?:\\.\\d+)?)$"
             },
             "description": "Game environment"
           },
@@ -9387,126 +9034,6 @@
                 }
               }
             }
-          }
-        }
-      }
-    },
-    "/api/v1/chat": {
-      "post": {
-        "tags": ["Chat"],
-        "summary": "Chat with the Starvis AI assistant (SSE streaming)",
-        "operationId": "chat",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": ["messages"],
-                "properties": {
-                  "messages": {
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "required": ["role", "content"],
-                      "properties": {
-                        "role": {
-                          "type": "string",
-                          "enum": ["user", "assistant"]
-                        },
-                        "content": {
-                          "type": "string"
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Server-Sent Events stream. Each event is JSON: `{type:\"chunk\",text}`, `{type:\"done\"}`, or `{type:\"error\",message}`",
-            "content": {
-              "text/event-stream": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          }
-        }
-      }
-    },
-    "/api/v1/chat/ask": {
-      "post": {
-        "tags": ["Chat"],
-        "summary": "Ask the Starvis AI assistant (synchronous JSON response)",
-        "operationId": "chatAsk",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": ["messages"],
-                "properties": {
-                  "messages": {
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "required": ["role", "content"],
-                      "properties": {
-                        "role": {
-                          "type": "string",
-                          "enum": ["user", "assistant"]
-                        },
-                        "content": {
-                          "type": "string"
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "AI reply",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "reply": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
           }
         }
       }
@@ -13950,6 +13477,176 @@
           },
           "403": {
             "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/missions/brokers": {
+      "get": {
+        "tags": ["Missions"],
+        "summary": "Mission broker offers — what a mission pays and on what terms",
+        "description": "/api/v1/missions comes from ContractTemplate and carries no reward at all: \"how much does it pay\" had no answer. MissionBrokerEntry holds 1 978 releasable offers, 1 858 of them with a reward, plus legality, difficulty and the giver. `title_is_template` matters: the game composes some titles at runtime — \"Secure Bounty: ~mission(TargetName) (VHRT)\" — and showing those verbatim would put code in front of a reader. Single /api/v2 envelope: data, meta, page.",
+        "operationId": "listMissionBrokers",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/env"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "lawful",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["true", "false"]
+            }
+          },
+          {
+            "name": "min_reward",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "readable_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["true", "false"]
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated broker offers, best paid first"
+          }
+        }
+      }
+    },
+    "/api/v1/translations": {
+      "get": {
+        "tags": ["System"],
+        "summary": "List bilingual (EN + FR) entity translations",
+        "operationId": "listTranslations",
+        "parameters": [
+          {
+            "name": "env",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "live"
+            },
+            "description": "Game environment or patch version (e.g. live, ptu, 4.7.2)"
+          },
+          {
+            "name": "domain",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Entity domain filter (ship, component, item, commodity, mission, crafting, location, mining, faction)"
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated bilingual translations"
+          }
+        }
+      }
+    },
+    "/api/v1/translations/{id}": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Get bilingual (EN + FR) translation by entity UUID or class_name",
+        "operationId": "getTranslationById",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "env",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "live"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bilingual translation record"
+          },
+          "404": {
+            "description": "Translation not found"
           }
         }
       }

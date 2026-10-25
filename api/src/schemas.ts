@@ -18,7 +18,17 @@ export const qStr = z.preprocess((v) => (Array.isArray(v) ? v[0] : v) || undefin
  * silencieusement sur 'live'. Une faute de frappe renverrait sinon les données
  * LIVE à un client qui a demandé PTU — une réponse fausse est pire qu'une erreur.
  */
-export const qEnv = z.preprocess((v) => (Array.isArray(v) ? v[0] : v) || 'live', z.enum(['live', 'ptu', 'custom']));
+export const GAME_ENV_RE = /^(?:live|ptu|eptu|tech-preview|custom|\d+\.\d+(?:\.\d+)?)$/;
+
+export const qEnv = z.preprocess((v) => {
+  const raw = (Array.isArray(v) ? v[0] : v) || 'live';
+  return typeof raw === 'string' ? raw.trim().toLowerCase() : raw;
+}, z.string().max(10).regex(GAME_ENV_RE));
+
+export const qLang = z.preprocess((v) => {
+  const raw = Array.isArray(v) ? v[0] : v;
+  return typeof raw === 'string' && raw.trim() !== '' ? raw.trim().toLowerCase() : undefined;
+}, z.enum(['en', 'fr', 'all']).optional());
 
 export const qInt = (def: number, max?: number) =>
   z

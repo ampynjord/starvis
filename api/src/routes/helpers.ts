@@ -153,13 +153,22 @@ export function getFilterString(req: Request, key: string, ...fallbackKeys: stri
   );
 }
 
-/** Starvis stores current patch data by environment; accept common aliases. */
+/** Starvis stores current and historical patch data by environment/version; accept common aliases. */
 export function getQueryEnv(req: Request): string {
   const raw = getQueryString(req, 'env') ?? getQueryString(req, 'channel') ?? getQueryString(req, 'version') ?? 'live';
-  const normalized = raw.toLowerCase();
+  const normalized = raw.trim().toLowerCase();
   if (normalized === 'pu') return 'live';
   if (['live', 'ptu', 'eptu', 'tech-preview', 'custom'].includes(normalized)) return normalized;
+  if (/^\d+\.\d+(?:\.\d+)?$/.test(normalized) && normalized.length <= 10) return normalized;
   return 'live';
+}
+
+/** Read requested localization language ('en' | 'fr' | 'all'), defaulting to 'en'. */
+export function getQueryLang(req: Request): 'en' | 'fr' | 'all' {
+  const raw = (getQueryString(req, 'lang') ?? getQueryString(req, 'locale') ?? 'en').trim().toLowerCase();
+  if (raw === 'fr' || raw.startsWith('fr-') || raw.startsWith('fr_')) return 'fr';
+  if (raw === 'all' || raw === 'both' || raw === 'bilingual') return 'all';
+  return 'en';
 }
 
 /** Read an optional number query parameter (undefined when missing/invalid). */
@@ -184,7 +193,7 @@ export function mountEnvDataRoute<T>(
     path,
     requireGameData,
     asyncHandler(async (req, res) => {
-      const env = getQueryString(req, 'env') ?? 'live';
+      const env = getQueryEnv(req);
       const data = await fetcher(env);
       sendDataWithETag(req, res, data);
     }),

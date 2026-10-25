@@ -58,6 +58,11 @@ describe('qEnv', () => {
     expect(qEnv.parse('live')).toBe('live');
   });
 
+  it('accepts semantic patch versions for historical queries', () => {
+    expect(qEnv.parse('4.7.2')).toBe('4.7.2');
+    expect(qEnv.parse('3.24.3')).toBe('3.24.3');
+  });
+
   it('rejects an invalid value instead of silently serving live', () => {
     expect(() => qEnv.parse('invalid')).toThrow();
   });

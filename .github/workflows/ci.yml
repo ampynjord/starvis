@@ -30,7 +30,6 @@ jobs:
       api: ${{ steps.filter.outputs.api }}
       ihm: ${{ steps.filter.outputs.ihm }}
       extractor: ${{ steps.filter.outputs.extractor }}
-      bot: ${{ steps.filter.outputs.bot }}
       e2e: ${{ steps.filter.outputs.e2e }}
     steps:
       - uses: actions/checkout@v7
@@ -57,9 +56,6 @@ jobs:
               - *shared
               - 'extractor/**'
               - 'db/**'
-            bot:
-              - *shared
-              - 'bot/**'
             e2e:
               - *shared
               - 'ihm/**'
@@ -99,8 +95,6 @@ jobs:
             file: api/Dockerfile
           - name: ihm
             file: ihm/Dockerfile
-          - name: bot
-            file: bot/Dockerfile
     steps:
       - uses: actions/checkout@v7
       - uses: hadolint/hadolint-action@v3.1.0
@@ -196,17 +190,13 @@ jobs:
           const requiredProd = [
             'ADMIN_API_KEY',
             'API_IMAGE',
-            'BOT_IMAGE',
             'CORS_ORIGIN',
             'DB_NAME',
             'DB_PASSWORD',
             'DB_USER',
-            'DISCORD_CLIENT_ID',
-            'DISCORD_TOKEN',
             'DOMAIN',
             'IHM_IMAGE',
             'JWT_SECRET',
-            'MISTRAL_API_KEY',
             'NEXT_PUBLIC_SITE_URL',
             'SITE_URL',
             'TRAEFIK_NETWORK',
@@ -234,8 +224,6 @@ jobs:
             setupNextTypes: true
           - name: extractor
             cmd: npm run typecheck --workspace=@starvis/extractor
-          - name: bot
-            cmd: npm run typecheck --workspace=@starvis/bot
           - name: db
             cmd: npm run typecheck --workspace=@starvis/db
     steps:
@@ -343,16 +331,6 @@ jobs:
       - uses: ./.github/actions/setup
       - run: npm run build --workspace=starvis-ihm
 
-  build-bot:
-    name: Build Bot
-    runs-on: ubuntu-latest
-    needs: changes
-    if: needs.changes.outputs.run_all == 'true' || needs.changes.outputs.bot == 'true'
-    steps:
-      - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup
-      - run: npm run build --workspace=@starvis/bot
-
   test-e2e:
     name: Tests E2E (Playwright)
     runs-on: ubuntu-latest
@@ -393,7 +371,6 @@ jobs:
       - test-extractor
       - test-ihm
       - build-ihm
-      - build-bot
       - test-e2e
     steps:
       - name: Verify all executed jobs passed
@@ -407,7 +384,7 @@ jobs:
           echo "All executed verification jobs passed."
 
   # ---------------------------------------------------------------------------
-  # Release: build images and deploy, only on main.
+  # Release: build images on main.
   # ---------------------------------------------------------------------------
   build:
     name: Build Image (${{ matrix.image.name }})
@@ -426,9 +403,6 @@ jobs:
             target: production
           - name: ihm
             file: ihm/Dockerfile
-            target: production
-          - name: bot
-            file: bot/Dockerfile
             target: production
     steps:
       - uses: actions/checkout@v7
@@ -473,8 +447,6 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: build
-    # Meme groupe que le workflow de retour arriere : les deux touchent la meme
-    # production, et se croiser laisserait les services desaccordes.
     concurrency:
       group: deploy-production
       cancel-in-progress: false
@@ -541,13 +513,11 @@ jobs:
             fi
             wait_for_health starvis-api API
 
-            if ! docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --remove-orphans ihm bot; then
+            if ! docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --remove-orphans ihm; then
               echo "==> API logs..."
               docker logs --tail=200 starvis-api || true
               echo "==> IHM logs..."
               docker logs --tail=200 starvis-ihm || true
-              echo "==> Bot logs..."
-              docker logs --tail=200 starvis-bot || true
               exit 1
             fi
 
@@ -582,11 +552,6 @@ jobs:
           STARVIS_AUDIT_API_KEY: ${{ secrets.STARVIS_AUDIT_API_KEY }}
         run: npm run quality:audit:data:prod
 
-      # L'audit ci-dessus vérifie que les endpoints répondent et ont la bonne
-      # forme ; celui-ci porte sur le fond — complétude, vraisemblance et
-      # rattachement aux sources sur la population entière. Il tourne après
-      # déploiement plutôt qu'à chaque poussée : il interroge la production et
-      # dure quelques minutes.
       - name: Audit production data truth
         env:
           STARVIS_AUDIT_API_KEY: ${{ secrets.STARVIS_AUDIT_API_KEY }}

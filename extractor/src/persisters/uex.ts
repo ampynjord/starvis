@@ -352,6 +352,7 @@ export async function saveUexMarket(conn: PoolClient, env: GameEnv, onProgress?:
         row,
       ),
     ),
+    ...(economy.refineryYields ?? []).map((row) => economyRow(env, 'refineries_yields', [{ kind: 'commodity', map: commodityMap }], row)),
   ];
 
   // On n'efface qu'une fois qu'on a de quoi remplacer. Les recuperations UEX

@@ -1,4 +1,6 @@
 import type { Router } from 'express';
+import { z } from 'zod';
+import { MissionBrokerService } from '../services/mission-broker-service.js';
 import {
   asyncHandler,
   getQueryNumber,
@@ -10,9 +12,49 @@ import {
 } from './helpers.js';
 import type { RouteDependencies } from './types.js';
 
+const BrokerQuery = z.object({
+  env: z.string().max(10).optional().default('live'),
+  page: z.coerce.number().int().min(1).optional().default(1),
+  limit: z.coerce.number().int().min(1).max(200).optional().default(50),
+  lawful: z.enum(['true', 'false']).optional(),
+  min_reward: z.coerce.number().int().min(0).optional(),
+  readable_only: z.enum(['true', 'false']).optional(),
+  search: z.string().max(120).optional(),
+});
+
 export function mountMissionRoutes(router: Router, deps: RouteDependencies): void {
   const { gameDataService } = deps;
   const requireGameData = makeGameDataGuard(gameDataService);
+  const missionBrokers = new MissionBrokerService(deps.prisma);
+
+  /**
+   * GET /api/v1/missions/brokers
+   * Mission broker entries with payouts, legality, difficulty and givers.
+   */
+  router.get(
+    '/api/v1/missions/brokers',
+    asyncHandler(async (req, res) => {
+      const query = BrokerQuery.parse(req.query);
+      const result = await missionBrokers.list({
+        env: query.env,
+        page: query.page,
+        limit: query.limit,
+        lawful: query.lawful === undefined ? undefined : query.lawful === 'true',
+        min_reward: query.min_reward,
+        readable_only: query.readable_only === 'true',
+        search: query.search,
+      });
+      sendWithETag(req, res, {
+        success: true,
+        count: result.data.length,
+        total: result.total,
+        page: result.page,
+        limit: result.limit,
+        pages: Math.max(1, Math.ceil(result.total / result.limit)),
+        data: result.data,
+      });
+    }),
+  );
 
   /**
    * GET /api/v1/missions/filters

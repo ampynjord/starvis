@@ -10,8 +10,24 @@
  * This service builds an index of these keys for fast lookup.
  */
 
+import { readFile } from 'node:fs/promises';
+import { SCRAPER_USER_AGENT } from '../config.js';
 import type { P4KProvider } from '../dataforge/p4k-provider.js';
 import logger from '../logger.js';
+
+export type SupportedLocale = 'en' | 'fr';
+
+const DEFAULT_FR_GLOBAL_INI_URL =
+  'https://raw.githubusercontent.com/Circuspes/Star-Citizen-FR/main/data/Localization/french_(france)/global.ini';
+
+interface LocaleIndexSet {
+  nameIndex: Map<string, string>;
+  descIndex: Map<string, string>;
+  classNameIndex: Map<string, string>;
+  classNameDescIndex: Map<string, string>;
+  classNameCanonicalIndex: Map<string, string>;
+  classNameDescCanonicalIndex: Map<string, string>;
+}
 
 export class LocalizationService {
   /** LOC key → display name */
@@ -27,7 +43,30 @@ export class LocalizationService {
   /** Canonical className → description (separator/case-insensitive) */
   private classNameDescCanonicalIndex = new Map<string, string>();
 
+  /** French (fr) indexes */
+  private frIndexes: LocaleIndexSet = {
+    nameIndex: new Map<string, string>(),
+    descIndex: new Map<string, string>(),
+    classNameIndex: new Map<string, string>(),
+    classNameDescIndex: new Map<string, string>(),
+    classNameCanonicalIndex: new Map<string, string>(),
+    classNameDescCanonicalIndex: new Map<string, string>(),
+  };
+
   private loaded = false;
+  private frLoaded = false;
+
+  private getIndexes(lang: SupportedLocale = 'en'): LocaleIndexSet {
+    if (lang === 'fr') return this.frIndexes;
+    return {
+      nameIndex: this.nameIndex,
+      descIndex: this.descIndex,
+      classNameIndex: this.classNameIndex,
+      classNameDescIndex: this.classNameDescIndex,
+      classNameCanonicalIndex: this.classNameCanonicalIndex,
+      classNameDescCanonicalIndex: this.classNameDescCanonicalIndex,
+    };
+  }
 
   private static canonicalizeClassName(value: string): string {
     return value
@@ -67,12 +106,18 @@ export class LocalizationService {
   get isLoaded(): boolean {
     return this.loaded;
   }
+  get isFrenchLoaded(): boolean {
+    return this.frLoaded;
+  }
   get entryCount(): number {
     return this.nameIndex.size;
   }
+  get frenchEntryCount(): number {
+    return this.frIndexes.nameIndex.size;
+  }
 
   /**
-   * Load and parse global.ini from P4K provider.
+   * Load and parse global.ini from P4K provider (English + French).
    * Tries multiple known paths for different SC versions.
    */
   async loadFromP4K(provider: P4KProvider, onProgress?: (msg: string) => void): Promise<number> {
@@ -97,20 +142,85 @@ export class LocalizationService {
       }
     }
 
+    let enCount = 0;
     if (!buffer) {
       logger.warn('global.ini not found in P4K — localization will use fallback names', { module: 'localization' });
       this.loaded = true; // Mark as loaded but empty — fallback mode
+    } else {
+      enCount = this.parseGlobalIni(buffer, onProgress, 'en');
+    }
+
+    await this.loadFrenchLocalization(provider, onProgress);
+    return enCount;
+  }
+
+  /**
+   * Load French (fr) global.ini from local override, P4K, or community SC-FR GitHub repository.
+   */
+  async loadFrenchLocalization(provider?: P4KProvider | null, onProgress?: (msg: string) => void): Promise<number> {
+    let buffer: Buffer | null = null;
+
+    const customFrPath = process.env.FR_GLOBAL_INI_PATH?.trim();
+    if (customFrPath) {
+      try {
+        buffer = await readFile(customFrPath);
+        onProgress?.(`Loading French localization from file: ${customFrPath}`);
+      } catch (err) {
+        logger.warn(`Failed to read FR_GLOBAL_INI_PATH (${customFrPath}): ${(err as Error).message}`, { module: 'localization' });
+      }
+    }
+
+    if (!buffer && provider) {
+      const p4kFrPaths = [
+        'Data/Localization/french_(france)/global.ini',
+        'Data/Localization/French_(France)/global.ini',
+        'Data\\Localization\\french_(france)\\global.ini',
+        'Data\\Localization\\French_(France)\\global.ini',
+      ];
+      for (const path of p4kFrPaths) {
+        try {
+          const entry = await provider.getEntry(path);
+          if (entry) {
+            onProgress?.(`Loading French localization from P4K: ${path} (${(entry.uncompressedSize / 1024).toFixed(0)} KB)`);
+            buffer = await provider.readFileFromEntry(entry);
+            break;
+          }
+        } catch {
+          // Try next path
+        }
+      }
+    }
+
+    if (!buffer && process.env.SKIP_FR_LOC_DOWNLOAD !== 'true' && process.env.NODE_ENV !== 'test') {
+      const url = (process.env.FR_GLOBAL_INI_URL ?? DEFAULT_FR_GLOBAL_INI_URL).trim();
+      try {
+        onProgress?.(`Fetching French localization (SC-FR) from ${url}…`);
+        const res = await fetch(url, {
+          headers: { 'User-Agent': SCRAPER_USER_AGENT },
+          signal: AbortSignal.timeout(25_000),
+        });
+        if (res.ok) {
+          const ab = await res.arrayBuffer();
+          buffer = Buffer.from(ab);
+        }
+      } catch (err) {
+        logger.warn(`French localization download skipped: ${(err as Error).message}`, { module: 'localization' });
+      }
+    }
+
+    if (!buffer) {
+      this.frLoaded = true;
       return 0;
     }
 
-    return this.parseGlobalIni(buffer, onProgress);
+    return this.parseGlobalIni(buffer, onProgress, 'fr');
   }
 
   /**
    * Parse global.ini buffer content.
    * Format: key=value lines, BOM-prefixed UTF-16LE or UTF-8
    */
-  private parseGlobalIni(buffer: Buffer, onProgress?: (msg: string) => void): number {
+  public parseGlobalIni(buffer: Buffer, onProgress?: (msg: string) => void, lang: SupportedLocale = 'en'): number {
     let content: string;
 
     // Detect encoding: UTF-16LE BOM = 0xFF 0xFE
@@ -125,6 +235,7 @@ export class LocalizationService {
 
     const lines = content.split(/\r?\n/);
     let parsed = 0;
+    const idx = this.getIndexes(lang);
 
     for (const line of lines) {
       const trimmed = line.trim();
@@ -145,11 +256,11 @@ export class LocalizationService {
       if (keyLower.startsWith('item_name')) {
         const className = key.substring('item_Name'.length);
         if (className) {
-          this.nameIndex.set(key, value);
-          this.classNameIndex.set(className.toLowerCase(), value);
+          idx.nameIndex.set(key, value);
+          idx.classNameIndex.set(className.toLowerCase(), value);
           const canonical = LocalizationService.canonicalizeClassName(className);
-          if (canonical && !this.classNameCanonicalIndex.has(canonical)) {
-            this.classNameCanonicalIndex.set(canonical, value);
+          if (canonical && !idx.classNameCanonicalIndex.has(canonical)) {
+            idx.classNameCanonicalIndex.set(canonical, value);
           }
           parsed++;
         }
@@ -158,11 +269,11 @@ export class LocalizationService {
       else if (keyLower.startsWith('item_desc')) {
         const className = key.substring('item_Desc'.length);
         if (className) {
-          this.descIndex.set(key, value);
-          this.classNameDescIndex.set(className.toLowerCase(), value);
+          idx.descIndex.set(key, value);
+          idx.classNameDescIndex.set(className.toLowerCase(), value);
           const canonical = LocalizationService.canonicalizeClassName(className);
-          if (canonical && !this.classNameDescCanonicalIndex.has(canonical)) {
-            this.classNameDescCanonicalIndex.set(canonical, value);
+          if (canonical && !idx.classNameDescCanonicalIndex.has(canonical)) {
+            idx.classNameDescCanonicalIndex.set(canonical, value);
           }
         }
       }
@@ -170,24 +281,32 @@ export class LocalizationService {
       else if (keyLower.startsWith('vehicle_name_')) {
         const className = key.substring('vehicle_Name_'.length);
         if (className) {
-          this.nameIndex.set(key, value);
-          this.classNameIndex.set(className.toLowerCase(), value);
+          idx.nameIndex.set(key, value);
+          idx.classNameIndex.set(className.toLowerCase(), value);
           const canonical = LocalizationService.canonicalizeClassName(className);
-          if (canonical && !this.classNameCanonicalIndex.has(canonical)) {
-            this.classNameCanonicalIndex.set(canonical, value);
+          if (canonical && !idx.classNameCanonicalIndex.has(canonical)) {
+            idx.classNameCanonicalIndex.set(canonical, value);
           }
           parsed++;
         }
       }
       // Generic LOC keys (catch-all for other patterns)
       else {
-        this.nameIndex.set(key, value);
+        idx.nameIndex.set(key, value);
       }
     }
 
-    this.loaded = true;
-    logger.info(`Localization loaded: ${parsed} name entries, ${this.descIndex.size} descriptions`, { module: 'localization' });
-    onProgress?.(`Localization: ${parsed} names, ${this.descIndex.size} descriptions`);
+    if (lang === 'fr') {
+      this.frLoaded = true;
+      logger.info(`French localization loaded: ${parsed} name entries, ${idx.descIndex.size} descriptions`, {
+        module: 'localization',
+      });
+      onProgress?.(`Localization [FR]: ${parsed} names, ${idx.descIndex.size} descriptions`);
+    } else {
+      this.loaded = true;
+      logger.info(`Localization loaded: ${parsed} name entries, ${idx.descIndex.size} descriptions`, { module: 'localization' });
+      onProgress?.(`Localization: ${parsed} names, ${idx.descIndex.size} descriptions`);
+    }
     return parsed;
   }
 
@@ -200,17 +319,18 @@ export class LocalizationService {
    *
    * @returns Resolved display name or null if not found
    */
-  resolveComponentName(className: string): string | null {
+  resolveComponentName(className: string, lang: SupportedLocale = 'en'): string | null {
     if (!className) return null;
+    const idx = this.getIndexes(lang);
     for (const candidate of LocalizationService.buildClassNameCandidates(className)) {
-      const direct = this.classNameIndex.get(candidate.toLowerCase());
+      const direct = idx.classNameIndex.get(candidate.toLowerCase());
       if (direct) return direct;
     }
 
     for (const candidate of LocalizationService.buildClassNameCandidates(className)) {
       const canonical = LocalizationService.canonicalizeClassName(candidate);
       if (!canonical) continue;
-      const mapped = this.classNameCanonicalIndex.get(canonical);
+      const mapped = idx.classNameCanonicalIndex.get(canonical);
       if (mapped) return mapped;
     }
 
@@ -220,17 +340,18 @@ export class LocalizationService {
   /**
    * Resolve a display name for a ship className.
    */
-  resolveShipName(className: string): string | null {
+  resolveShipName(className: string, lang: SupportedLocale = 'en'): string | null {
     if (!className) return null;
+    const idx = this.getIndexes(lang);
     const cn = className.toLowerCase();
 
     // Direct match
-    const direct = this.classNameIndex.get(cn);
+    const direct = idx.classNameIndex.get(cn);
     if (direct) return direct;
 
     // Try vehicle_Name_ prefix pattern
     const vehicleKey = `vehicle_Name_${className}`;
-    const veh = this.nameIndex.get(vehicleKey);
+    const veh = idx.nameIndex.get(vehicleKey);
     if (veh) return veh;
 
     return null;
@@ -239,16 +360,17 @@ export class LocalizationService {
   /**
    * Resolve a description for a given className.
    */
-  resolveDescription(className: string): string | null {
+  resolveDescription(className: string, lang: SupportedLocale = 'en'): string | null {
     if (!className) return null;
+    const idx = this.getIndexes(lang);
     for (const candidate of LocalizationService.buildClassNameCandidates(className)) {
-      const direct = this.classNameDescIndex.get(candidate.toLowerCase());
+      const direct = idx.classNameDescIndex.get(candidate.toLowerCase());
       if (direct) return direct;
     }
     for (const candidate of LocalizationService.buildClassNameCandidates(className)) {
       const canonical = LocalizationService.canonicalizeClassName(candidate);
       if (!canonical) continue;
-      const mapped = this.classNameDescCanonicalIndex.get(canonical);
+      const mapped = idx.classNameDescCanonicalIndex.get(canonical);
       if (mapped) return mapped;
     }
     return null;
@@ -258,10 +380,11 @@ export class LocalizationService {
    * Resolve a raw LOC key (with or without leading @) directly from the nameIndex.
    * Used for keys that don't follow className patterns, e.g. @hud_mining_rock_name_1
    */
-  resolveKey(rawKey: string): string | null {
+  resolveKey(rawKey: string, lang: SupportedLocale = 'en'): string | null {
     if (!rawKey) return null;
+    const idx = this.getIndexes(lang);
     const key = rawKey.startsWith('@') ? rawKey.substring(1) : rawKey;
-    return this.nameIndex.get(key) ?? this.nameIndex.get(key.toLowerCase()) ?? null;
+    return idx.nameIndex.get(key) ?? idx.nameIndex.get(key.toLowerCase()) ?? null;
   }
 
   /**

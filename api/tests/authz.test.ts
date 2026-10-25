@@ -256,9 +256,10 @@ describe('admin routes authorization', () => {
 });
 
 describe('external API authorization', () => {
-  it('rejects anonymous /api/v1 calls with 401', async () => {
+  it('allows anonymous /api/v1 calls on the public API surface', async () => {
     const res = await request(app).get('/api/v1/protected-data');
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(200);
+    expect(res.body.actor).toBeNull();
   });
 
   it('allows /api/v1 calls with a valid user JWT and refreshes the DB role', async () => {

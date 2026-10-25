@@ -580,4 +580,91 @@ export class GameDataService {
       last_extraction: (latest[0]?.extracted_at as string) ?? null,
     };
   }
+
+  async getTranslations(
+    opts: { env?: string; domain?: string; search?: string; page?: number; limit?: number } = {},
+  ): Promise<PaginatedResult<Row>> {
+    const env = opts.env ?? 'live';
+    const prisma = this.getClient(env);
+    const page = Math.max(1, opts.page ?? 1);
+    const limit = Math.min(200, Math.max(1, opts.limit ?? 50));
+    const offset = (page - 1) * limit;
+
+    const where: string[] = [`env = ?`, `category = 'translation_fr'`];
+    const params: (string | number)[] = [env];
+    if (opts.domain) {
+      where.push(`source_type = ?`);
+      params.push(opts.domain);
+    }
+    if (opts.search) {
+      where.push(`(name ILIKE ? OR class_name ILIKE ? OR value_text ILIKE ?)`);
+      const q = `%${opts.search}%`;
+      params.push(q, q, q);
+    }
+
+    const w = ` WHERE ${where.join(' AND ')}`;
+    const countRows = await prisma.$queryRawUnsafe<Row[]>(toPostgres(`SELECT COUNT(*) AS total FROM game.game_insights${w}`), ...params);
+    const total = Number(countRows[0]?.total) || 0;
+    const rows = await prisma.$queryRawUnsafe<Row[]>(
+      toPostgres(
+        `SELECT uuid, env, source_type AS domain, class_name, name AS name_fr, value_text AS description_fr, raw_json, extracted_at
+         FROM game.game_insights${w}
+         ORDER BY class_name ASC
+         LIMIT ${Number(limit)} OFFSET ${Number(offset)}`,
+      ),
+      ...params,
+    );
+
+    const data = rows.map((r) => {
+      const parsed = typeof r.raw_json === 'string' ? JSON.parse(r.raw_json) : (r.raw_json as Record<string, unknown> | null);
+      return {
+        uuid: r.uuid,
+        env: r.env,
+        domain: r.domain,
+        class_name: r.class_name,
+        name_en: parsed?.name_en ?? null,
+        name_fr: r.name_fr ?? parsed?.name_fr ?? null,
+        description_en: parsed?.description_en ?? null,
+        description_fr: r.description_fr ?? parsed?.description_fr ?? null,
+        extracted_at: r.extracted_at,
+      };
+    });
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      pages: Math.ceil(total / limit),
+    };
+  }
+
+  async getTranslationById(id: string, env = 'live'): Promise<Row | null> {
+    const prisma = this.getClient(env);
+    const rows = await prisma.$queryRawUnsafe<Row[]>(
+      toPostgres(
+        `SELECT uuid, env, source_type AS domain, class_name, name AS name_fr, value_text AS description_fr, raw_json, extracted_at
+         FROM game.game_insights
+         WHERE env = ? AND category = 'translation_fr' AND (uuid = ? OR LOWER(class_name) = LOWER(?))
+         LIMIT 1`,
+      ),
+      env,
+      id,
+      id,
+    );
+    const r = rows[0];
+    if (!r) return null;
+    const parsed = typeof r.raw_json === 'string' ? JSON.parse(r.raw_json) : (r.raw_json as Record<string, unknown> | null);
+    return {
+      uuid: r.uuid,
+      env: r.env,
+      domain: r.domain,
+      class_name: r.class_name,
+      name_en: parsed?.name_en ?? null,
+      name_fr: r.name_fr ?? parsed?.name_fr ?? null,
+      description_en: parsed?.description_en ?? null,
+      description_fr: r.description_fr ?? parsed?.description_fr ?? null,
+      extracted_at: r.extracted_at,
+    };
+  }
 }
