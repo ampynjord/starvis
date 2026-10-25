@@ -13863,6 +13863,16 @@
               "default": 20
             },
             "description": "Maximum items to return"
+          },
+          {
+            "name": "lang",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["fr", "en"],
+              "default": "fr"
+            },
+            "description": "Output localization language"
           }
         ],
         "responses": {
@@ -13944,6 +13954,50 @@
               "default": "live"
             },
             "description": "Game environment"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["all", "flight-ready", "in-concept", "lore"],
+              "default": "all"
+            },
+            "description": "Production status filter (flight-ready, in-concept, lore)"
+          },
+          {
+            "name": "manufacturer",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Manufacturer code filter"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Entity type filter"
+          },
+          {
+            "name": "system",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Star system filter"
+          },
+          {
+            "name": "lang",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["fr", "en"],
+              "default": "fr"
+            },
+            "description": "Output localization language"
           }
         ],
         "responses": {
@@ -14020,6 +14074,16 @@
               "default": "live"
             },
             "description": "Game environment"
+          },
+          {
+            "name": "lang",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["fr", "en"],
+              "default": "fr"
+            },
+            "description": "Output localization language"
           }
         ],
         "responses": {
