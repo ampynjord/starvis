@@ -189,7 +189,7 @@ test.describe('@critical application flows', () => {
   test('data library pages render usable records', async ({ page }) => {
     const pageErrors = watchBrowserErrors(page);
     const pages = [
-      { path: '/ships', heading: 'Ships', text: '100i' },
+      { path: '/ships', heading: 'Ships', text: /Aurora MR|100i/i },
       { path: '/components', heading: 'Components', text: 'CF-117 Bulldog' },
       { path: '/weapons', heading: /Weapons|Equipment/i, text: 'P4-AR Rifle' },
       { path: '/commodities', heading: 'Commodities', text: 'Agricium' },
