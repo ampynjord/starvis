@@ -16,9 +16,10 @@ export function mountUniverseNexusRoutes(router: Router, deps: RouteDependencies
     asyncHandler(async (req, res) => {
       const q = getQueryString(req, 'q') ?? getQueryString(req, 'search') ?? '';
       const env = getQueryString(req, 'env') ?? 'live';
+      const lang = getQueryString(req, 'lang') ?? 'fr';
       const limit = Number(req.query.limit ?? 20);
 
-      const results = await nexusService.omniSearch(q, env, limit);
+      const results = await nexusService.omniSearch(q, env, limit, lang);
       sendWithETag(req, res, {
         success: true,
         data: results,
@@ -42,6 +43,7 @@ export function mountUniverseNexusRoutes(router: Router, deps: RouteDependencies
       const page = Number(req.query.page ?? 1);
       const limit = Number(req.query.limit ?? 24);
       const env = getQueryString(req, 'env') ?? 'live';
+      const lang = getQueryString(req, 'lang') ?? 'fr';
 
       const result = await nexusService.explore({
         category,
@@ -52,6 +54,7 @@ export function mountUniverseNexusRoutes(router: Router, deps: RouteDependencies
         page,
         limit,
         env,
+        lang,
       });
 
       sendWithETag(req, res, {
@@ -71,13 +74,14 @@ export function mountUniverseNexusRoutes(router: Router, deps: RouteDependencies
       const category = req.params.category as any;
       const id = req.params.id;
       const env = getQueryString(req, 'env') ?? 'live';
+      const lang = getQueryString(req, 'lang') ?? 'fr';
 
       if (!['ships', 'components', 'items', 'locations', 'commodities'].includes(category)) {
         res.status(400).json({ success: false, error: 'Invalid category' });
         return;
       }
 
-      const result = await nexusService.getEntityNexus(category, id, env);
+      const result = await nexusService.getEntityNexus(category, id, env, lang);
       if (!result) {
         res.status(404).json({ success: false, error: 'Entity not found in universe' });
         return;

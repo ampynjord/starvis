@@ -323,8 +323,10 @@ test.describe('@mobile responsive shell', () => {
     await page.getByLabel(/(Open menu|Ouvrir menu)/i).click();
     await expectDrawerInViewport(page);
     const navigation = page.getByRole('navigation');
-    await expect(navigation.getByRole('link', { name: /(Ships & Vehicles|Flotte & Véhicules)/i })).toBeVisible();
-    await expect(navigation.getByRole('link', { name: /Missions/i })).toBeVisible();
+    await expect(navigation.getByRole('link', { name: /(Universal Nexus|Nexus Universel)/i })).toBeVisible();
+    await expect(navigation.getByRole('link', { name: /(3D Starmap|Starmap 3D)/i })).toBeVisible();
+    await expect(navigation.getByRole('link', { name: /(Ships & Vehicles|Flotte & Véhicules)/i })).toHaveCount(0);
+    await expect(navigation.getByRole('link', { name: /^Missions$/i })).toHaveCount(0);
     await page.getByLabel(/(Close menu|Fermer menu)/i).click();
     await expect(page.getByLabel(/(Open menu|Ouvrir menu)/i)).toBeVisible();
     await expectNoShellHorizontalOverflow(page);

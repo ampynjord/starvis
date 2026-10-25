@@ -1,15 +1,17 @@
 import type { UniverseEntityNexus, UniverseOmniResult } from '@/types/universe';
 
+type NexusLang = 'fr' | 'en';
+
 function getBaseUrl(): string {
   if (typeof window !== 'undefined') return '';
   return (process.env.API_URL ?? 'http://127.0.0.1:3000').replace(/\/$/, '');
 }
 
-export async function fetchOmniSearch(query: string, env = 'live', limit = 20): Promise<UniverseOmniResult[]> {
+export async function fetchOmniSearch(query: string, env = 'live', limit = 20, lang: NexusLang = 'fr'): Promise<UniverseOmniResult[]> {
   if (!query || query.trim().length === 0) return [];
   const base = getBaseUrl();
   const res = await fetch(
-    `${base}/api/v2/universe/omni-search?q=${encodeURIComponent(query)}&env=${encodeURIComponent(env)}&limit=${limit}`,
+    `${base}/api/v2/universe/omni-search?q=${encodeURIComponent(query)}&env=${encodeURIComponent(env)}&lang=${lang}&limit=${limit}`,
   );
   if (!res.ok) return [];
   const json = await res.json();
@@ -24,6 +26,7 @@ export async function fetchUniverseExplore(params: {
   page?: number;
   limit?: number;
   env?: string;
+  lang?: NexusLang;
 }) {
   const query = new URLSearchParams();
   if (params.category) query.set('category', params.category);
@@ -33,6 +36,7 @@ export async function fetchUniverseExplore(params: {
   if (params.page) query.set('page', String(params.page));
   if (params.limit) query.set('limit', String(params.limit));
   if (params.env) query.set('env', params.env);
+  if (params.lang) query.set('lang', params.lang);
 
   const base = getBaseUrl();
   const res = await fetch(`${base}/api/v2/universe/explore?${query.toString()}`);
@@ -40,10 +44,15 @@ export async function fetchUniverseExplore(params: {
   return res.json();
 }
 
-export async function fetchEntityNexus(category: string, id: string, env = 'live'): Promise<UniverseEntityNexus | null> {
+export async function fetchEntityNexus(
+  category: string,
+  id: string,
+  env = 'live',
+  lang: NexusLang = 'fr',
+): Promise<UniverseEntityNexus | null> {
   const base = getBaseUrl();
   const res = await fetch(
-    `${base}/api/v2/universe/entities/${encodeURIComponent(category)}/${encodeURIComponent(id)}?env=${encodeURIComponent(env)}`,
+    `${base}/api/v2/universe/entities/${encodeURIComponent(category)}/${encodeURIComponent(id)}?env=${encodeURIComponent(env)}&lang=${lang}`,
   );
   if (!res.ok) return null;
   const json = await res.json();

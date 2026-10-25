@@ -17,6 +17,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { fetchEntityNexus } from '@/services/universe-api';
 import type { UniverseEntityNexus } from '@/types/universe';
 import { fNumber } from '@/utils/formatters';
+import { localizeCatalogLabel } from '@/lib/catalog-labels';
 import { ShipHoloViewer } from '@/components/ship/ShipHoloViewer';
 
 interface EntityNexusSheetProps {
@@ -59,7 +60,7 @@ export function EntityNexusSheet({ category, id, open, onClose, onOpenModel3D }:
     let active = true;
     setLoading(true);
 
-    fetchEntityNexus(currentTarget.category, currentTarget.id, env)
+    fetchEntityNexus(currentTarget.category, currentTarget.id, env, language)
       .then((res) => {
         if (active) {
           setData(res);
@@ -73,7 +74,7 @@ export function EntityNexusSheet({ category, id, open, onClose, onOpenModel3D }:
     return () => {
       active = false;
     };
-  }, [currentTarget?.category, currentTarget?.id, env]);
+  }, [currentTarget?.category, currentTarget?.id, env, language]);
 
   const handlePivot = (newCategory: 'ships' | 'components' | 'items' | 'locations' | 'commodities', newId: string, newName = '') => {
     setShow3D(false);
@@ -183,8 +184,10 @@ export function EntityNexusSheet({ category, id, open, onClose, onOpenModel3D }:
                         {entity.manufacturer_name && (
                           <span className="text-cyan-400 font-medium">{entity.manufacturer_name}</span>
                         )}
-                        {entity.role && <span>• {entity.role}</span>}
-                        {entity.type && <span>• {entity.type}</span>}
+                        {entity.role && <span>• {localizeCatalogLabel(language, entity.role)}</span>}
+                        {entity.type && entity.type !== entity.role && (
+                          <span>• {localizeCatalogLabel(language, entity.type)}</span>
+                        )}
                         {entity.system_code && <span>• {language === 'fr' ? 'Système' : 'System'} {entity.system_code}</span>}
                       </div>
                       <h2 className="text-2xl sm:text-3xl font-bold font-rajdhani text-white mt-1">
@@ -363,7 +366,7 @@ export function EntityNexusSheet({ category, id, open, onClose, onOpenModel3D }:
                                 {slot.port_name} ({slot.port_type})
                               </span>
                               <span className="text-xs font-semibold text-white font-rajdhani truncate block group-hover:text-cyan-300">
-                                {slot.component_name || slot.component_class_name}
+                                {slot.component_name || localizeCatalogLabel(language, slot.component_type) || t('cat_components')}
                               </span>
                             </div>
                             {slot.component_size && (

@@ -112,6 +112,15 @@ export const TRANSLATIONS = {
     menu_monitoring: 'Supervision API',
     menu_about: 'À propos',
     menu_legal: 'Mentions Légales',
+    menu_roadmap: 'Feuille de Route',
+    disclaimer: 'Projet fan non officiel. Non affilié à Cloud Imperium Games.',
+    doc_title: 'STARVIS — Nexus Universel Star Citizen',
+    cookie_before: 'Starvis utilise le cookie d’authentification strictement nécessaire',
+    cookie_after:
+      'Aucun cookie publicitaire ou de suivi n’est utilisé. Refuser masque seulement cet avis et ne désactive pas le cookie de connexion.',
+    cookie_more: 'En savoir plus',
+    cookie_decline: 'REFUSER',
+    cookie_accept: 'ACCEPTER',
   },
   en: {
     // Navigation & Cockpit
@@ -224,6 +233,14 @@ export const TRANSLATIONS = {
     menu_monitoring: 'Monitoring',
     menu_about: 'About',
     menu_legal: 'Legal Terms',
+    menu_roadmap: 'Roadmap',
+    disclaimer: 'Unofficial fan project. Not affiliated with Cloud Imperium Games.',
+    doc_title: 'STARVIS — Universal Star Citizen Nexus',
+    cookie_before: 'Starvis uses the strictly necessary authentication cookie',
+    cookie_after: 'No advertising or tracking cookies are used. Declining only hides this notice and does not disable login cookies.',
+    cookie_more: 'Learn more',
+    cookie_decline: 'DECLINE',
+    cookie_accept: 'ACCEPT',
   },
 } as const;
 

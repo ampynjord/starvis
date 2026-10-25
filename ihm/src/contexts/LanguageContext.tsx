@@ -19,6 +19,10 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<SupportedLanguage>('fr');
 
   useEffect(() => {
+    document.documentElement.lang = language === 'fr' ? 'fr' : 'en';
+  }, [language]);
+
+  useEffect(() => {
     try {
       const stored = localStorage.getItem('starvis-lang');
       if (stored === 'fr' || stored === 'en') {

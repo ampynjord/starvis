@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import {
@@ -21,6 +21,7 @@ import { useEnv } from '@/contexts/EnvContext';
 import { useEntityNexus } from '@/contexts/NexusContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { fetchUniverseExplore } from '@/services/universe-api';
+import { localizeCatalogLabel } from '@/lib/catalog-labels';
 import type { UniverseOmniResult } from '@/types/universe';
 import { fNumber } from '@/utils/formatters';
 
@@ -43,8 +44,12 @@ export function UniverseNexusView() {
   const [page, setPage] = useState(1);
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
 
+  useEffect(() => {
+    document.title = t('doc_title');
+  }, [language, t]);
+
   const { data, isLoading } = useQuery({
-    queryKey: ['universe-explore', selectedCategory, search, page, env],
+    queryKey: ['universe-explore', selectedCategory, search, page, env, language],
     queryFn: () =>
       fetchUniverseExplore({
         category: selectedCategory,
@@ -52,6 +57,7 @@ export function UniverseNexusView() {
         page,
         limit: 24,
         env,
+        lang: language,
       }),
     staleTime: 30_000,
   });
@@ -206,7 +212,7 @@ export function UniverseNexusView() {
                               : 'bg-slate-900/90 text-slate-300 border-slate-700'
                           }`}
                         >
-                          {item.badge.label}
+                          {localizeCatalogLabel(language, item.badge.label)}
                         </span>
                       </div>
                     )}
@@ -215,13 +221,21 @@ export function UniverseNexusView() {
                   {/* Body Info */}
                   <div className="p-4 space-y-1.5">
                     <span className="text-[11px] font-mono-sc text-cyan-400 block truncate">
-                      {item.manufacturer || (item.system ? `${language === 'fr' ? 'Système' : 'System'} ${item.system}` : item.category)}
+                      {item.manufacturer ||
+                        (item.system
+                          ? `${language === 'fr' ? 'Système' : 'System'} ${item.system}`
+                          : localizeCatalogLabel(language, item.category))}
                     </span>
                     <h3 className="font-bold text-base font-rajdhani text-white group-hover:text-cyan-300 transition-colors line-clamp-1">
                       {item.name}
                     </h3>
                     <p className="text-xs font-mono-sc text-slate-400 truncate">
-                      {item.type} {item.subType ? `• ${item.subType}` : ''}
+                      {(() => {
+                        const typeLabel = localizeCatalogLabel(language, item.type);
+                        const subLabel =
+                          item.subType && item.subType !== 'UNDEFINED' ? localizeCatalogLabel(language, item.subType) : '';
+                        return subLabel && subLabel !== typeLabel ? `${typeLabel} • ${subLabel}` : typeLabel;
+                      })()}
                     </p>
                   </div>
                 </div>
@@ -276,10 +290,10 @@ export function UniverseNexusView() {
                     </td>
                     <td className="px-4 py-3">
                       <span className="px-2 py-0.5 rounded bg-slate-800 text-[10px] uppercase text-cyan-300">
-                        {item.category}
+                        {localizeCatalogLabel(language, item.category)}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-slate-400">{item.type}</td>
+                    <td className="px-4 py-3 text-slate-400">{localizeCatalogLabel(language, item.type)}</td>
                     <td className="px-4 py-3 text-slate-400">{item.manufacturer || item.system || '-'}</td>
                     <td className="px-4 py-3 text-right">
                       <button className="text-cyan-400 hover:text-cyan-300">{t('inspect')}</button>

@@ -3,12 +3,11 @@ import { PUBLIC_SITE_URL } from '@/lib/server-config';
 import { UniverseNexusView } from '@/views/UniverseNexusView';
 
 export const metadata: Metadata = {
-  title: 'STARVIS — Nexus Universel Star Citizen',
-  description:
-    'Explorateur universel et connecté de Star Citizen : flotte, armement, équipement, lieux et marchés sans silos.',
+  title: 'STARVIS — Universal Star Citizen Nexus',
+  description: 'Connected Star Citizen explorer: fleet, weapons, equipment, locations and markets in one place.',
   openGraph: {
-    title: 'STARVIS — Nexus Universel Star Citizen',
-    description: 'Explorateur universel et connecté de Star Citizen : flotte, armement, équipement, lieux et marchés sans silos.',
+    title: 'STARVIS — Universal Star Citizen Nexus',
+    description: 'Connected Star Citizen explorer: fleet, weapons, equipment, locations and markets in one place.',
   },
 };
 
@@ -17,7 +16,7 @@ const jsonLd = {
   '@type': 'WebSite',
   name: 'STARVIS',
   url: PUBLIC_SITE_URL,
-  description: 'STARVIS — Nexus Universel Star Citizen',
+  description: 'STARVIS — Universal Star Citizen Nexus',
   potentialAction: {
     '@type': 'SearchAction',
     target: `${PUBLIC_SITE_URL}/search?q={search_term_string}`,

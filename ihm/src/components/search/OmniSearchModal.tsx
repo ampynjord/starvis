@@ -17,6 +17,7 @@ import { useDebounce } from '@/hooks/useDebounce';
 import { useEnv } from '@/contexts/EnvContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { fetchOmniSearch } from '@/services/universe-api';
+import { localizeCatalogLabel } from '@/lib/catalog-labels';
 import type { UniverseOmniResult } from '@/types/universe';
 
 interface OmniSearchModalProps {
@@ -81,7 +82,7 @@ export function OmniSearchModal({ open, onClose, onSelectEntity }: OmniSearchMod
     let active = true;
     setLoading(true);
 
-    fetchOmniSearch(debouncedQuery, env, 20)
+    fetchOmniSearch(debouncedQuery, env, 20, language)
       .then((items) => {
         if (active) {
           setResults(items);
@@ -99,7 +100,7 @@ export function OmniSearchModal({ open, onClose, onSelectEntity }: OmniSearchMod
     return () => {
       active = false;
     };
-  }, [debouncedQuery, env]);
+  }, [debouncedQuery, env, language]);
 
   const handleSelect = (item: UniverseOmniResult) => {
     if (onSelectEntity) {
@@ -215,13 +216,13 @@ export function OmniSearchModal({ open, onClose, onSelectEntity }: OmniSearchMod
                                 : 'bg-slate-800 text-slate-300'
                             }`}
                           >
-                            {item.badge.label}
+                            {localizeCatalogLabel(language, item.badge.label)}
                           </span>
                         )}
                       </div>
                       <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5 truncate font-mono-sc">
                         {item.manufacturer && <span>{item.manufacturer}</span>}
-                        {item.type && <span>• {item.type}</span>}
+                        {item.type && <span>• {localizeCatalogLabel(language, item.type)}</span>}
                         {item.subType && <span>• {item.subType}</span>}
                         {item.system && <span>• {language === 'fr' ? 'Système' : 'System'} {item.system}</span>}
                       </div>
