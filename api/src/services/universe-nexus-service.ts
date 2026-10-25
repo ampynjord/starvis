@@ -267,12 +267,19 @@ function readTranslation(
 
 function applyLanguage(row: Row, lang: NexusLang): Row {
   const parsed = readTranslation(row);
-  const english = parsed?.name_en || row.name;
-  const french = parsed?.name_fr || row.translation_name;
+  const english = (parsed?.name_en || row.name)
+    ?.toString()
+    .replace(/\s+GS$/i, '')
+    .replace(/_GS\b/g, '');
+  const french = (parsed?.name_fr || row.translation_name)
+    ?.toString()
+    .replace(/\s+GS$/i, '')
+    .replace(/_GS\b/g, '');
   const name =
     lang === 'fr' && french && String(french).toLowerCase() !== String(english || '').toLowerCase() ? french : english || row.name;
   const description = lang === 'fr' ? parsed?.description_fr || row.description : parsed?.description_en || row.description;
-  const next: Row = { ...row, name };
+  const cleanedName = typeof name === 'string' ? name.replace(/\s+GS$/i, '').replace(/_GS\b/g, '') : name;
+  const next: Row = { ...row, name: cleanedName };
   if (description) next.description = description;
   delete next.translation_json;
   delete next.translation_name;
@@ -1834,12 +1841,12 @@ export class UniverseNexusService {
           c.shield_regen,
           c.shield_hardening,
           c.shield_faces,
-          c.quantum_speed,
-          c.quantum_spool_time,
-          c.quantum_range,
+          c.qd_speed AS quantum_speed,
+          c.qd_spool_time AS quantum_spool_time,
+          c.qd_range AS quantum_range,
           c.qd_fuel_rate,
           c.qd_cooldown,
-          c.cooler_cooling_rate,
+          c.cooling_rate AS cooler_cooling_rate,
           c.power_output,
           c.em_signature,
           c.ir_signature,
@@ -1850,10 +1857,6 @@ export class UniverseNexusService {
         LEFT JOIN game.components c ON (c.uuid = sl.component_uuid OR c.class_name = sl.component_class_name) AND c.env = $1
         ${translationJoin('c')}
         WHERE sl.ship_uuid = $2 AND sl.env = $1
-          AND sl.component_class_name !~* '(door|interior|airlock|seat|light|hatch|bed|toilet|ladder|cockpit|flair|dashboard|radar_helper|screen_mfd|controller_|screen_annunciator|display_hud)'
-          AND sl.port_name !~* '(door|interior|airlock|seat|light|hatch|bed|toilet|ladder|cockpit|flair|screen_|display_|controller_|^\\$.*|^bar\\d|^mec|^pow|^ven|landingpad)'
-          AND (c.name IS NOT NULL OR sl.port_type IN ('Turret', 'WeaponGun', 'MissileRack', 'Gimbal', 'QuantumDrive', 'Countermeasure'))
-          AND (c.name IS NULL OR (c.name NOT ILIKE '%placeholder%' AND c.name !~ '^[A-Z]{2,5}_'))
         ORDER BY sl.id ASC`,
         toPostgres(env),
         ship.uuid,

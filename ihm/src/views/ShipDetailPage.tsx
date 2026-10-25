@@ -450,6 +450,7 @@ export default function ShipDetailPage({ initialShip }: { initialShip?: Ship | n
   const hasInsurance = ship.insurance_claim_time != null || ship.insurance_expedite_cost != null;
   const gallery = ship.gallery ?? [];
   const marketEmptyCopy = shipMarketEmptyCopy(ship);
+  const cleanShipName = (ship.name || '').replace(/\s+GS$/i, '').replace(/_GS\b/g, '');
 
   return (
     <PageShell size="xl">
@@ -462,7 +463,7 @@ export default function ShipDetailPage({ initialShip }: { initialShip?: Ship | n
         <ChevronRight size={10} />
         <Link href={categoryHref} className="hover:text-slate-400 transition-colors">{categoryLabel}</Link>
         <ChevronRight size={10} />
-        <span className="text-slate-400">{ship.name}</span>
+        <span className="text-slate-400">{cleanShipName}</span>
       </div>
 
       {/* ── Hero ───────────────────────────────────────────────────────────── */}
@@ -472,14 +473,14 @@ export default function ShipDetailPage({ initialShip }: { initialShip?: Ship | n
           {(ship.thumbnail_large ?? ship.thumbnail) ? (
             <img
               src={(ship.thumbnail_large ?? ship.thumbnail)!}
-              alt={ship.name}
+              alt={cleanShipName}
               className="w-full h-full object-cover opacity-80"
               loading="lazy"
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
               <span className="font-orbitron text-6xl font-black text-slate-800 select-none tracking-widest">
-                {ship.manufacturer_code ?? ship.name.slice(0, 3).toUpperCase()}
+                {ship.manufacturer_code ?? cleanShipName.slice(0, 3).toUpperCase()}
               </span>
             </div>
           )}
@@ -494,10 +495,10 @@ export default function ShipDetailPage({ initialShip }: { initialShip?: Ship | n
                 {ship.manufacturer_name}
               </p>
               <h1 className="font-orbitron text-3xl font-black text-slate-100 leading-tight">
-                {ship.name}
+                {cleanShipName}
               </h1>
-              {ship.short_name && ship.short_name !== ship.name && (
-                <p className="text-[10px] font-mono-sc text-slate-600 mt-0.5 uppercase tracking-widest">{ship.short_name}</p>
+              {ship.short_name && ship.short_name !== cleanShipName && (
+                <p className="text-[10px] font-mono-sc text-slate-600 mt-0.5 uppercase tracking-widest">{ship.short_name.replace(/\s+GS$/i, '')}</p>
               )}
               <div className="flex flex-wrap gap-2 mt-3">
                 {generateShipTags(ship as unknown as import('@/types/api').ShipListItem).map((tag) => (
@@ -599,7 +600,7 @@ export default function ShipDetailPage({ initialShip }: { initialShip?: Ship | n
 
           {/* Ship holoviewer — only if 3D model available */}
           {ship.ctm_url && (
-            <ShipHoloViewer shipUuid={ship.uuid} shipName={ship.name} hasModel />
+            <ShipHoloViewer shipUuid={ship.uuid} shipName={cleanShipName} hasModel />
           )}
 
           {/* Dimensions */}
@@ -617,7 +618,7 @@ export default function ShipDetailPage({ initialShip }: { initialShip?: Ship | n
           {/* Cargo */}
           {hasCargo && (
             <ScifiPanel title="Cargo" actions={<Package size={13} className="text-slate-600" />}>
-              <CargoGrid scu={Number(ship.cargo_capacity)} shipName={ship.name} />
+              <CargoGrid scu={Number(ship.cargo_capacity)} shipName={cleanShipName} />
             </ScifiPanel>
           )}
 
@@ -639,7 +640,7 @@ export default function ShipDetailPage({ initialShip }: { initialShip?: Ship | n
             </ScifiPanel>
           )}
 
-          {gallery.length > 0 && <OfficialGallerySections shipName={ship.name} images={gallery} />}
+          {gallery.length > 0 && <OfficialGallerySections shipName={cleanShipName} images={gallery} />}
         </div>
 
         {/* ════ RIGHT sidebar ════ */}

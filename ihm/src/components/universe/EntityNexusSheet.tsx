@@ -262,6 +262,7 @@ export function EntityNexusSheet({ category, id, open, onClose, onOpenModel3D }:
 
   const entity = data?.entity;
   const connections = data?.connections;
+  const displayName = (entity?.name || '').replace(/\s+GS$/i, '').replace(/_GS\b/g, '');
 
   return (
     <AnimatePresence>
@@ -324,7 +325,7 @@ export function EntityNexusSheet({ category, id, open, onClose, onOpenModel3D }:
                       <div className="relative w-full h-48 sm:h-56 rounded-xl overflow-hidden border border-slate-800 bg-slate-900">
                         <img
                           src={entity.thumbnail}
-                          alt={entity.name}
+                          alt={displayName}
                           className="w-full h-full object-cover object-center"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent" />
@@ -363,7 +364,7 @@ export function EntityNexusSheet({ category, id, open, onClose, onOpenModel3D }:
                         {entity.system_code && <span>• {language === 'fr' ? 'Système' : 'System'} {entity.system_code}</span>}
                       </div>
                       <h2 className="text-2xl sm:text-3xl font-bold font-rajdhani text-white mt-1">
-                        {entity.name}
+                        {displayName}
                       </h2>
                     </div>
 
@@ -404,7 +405,7 @@ export function EntityNexusSheet({ category, id, open, onClose, onOpenModel3D }:
                     {/* Interactive 3D Holoviewer — mounted only when a CTM URL exists */}
                     {currentTarget.category === 'ships' && show3D && entity.ctm_url && (
                       <div className="rounded-xl overflow-hidden border border-cyan-500/40 bg-slate-950 shadow-2xl mt-2">
-                        <ShipHoloViewer shipUuid={entity.uuid} shipName={entity.name} hasModel={Boolean(entity.ctm_url)} />
+                        <ShipHoloViewer shipUuid={entity.uuid} shipName={displayName} hasModel={Boolean(entity.ctm_url)} />
                       </div>
                     )}
 
@@ -595,24 +596,27 @@ export function EntityNexusSheet({ category, id, open, onClose, onOpenModel3D }:
                         <span>{t('compatible_ships_title')}</span>
                       </h3>
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                        {connections.equippedOn.map((ship, i) => (
-                          <div
-                            key={i}
-                            onClick={() => handlePivot('ships', ship.uuid, ship.name)}
-                            className="p-2 rounded-lg bg-slate-900/60 hover:bg-cyan-950/50 border border-slate-800 hover:border-cyan-500/40 cursor-pointer transition-all flex items-center gap-2"
-                          >
-                            <div className="w-8 h-8 rounded bg-slate-950 shrink-0 overflow-hidden border border-slate-800">
-                              {ship.thumbnail ? (
-                                <img src={ship.thumbnail} alt={ship.name} className="w-full h-full object-cover" />
-                              ) : (
-                                <Rocket size={14} className="m-auto text-cyan-400" />
-                              )}
+                        {connections.equippedOn.map((ship, i) => {
+                          const shipName = (ship.name || '').replace(/\s+GS$/i, '').replace(/_GS\b/g, '');
+                          return (
+                            <div
+                              key={i}
+                              onClick={() => handlePivot('ships', ship.uuid, shipName)}
+                              className="p-2 rounded-lg bg-slate-900/60 hover:bg-cyan-950/50 border border-slate-800 hover:border-cyan-500/40 cursor-pointer transition-all flex items-center gap-2"
+                            >
+                              <div className="w-8 h-8 rounded bg-slate-950 shrink-0 overflow-hidden border border-slate-800">
+                                {ship.thumbnail ? (
+                                  <img src={ship.thumbnail} alt={shipName} className="w-full h-full object-cover" />
+                                ) : (
+                                  <Rocket size={14} className="m-auto text-cyan-400" />
+                                )}
+                              </div>
+                              <span className="text-xs font-semibold text-white font-rajdhani truncate">
+                                {shipName}
+                              </span>
                             </div>
-                            <span className="text-xs font-semibold text-white font-rajdhani truncate">
-                              {ship.name}
-                            </span>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   )}

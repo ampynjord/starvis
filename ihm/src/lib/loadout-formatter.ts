@@ -206,6 +206,59 @@ export function isNoisyPort(portName?: string | null, componentClassName?: strin
   const c = (componentClassName || '').toLowerCase();
   const n = (componentName || '').toLowerCase();
 
+  // Internal engine controllers (except flight computer which is a valid component)
+  if ((p.includes('controller_') || c.includes('controller_')) && !p.includes('controller_flight') && !c.includes('controller_flight')) {
+    return true;
+  }
+
+  // Doors, airlocks, ladders, seats, interior fixtures, cargo grids, panels, glass, buff modifiers, self-destruct
+  if (
+    p.includes('door') ||
+    c.includes('door') ||
+    p.includes('airlock') ||
+    p.includes('ladder') ||
+    p.includes('toilet') ||
+    p.includes('bed') ||
+    p.includes('seat') ||
+    c.includes('seat') ||
+    p.includes('cargogrid') ||
+    c.includes('cargogrid') ||
+    p.includes('cargobay') ||
+    p.includes('cargo_bay') ||
+    c.includes('cargobay') ||
+    p.includes('glass') ||
+    c.includes('glass') ||
+    p.includes('buff') ||
+    c.includes('buff') ||
+    p.includes('control_panel') ||
+    p.includes('panel_interior') ||
+    c.includes('controlpanel') ||
+    p.includes('selfdestruct') ||
+    p.includes('self_destruct') ||
+    c.includes('selfdestruct') ||
+    p.includes('paint') ||
+    p.includes('landingpad') ||
+    p.includes('air_traffic') ||
+    p.includes('fuse') ||
+    p.includes('relay') ||
+    p.includes('light') ||
+    p.includes('hatch') ||
+    p.includes('radar_helper') ||
+    p.includes('display_hud') ||
+    p.includes('screen_mfd') ||
+    p.includes('screen_annunciator') ||
+    p.includes('screen_radar') ||
+    p.includes('screen_') ||
+    c.includes('vehicle_screen') ||
+    p.startsWith('$slot') ||
+    p.startsWith('bar') ||
+    p.startsWith('mec') ||
+    p.startsWith('pow') ||
+    p.startsWith('ven')
+  ) {
+    return true;
+  }
+
   // Explicit exceptions: NEVER discard functional equipment even if CIG labels them placeholder or controller
   if (
     p.includes('thruster') ||
@@ -241,14 +294,6 @@ export function isNoisyPort(portName?: string | null, componentClassName?: strin
 
   // True interior & display noise
   if (n.includes('placeholder') && !p.includes('thruster') && !p.includes('intake') && !p.includes('tank')) return true;
-  if (p.includes('radar_helper') || p.includes('display_hud') || p.includes('screen_mfd')) return true;
-  if (p.includes('screen_annunciator') || p.includes('screen_radar') || p.includes('screen_')) return true;
-  if (p.includes('dashboard_pilot') || p.includes('seataccess') || p.includes('seat_') || p.includes('cockpit_flair')) return true;
-  if (p.includes('airlock') || p.includes('door') || p.includes('ladder') || p.includes('toilet') || p.includes('bed')) return true;
-  if (p.includes('light') || p.includes('hatch') || p.includes('fuse') || p.includes('relay')) return true;
-  if (p.includes('landingpad') || p.includes('air_traffic') || p.includes('self_destruct')) return true;
-  if (p.startsWith('$slot') || p.startsWith('bar') || p.startsWith('mec') || p.startsWith('pow') || p.startsWith('ven')) return true;
-  if (c.includes('door_') || c.includes('seat_access') || c.includes('vehicle_screen')) return true;
   return false;
 }
 
