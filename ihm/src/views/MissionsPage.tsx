@@ -394,7 +394,7 @@ function DetailPanel({ m, env }: { m: Mission; env: string }) {
               </div>
             ) : (
               <Link
-                href={mission.blueprint_reward_uuid ? `/crafting-calculator?recipe=${mission.blueprint_reward_uuid}` : '/crafting-calculator'}
+                href={mission.blueprint_reward_uuid ? `/items/${mission.blueprint_reward_uuid}` : '/items'}
                 className="mt-1 inline-flex items-center gap-1 text-sm font-mono-sc text-purple-200 hover:text-purple-100"
               >
                 {mission.blueprint_name ?? mission.blueprint_output ?? 'Unknown Blueprint'}

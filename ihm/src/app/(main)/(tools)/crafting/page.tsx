@@ -5,6 +5,6 @@ import { useRouter } from 'next/navigation';
 
 export default function Page() {
   const router = useRouter();
-  useEffect(() => { router.replace('/crafting-calculator'); }, [router]);
+  useEffect(() => { router.replace('/items'); }, [router]);
   return null;
 }

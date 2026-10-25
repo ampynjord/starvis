@@ -1,14 +1,13 @@
 'use client';
 
-import { Boxes, Factory, Route, Scale } from 'lucide-react';
+import { Boxes, Shield, Target } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 const tabs = [
-  { href: '/trade', label: 'Routes', icon: Route },
-  { href: '/trade-calculator', label: 'Calculator', icon: Scale },
-  { href: '/commodities', label: 'Commodities', icon: Boxes },
-  { href: '/industrial', label: 'Industries', icon: Factory },
+  { href: '/commodities', label: 'Commodities & Prices', icon: Boxes },
+  { href: '/missions', label: 'Missions & Contracts', icon: Target },
+  { href: '/factions', label: 'Factions & Reputation', icon: Shield },
 ];
 
 export function EconomyNav() {

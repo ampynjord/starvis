@@ -34,21 +34,24 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     return [
-      { source: '/equipment', destination: '/ships-components', permanent: true },
-      { source: '/components', destination: '/ships-components', permanent: true },
-      { source: '/outfitter', destination: '/loadout-manager', permanent: true },
-      { source: '/blueprints', destination: '/crafting-calculator', permanent: true },
-      { source: '/mining', destination: '/mining-calculator', permanent: true },
-      { source: '/trade', destination: '/trade-calculator', permanent: true },
+      { source: '/equipment', destination: '/components', permanent: true },
+      { source: '/ships-components', destination: '/components', permanent: true },
+      { source: '/vehicles', destination: '/ships', permanent: true },
+      { source: '/outfitter', destination: '/ships', permanent: true },
+      { source: '/blueprints', destination: '/items', permanent: true },
+      { source: '/mining', destination: '/commodities', permanent: true },
+      { source: '/trade', destination: '/commodities', permanent: true },
       { source: '/industrial', destination: '/commodities', permanent: true },
       { source: '/minerals', destination: '/commodities', permanent: true },
-      { source: '/other-items', destination: '/consumables', permanent: true },
-      { source: '/items', destination: '/consumables', permanent: true },
-      // Pas de redirection pour /items/:uuid : seul le listing a été renommé en
-      // /consumables. La variante à identifiant avait suivi par erreur et
-      // renvoyait vers /consumables/:uuid, qui n'existe pas — toutes les fiches
-      // d'items répondaient donc 404, alors que l'IHM y lie depuis la liste des
-      // items et les ingrédients de recettes.
+      { source: '/other-items', destination: '/items', permanent: true },
+      { source: '/consumables', destination: '/items', permanent: true },
+      { source: '/compare', destination: '/ships', permanent: true },
+      { source: '/ranking', destination: '/ships', permanent: true },
+      { source: '/fps-calculator', destination: '/items', permanent: true },
+      { source: '/trade-calculator', destination: '/commodities', permanent: true },
+      { source: '/mining-calculator', destination: '/commodities', permanent: true },
+      { source: '/crafting-calculator', destination: '/items', permanent: true },
+      { source: '/crafting', destination: '/items', permanent: true },
     ];
   },
 };
