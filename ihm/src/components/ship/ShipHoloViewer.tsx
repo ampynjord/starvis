@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { loadCachedGeometry } from '@/components/holo/ctm-geometry-cache';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { CTMLoader } from '@/lib/CTMLoader';
 import { createVisibilityTracker, disposeObject3D, getThreePixelRatio } from '@/lib/three-performance';
 import { API_BASE } from '@/utils/constants';
@@ -12,74 +13,71 @@ import { API_BASE } from '@/utils/constants';
 interface Props {
   shipUuid: string;
   shipName: string;
+  /** When false, skip WebGL and show an empty state (e.g. no `ctm_url`). */
+  hasModel?: boolean;
 }
 
-type LoadState = 'idle' | 'loading' | 'ready' | 'error';
+type LoadState = 'idle' | 'loading' | 'ready' | 'error' | 'unavailable';
 
-export function ShipHoloViewer({ shipUuid, shipName }: Props) {
-  const ctmUrl = `${API_BASE}/ships/${shipUuid}/model/file`;
+export function ShipHoloViewer({ shipUuid, shipName, hasModel = true }: Props) {
+  const { t } = useLanguage();
+  const ctmUrl = hasModel ? `${API_BASE}/ships/${encodeURIComponent(shipUuid)}/model/file` : null;
   const canvasRef = useRef<HTMLDivElement>(null);
-  const [loadState, setLoadState] = useState<LoadState>('idle');
+  const [loadState, setLoadState] = useState<LoadState>(hasModel ? 'idle' : 'unavailable');
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const frameRef = useRef<number>(0);
 
   useEffect(() => {
+    if (!hasModel) {
+      setLoadState('unavailable');
+      return;
+    }
     if (!ctmUrl || !canvasRef.current) return;
     let disposed = false;
 
     const container = canvasRef.current;
-    const width = container.clientWidth;
-    const height = container.clientHeight;
+    const width = Math.max(container.clientWidth, 1);
+    const height = Math.max(container.clientHeight, 1);
 
-    // ── Scene ──────────────────────────────────────────────────────────
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x08111e);
 
-    // ── Lighting (modeled after RSI Holoviewer) ────────────────────────
-    // Very dark ambient — ship hollows remain nearly black
     scene.add(new THREE.AmbientLight(0x0a2535, 2.5));
 
-    // Key light: top-front, strong white-cyan → bright flat surfaces
     const key = new THREE.DirectionalLight(0x60d8ef, 4.5);
     key.position.set(0.4, 1.0, 0.6);
     scene.add(key);
 
-    // Very soft fill on the opposite side (avoids total black on flanks)
     const fill = new THREE.DirectionalLight(0x1060a0, 0.6);
     fill.position.set(-1, 0.2, -0.8);
     scene.add(fill);
 
-    // ── Renderer ───────────────────────────────────────────────────────
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     renderer.setPixelRatio(getThreePixelRatio());
     renderer.setSize(width, height);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    // ── Camera ─────────────────────────────────────────────────────────
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.01, 50000);
     camera.position.set(0, 5, 20);
 
-    // ── Controls ───────────────────────────────────────────────────────
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
     controls.autoRotate = true;
-    controls.autoRotateSpeed = 0.5;
+    controls.autoRotateSpeed = 0.45;
     controls.enablePan = false;
     const visibility = createVisibilityTracker(container);
 
-    // ── RSI hologram material (MeshPhong — soft shadow, light specular) ─
     const holoMaterial = new THREE.MeshPhongMaterial({
-      color: 0x1aa8c0,      // cyan-turquoise hologramme
-      emissive: 0x041828,   // slight self-glow to avoid total black
-      specular: 0x66ddff,   // reflets brillants blanc-bleu
+      color: 0x1aa8c0,
+      emissive: 0x041828,
+      specular: 0x66ddff,
       shininess: 55,
       side: THREE.DoubleSide,
     });
 
-    // ── Load CTM ───────────────────────────────────────────────────────
     setLoadState('loading');
     const loader = new CTMLoader();
     void loadCachedGeometry(loader, ctmUrl)
@@ -92,7 +90,6 @@ export function ShipHoloViewer({ shipUuid, shipName }: Props) {
         pivot.add(mesh);
         scene.add(pivot);
 
-        // Centrer en world space
         pivot.updateMatrixWorld(true);
         const box = new THREE.Box3().setFromObject(pivot);
         const center = new THREE.Vector3();
@@ -103,10 +100,10 @@ export function ShipHoloViewer({ shipUuid, shipName }: Props) {
         const box2 = new THREE.Box3().setFromObject(pivot);
         const sphere = new THREE.Sphere();
         box2.getBoundingSphere(sphere);
-        const r = sphere.radius;
+        const r = Math.max(sphere.radius, 0.01);
 
         camera.near = r * 0.001;
-        camera.far  = r * 200;
+        camera.far = r * 200;
         camera.position.set(r * 0.3, r * 0.45, r * 1.6);
         camera.updateProjectionMatrix();
 
@@ -115,7 +112,6 @@ export function ShipHoloViewer({ shipUuid, shipName }: Props) {
         controls.target.set(0, 0, 0);
         controls.update();
 
-        // ── Grille de sol ─────────────────────────────────────────────
         const floorY = box2.min.y - r * 0.04;
         const gridSize = r * 8;
         const divs = Math.max(10, Math.round(gridSize / (r / 2)));
@@ -130,7 +126,6 @@ export function ShipHoloViewer({ shipUuid, shipName }: Props) {
         if (!disposed) setLoadState('error');
       });
 
-    // ── Render loop ────────────────────────────────────────────────────
     const animate = () => {
       frameRef.current = requestAnimationFrame(animate);
       if (!visibility.isVisible()) return;
@@ -139,10 +134,9 @@ export function ShipHoloViewer({ shipUuid, shipName }: Props) {
     };
     animate();
 
-    // ── Resize ─────────────────────────────────────────────────────────
     const onResize = () => {
-      const w = container.clientWidth;
-      const h = container.clientHeight;
+      const w = Math.max(container.clientWidth, 1);
+      const h = Math.max(container.clientHeight, 1);
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
       renderer.setPixelRatio(getThreePixelRatio());
@@ -159,59 +153,62 @@ export function ShipHoloViewer({ shipUuid, shipName }: Props) {
       controls.dispose();
       disposeObject3D(scene);
       renderer.dispose();
-      container.removeChild(renderer.domElement);
+      if (renderer.domElement.parentNode === container) {
+        container.removeChild(renderer.domElement);
+      }
       rendererRef.current = null;
     };
-  }, [ctmUrl]);
-
-  if (!ctmUrl) return null;
+  }, [ctmUrl, hasModel]);
 
   return (
     <div className="sci-panel overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-800/60 bg-slate-900/40">
+      <div className="flex items-center justify-between gap-2 px-3 sm:px-4 py-2.5 border-b border-slate-800/60 bg-slate-900/40">
         <div className="flex items-center gap-2 text-xs font-mono-sc text-cyan-700 uppercase tracking-widest">
           <Box size={13} />
-          Holoviewer
+          {t('holo_title')}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           {loadState === 'loading' && (
             <span className="text-[10px] font-mono-sc text-yellow-600 uppercase tracking-wider animate-pulse">
-              Chargement…
+              {t('holo_loading')}
             </span>
           )}
           {loadState === 'ready' && (
-            <span className="text-[10px] font-mono-sc text-cyan-700 uppercase tracking-wider">
+            <span className="text-[10px] font-mono-sc text-cyan-700 uppercase tracking-wider truncate max-w-[12rem] sm:max-w-none">
               {shipName}
             </span>
           )}
-          {loadState === 'error' && (
-            <span className="text-[10px] font-mono-sc text-red-600 uppercase tracking-wider">
-              Erreur de chargement
+          {(loadState === 'error' || loadState === 'unavailable') && (
+            <span className="text-[10px] font-mono-sc text-slate-500 uppercase tracking-wider">
+              {t('holo_error')}
             </span>
           )}
         </div>
       </div>
 
-      {/* Canvas 3D */}
-      <div
-        ref={canvasRef}
-        className="w-full"
-        style={{ height: 340 }}
-        title="Clic gauche: rotation · Scroll: zoom"
-      />
+      <div className="relative w-full bg-[#08111e]" style={{ height: 'min(42vw, 380px)', minHeight: 240 }} title={t('holo_hint')}>
+        {hasModel && <div ref={canvasRef} className="absolute inset-0" />}
+        {(loadState === 'loading' || loadState === 'error' || loadState === 'unavailable') && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+            {loadState === 'loading' ? (
+              <div className="h-8 w-8 rounded-full border-2 border-cyan-500/30 border-t-cyan-400 animate-spin" />
+            ) : (
+              <p className="px-4 text-center text-xs font-mono-sc text-slate-500 max-w-sm">{t('holo_unavailable')}</p>
+            )}
+          </div>
+        )}
+      </div>
 
-      {/* Footer hint & 3D export downloads */}
-      {loadState === 'ready' && (
-        <div className="px-4 py-2 border-t border-slate-800/40 bg-slate-900/20 flex flex-wrap items-center justify-between gap-2 text-[10px] font-mono-sc text-slate-500">
-          <span>Clic gauche: rotation · Scroll: zoom</span>
-          <div className="flex items-center gap-1.5">
-            <span className="text-slate-600 uppercase">Export 3D:</span>
+      {loadState === 'ready' && ctmUrl && (
+        <div className="px-3 sm:px-4 py-2 border-t border-slate-800/40 bg-slate-900/20 flex flex-wrap items-center justify-between gap-2 text-[10px] font-mono-sc text-slate-500">
+          <span className="hidden sm:inline">{t('holo_hint')}</span>
+          <div className="flex items-center gap-1.5 ml-auto">
+            <span className="text-slate-600 uppercase">{t('holo_export')}</span>
             <a
               href={`${ctmUrl}?format=glb`}
               download
               className="px-1.5 py-0.5 rounded border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20 transition-colors"
-              title="Télécharger le modèle 3D au format standard glTF 2.0 Binaire (.glb)"
+              title={t('holo_dl_glb')}
             >
               GLB
             </a>
@@ -219,7 +216,7 @@ export function ShipHoloViewer({ shipUuid, shipName }: Props) {
               href={`${ctmUrl}?format=obj`}
               download
               className="px-1.5 py-0.5 rounded border border-slate-700 bg-slate-800/60 text-slate-300 hover:border-cyan-500/30 hover:text-cyan-300 transition-colors"
-              title="Télécharger le modèle 3D au format Wavefront (.obj)"
+              title={t('holo_dl_obj')}
             >
               OBJ
             </a>
@@ -227,7 +224,7 @@ export function ShipHoloViewer({ shipUuid, shipName }: Props) {
               href={ctmUrl}
               download
               className="px-1.5 py-0.5 rounded border border-slate-700 bg-slate-800/60 text-slate-400 hover:border-cyan-500/30 hover:text-cyan-300 transition-colors"
-              title="Télécharger le modèle 3D brut OpenCTM RSI (.ctm)"
+              title={t('holo_dl_ctm')}
             >
               CTM
             </a>

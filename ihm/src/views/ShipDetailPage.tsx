@@ -597,7 +597,7 @@ export default function ShipDetailPage({ initialShip }: { initialShip?: Ship | n
 
           {/* Ship holoviewer — only if 3D model available */}
           {ship.ctm_url && (
-            <ShipHoloViewer shipUuid={ship.uuid} shipName={ship.name} />
+            <ShipHoloViewer shipUuid={ship.uuid} shipName={ship.name} hasModel />
           )}
 
           {/* Dimensions */}

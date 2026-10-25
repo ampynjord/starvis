@@ -31,7 +31,7 @@ import type { PoolClient } from 'pg';
 import logger from '../logger.js';
 import type { GameEnv } from '../module-registry.js';
 import type { LocalizationService } from './localization-service.js';
-import { resolveGameShipName, stripManufacturerPrefix } from './ship-naming.js';
+import { looksLikeWorkshopShipName, resolveGameShipName, stripManufacturerPrefix } from './ship-naming.js';
 
 const WIKI_BASE = 'https://api.star-citizen.wiki/api/v3/vehicles';
 const REQUEST_TIMEOUT_MS = 8000;
@@ -103,7 +103,10 @@ export async function nameShipsFromCommunityWiki(
     [env],
   );
 
-  const orphans = rows.filter((s) => !(loc.isLoaded && resolveGameShipName(loc, s.class_name)));
+  const orphans = rows.filter((s) => {
+    if (looksLikeWorkshopShipName(s.name)) return true;
+    return !(loc.isLoaded && resolveGameShipName(loc, s.class_name));
+  });
   if (orphans.length === 0) return 0;
 
   onProgress?.(`Asking the community wiki for ${orphans.length} ship names the game does not provide…`);
@@ -194,6 +197,47 @@ export function partitionByCollision(
   return { applicable, rejected };
 }
 
+/**
+ * Suffixe lisible tiré du `class_name` (Military, Stealth, Civilian…).
+ * Sert à désambiguïser quand le wiki donne le même libellé à deux variantes.
+ */
+export function variantLabelFromClassName(className: string): string | null {
+  const parts = className.split('_').filter(Boolean);
+  if (parts.length === 0) return null;
+  const last = parts[parts.length - 1] ?? '';
+  if (/^StealthIndustrial$/i.test(last)) return 'Stealth';
+  if (/^Grad\d+$/i.test(last)) return last;
+  const aliases: Record<string, string> = {
+    civ: 'Civilian',
+    indust: 'Industrial',
+    mod: 'Mod',
+    military: 'Military',
+    stealth: 'Stealth',
+  };
+  const mapped = aliases[last.toLowerCase()];
+  if (mapped) return mapped;
+  if (/^(Exec|Collector)$/i.test(last) && parts.length >= 2) {
+    return variantLabelFromClassName(parts.slice(0, -1).join('_'));
+  }
+  return null;
+}
+
+/**
+ * Quand deux variantes partagent le même nom wiki, on garde le libellé et on
+ * ajoute `(Military)` / `(Stealth)` plutôt que de laisser le nom d'atelier.
+ */
+export function disambiguateCollidingProposals(rejected: RenameProposal[]): RenameProposal[] {
+  return rejected
+    .map((p) => {
+      const variant = variantLabelFromClassName(p.className);
+      if (!variant) return null;
+      const tagged = `${p.proposedName} (${variant})`;
+      if (tagged === p.currentName) return null;
+      return { ...p, proposedName: tagged };
+    })
+    .filter((p): p is RenameProposal => p != null);
+}
+
 async function applyWithoutCollisions(
   conn: PoolClient,
   env: GameEnv,
@@ -201,15 +245,22 @@ async function applyWithoutCollisions(
 ): Promise<{ applied: number; collided: number }> {
   const { rows: existing } = await conn.query<{ uuid: string; name: string }>('SELECT uuid, name FROM game.ships WHERE env = $1', [env]);
 
-  const { applicable, rejected } = partitionByCollision(
-    proposals.map((p) => ({
-      uuid: p.ship.uuid,
-      className: p.ship.class_name,
-      currentName: p.ship.name,
-      proposedName: p.display,
-    })),
-    existing,
-  );
+  const initial = proposals.map((p) => ({
+    uuid: p.ship.uuid,
+    className: p.ship.class_name,
+    currentName: p.ship.name,
+    proposedName: p.display,
+  }));
+
+  const first = partitionByCollision(initial, existing);
+  const disambiguated = disambiguateCollidingProposals(first.rejected);
+  const second = partitionByCollision(disambiguated, [
+    ...existing,
+    ...first.applicable.map((p) => ({ uuid: p.uuid, name: p.proposedName })),
+  ]);
+
+  const applicable = [...first.applicable, ...second.applicable];
+  const rejected = second.rejected;
 
   for (const p of rejected) {
     logger.warn(`Community wiki name rejected — would collide: "${p.currentName}" → "${p.proposedName}"`, {

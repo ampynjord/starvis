@@ -49,7 +49,7 @@ import { archiveVersionSnapshot, captureExtractionSnapshot, cleanStaleGameData, 
 import { LocalizationService } from './localization-service.js';
 import { RsiSyncService } from './rsi-sync-service.js';
 import { nameShipsFromCommunityWiki } from './sc-wiki-ship-names.js';
-import { nameShipsMissingFromShipMatrix } from './ship-naming.js';
+import { nameRemainingWorkshopShips, nameShipsMissingFromShipMatrix } from './ship-naming.js';
 
 export type { ExtractionModule, GameEnv };
 
@@ -432,6 +432,9 @@ export class ExtractionService {
         } catch (e) {
           onProgress?.(`Community wiki naming skipped: ${(e as Error).message}`);
         }
+        // Ultime secours : dériver un libellé du class_name pour les restes
+        // d'atelier que localisation et wiki n'ont pas couverts.
+        await nameRemainingWorkshopShips(conn, env, onProgress);
         // Recompute ship market summaries from existing shop inventory data whenever
         // ships are re-extracted, even when the shops module is not in this run.
         if (!run('shops')) {

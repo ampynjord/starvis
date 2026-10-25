@@ -195,23 +195,26 @@ export function EntityNexusSheet({ category, id, open, onClose, onOpenModel3D }:
                       </h2>
                     </div>
 
-                    {/* Actions bar (3D, Store...) */}
-                    {currentTarget.category === 'ships' && (
+                    {/* Actions bar (3D only when RSI CTM exists, Store...) */}
+                    {currentTarget.category === 'ships' && (entity.ctm_url || entity.store_url) && (
                       <div className="flex flex-wrap items-center gap-2 pt-1">
-                        <button
-                          onClick={() => {
-                            setShow3D((v) => !v);
-                            if (onOpenModel3D) onOpenModel3D(entity);
-                          }}
-                          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono-sc transition-all ${
-                            show3D
-                              ? 'bg-cyan-500 text-slate-950 font-bold shadow-lg shadow-cyan-500/20'
-                              : 'bg-cyan-950/60 hover:bg-cyan-900/80 border border-cyan-500/40 text-cyan-300'
-                          }`}
-                        >
-                          <Box size={14} />
-                          <span>{show3D ? t('btn_close_3d') : t('btn_3d_viewer')}</span>
-                        </button>
+                        {entity.ctm_url && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShow3D((v) => !v);
+                              if (onOpenModel3D) onOpenModel3D(entity);
+                            }}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono-sc transition-all ${
+                              show3D
+                                ? 'bg-cyan-500 text-slate-950 font-bold shadow-lg shadow-cyan-500/20'
+                                : 'bg-cyan-950/60 hover:bg-cyan-900/80 border border-cyan-500/40 text-cyan-300'
+                            }`}
+                          >
+                            <Box size={14} />
+                            <span>{show3D ? t('btn_close_3d') : t('btn_3d_viewer')}</span>
+                          </button>
+                        )}
                         {entity.store_url && (
                           <a
                             href={entity.store_url}
@@ -226,10 +229,10 @@ export function EntityNexusSheet({ category, id, open, onClose, onOpenModel3D }:
                       </div>
                     )}
 
-                    {/* Interactive 3D Holoviewer Container */}
-                    {currentTarget.category === 'ships' && show3D && (
+                    {/* Interactive 3D Holoviewer — mounted only when a CTM URL exists */}
+                    {currentTarget.category === 'ships' && show3D && entity.ctm_url && (
                       <div className="rounded-xl overflow-hidden border border-cyan-500/40 bg-slate-950 shadow-2xl mt-2">
-                        <ShipHoloViewer shipUuid={entity.uuid} shipName={entity.name} />
+                        <ShipHoloViewer shipUuid={entity.uuid} shipName={entity.name} hasModel={Boolean(entity.ctm_url)} />
                       </div>
                     )}
 
@@ -353,7 +356,7 @@ export function EntityNexusSheet({ category, id, open, onClose, onOpenModel3D }:
                             key={i}
                             onClick={() =>
                               slot.component_uuid &&
-                              handlePivot('components', slot.component_uuid, slot.component_name || slot.component_class_name)
+                              handlePivot('components', slot.component_uuid, slot.component_name || '')
                             }
                             className={`p-2.5 rounded-lg border transition-all flex items-center justify-between ${
                               slot.component_uuid

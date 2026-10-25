@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { classNameToWikiSlug, fetchWikiShipName, partitionByCollision } from '../src/services/sc-wiki-ship-names.js';
+import {
+  classNameToWikiSlug,
+  disambiguateCollidingProposals,
+  fetchWikiShipName,
+  partitionByCollision,
+  variantLabelFromClassName,
+} from '../src/services/sc-wiki-ship-names.js';
 
 describe('classNameToWikiSlug', () => {
   it('reproduit l’indexation du wiki communautaire', () => {
@@ -95,6 +101,37 @@ describe('partitionByCollision', () => {
       [p('a', 'Prospector Wikelo Work Special'), p('b', 'Dragonfly Star Kitten')],
       [{ uuid: 'z', name: 'Gladius' }],
     );
+    expect(applicable).toHaveLength(2);
+    expect(rejected).toHaveLength(0);
+  });
+});
+
+describe('variantLabelFromClassName', () => {
+  it('extrait Military / Stealth / Civilian depuis le class_name', () => {
+    expect(variantLabelFromClassName('DRAK_Corsair_Exec_Military')).toBe('Military');
+    expect(variantLabelFromClassName('DRAK_Corsair_Exec_StealthIndustrial')).toBe('Stealth');
+    expect(variantLabelFromClassName('MRAI_Pulse_Collector_Civ')).toBe('Civilian');
+  });
+});
+
+describe('disambiguateCollidingProposals', () => {
+  it('ajoute un suffixe de variante pour séparer deux Corsair PYAM Exec', () => {
+    const tagged = disambiguateCollidingProposals([
+      {
+        uuid: 'a',
+        className: 'DRAK_Corsair_Exec_Military',
+        currentName: 'Corsair Exec Military',
+        proposedName: 'Corsair PYAM Exec',
+      },
+      {
+        uuid: 'b',
+        className: 'DRAK_Corsair_Exec_StealthIndustrial',
+        currentName: 'Corsair Exec StealthIndustrial',
+        proposedName: 'Corsair PYAM Exec',
+      },
+    ]);
+    expect(tagged.map((p) => p.proposedName).sort()).toEqual(['Corsair PYAM Exec (Military)', 'Corsair PYAM Exec (Stealth)']);
+    const { applicable, rejected } = partitionByCollision(tagged, []);
     expect(applicable).toHaveLength(2);
     expect(rejected).toHaveLength(0);
   });

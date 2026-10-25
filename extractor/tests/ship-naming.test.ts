@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { resolveGameShipName, stripManufacturerPrefix } from '../src/services/ship-naming.js';
+import {
+  humanizeWorkshopClassName,
+  looksLikeWorkshopShipName,
+  resolveGameShipName,
+  stripManufacturerPrefix,
+} from '../src/services/ship-naming.js';
 
 describe('stripManufacturerPrefix', () => {
   it('retire la raison sociale complète', () => {
@@ -53,5 +58,28 @@ describe('resolveGameShipName', () => {
 
   it('renvoie null quand le jeu ne nomme pas le vaisseau', () => {
     expect(resolveGameShipName(loc({}), 'ARGO_ATLS_GEO_Collector_Grad01')).toBeNull();
+  });
+});
+
+describe('looksLikeWorkshopShipName', () => {
+  it('détecte les restes de nomenclature DataForge', () => {
+    expect(looksLikeWorkshopShipName('Pulse Collector Civ')).toBe(true);
+    expect(looksLikeWorkshopShipName('Corsair Exec StealthIndustrial')).toBe(true);
+    expect(looksLikeWorkshopShipName('ANVL_Arrow')).toBe(true);
+    expect(looksLikeWorkshopShipName('Cutlass Black Exec Military')).toBe(true);
+  });
+
+  it('laisse passer les noms humains du jeu', () => {
+    expect(looksLikeWorkshopShipName('S-65 Stingray')).toBe(false);
+    expect(looksLikeWorkshopShipName('Arrow')).toBe(false);
+    expect(looksLikeWorkshopShipName('A2 Hercules Starlifter Wikelo War Special')).toBe(false);
+  });
+});
+
+describe('humanizeWorkshopClassName', () => {
+  it('produit un libellé lisible depuis le class_name', () => {
+    expect(humanizeWorkshopClassName('MRAI_Pulse_Collector_Civ', 'MRAI')).toBe('Pulse (Civilian)');
+    expect(humanizeWorkshopClassName('DRAK_Corsair_Exec_Military', 'DRAK')).toBe('Corsair (Military)');
+    expect(looksLikeWorkshopShipName(humanizeWorkshopClassName('MRAI_Pulse_Collector_Civ', 'MRAI'))).toBe(false);
   });
 });
