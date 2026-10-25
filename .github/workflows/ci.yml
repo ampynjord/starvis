@@ -333,7 +333,7 @@ jobs:
 
   test-e2e:
     name: Tests E2E (Playwright)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: changes
     if: needs.changes.outputs.run_all == 'true' || needs.changes.outputs.e2e == 'true'
     steps:
