@@ -27,7 +27,7 @@ ENV HOSTNAME=0.0.0.0
 
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 
-COPY --from=builder /app/ihm/public ./ihm/public
+COPY --from=builder --chown=nextjs:nodejs /app/ihm/public ./ihm/public
 COPY --from=builder --chown=nextjs:nodejs /app/ihm/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/ihm/.next/static ./ihm/.next/static
 
