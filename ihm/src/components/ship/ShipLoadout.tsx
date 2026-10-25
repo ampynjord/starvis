@@ -4,13 +4,25 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   Crosshair,
-  Shield,
-  Layers,
+  Target,
+  ShieldAlert,
+  Rocket,
   Compass,
+  Shield,
+  Zap,
+  Snowflake,
   Radio,
-  Flame,
+  HeartPulse,
+  Gauge,
+  Anchor,
+  Wrench,
+  Cpu,
+  Fuel,
+  Layers,
+  Palette,
   Search,
   ExternalLink,
+  Layers as LayersIcon,
 } from 'lucide-react';
 import type { LoadoutNode as ApiLoadoutNode, ShipModule } from '@/types/api';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -18,7 +30,6 @@ import {
   buildLoadoutTree,
   type GroupedLoadoutSection,
   type LoadoutNode,
-  type LoadoutGroupKey,
 } from '@/lib/loadout-formatter';
 
 interface ShipLoadoutProps {
@@ -53,6 +64,46 @@ const TRACKING_TYPE_STYLE: Record<string, { label: string; color: string }> = {
   cs: { label: 'CS', color: 'text-emerald-400 border-emerald-800/60 bg-emerald-950/40' },
 };
 
+const SECTION_ICONS: Record<GroupedLoadoutSection['iconName'], React.ElementType> = {
+  crosshair: Crosshair,
+  target: Target,
+  'shield-alert': ShieldAlert,
+  rocket: Rocket,
+  compass: Compass,
+  shield: Shield,
+  zap: Zap,
+  snowflake: Snowflake,
+  radio: Radio,
+  'heart-pulse': HeartPulse,
+  gauge: Gauge,
+  anchor: Anchor,
+  wrench: Wrench,
+  cpu: Cpu,
+  fuel: Fuel,
+  layers: Layers,
+  palette: Palette,
+};
+
+const TAB_LABELS: Record<string, { fr: string; en: string }> = {
+  fixed_weapons: { fr: 'Armes Fixes', en: 'Fixed Weapons' },
+  turrets: { fr: 'Tourelles', en: 'Turrets' },
+  pds: { fr: 'Défense PDS', en: 'Point Defense' },
+  ordnance: { fr: 'Munitions & Racks', en: 'Ordnance' },
+  quantum: { fr: 'Quantique & Saut', en: 'Quantum & Jump' },
+  shields: { fr: 'Boucliers', en: 'Shields' },
+  power_plants: { fr: 'Énergie', en: 'Power Plants' },
+  coolers: { fr: 'Refroidisseurs', en: 'Coolers' },
+  radar: { fr: 'Radars', en: 'Radar' },
+  life_support: { fr: 'Survie', en: 'Life Support' },
+  thrusters: { fr: 'Propulseurs', en: 'Thrusters' },
+  docked_vehicles: { fr: 'Véhicules Arrimés', en: 'Docked Craft' },
+  specialized: { fr: 'Spécialisé', en: 'Specialized' },
+  avionics_blades: { fr: 'Avionique & Blades', en: 'Avionics & Blades' },
+  fuel: { fr: 'Carburant & Intakes', en: 'Fuel & Intakes' },
+  modules: { fr: 'Baies Modulaires', en: 'Modular Bays' },
+  paints: { fr: 'Peintures', en: 'Liveries' },
+};
+
 function SizeBadge({ size }: { size?: number | string | null }) {
   if (size == null) return null;
   return (
@@ -75,7 +126,17 @@ function GradeBadge({ grade }: { grade?: string | null }) {
   );
 }
 
-function StatChip({ label, value, unit, color = 'text-white' }: { label: string; value: string | number; unit?: string; color?: string }) {
+function StatChip({
+  label,
+  value,
+  unit,
+  color = 'text-white',
+}: {
+  label: string;
+  value: string | number;
+  unit?: string;
+  color?: string;
+}) {
   return (
     <div className="flex items-center gap-1 bg-slate-950/60 border border-slate-800/80 rounded px-1.5 py-0.5 text-[10px] font-mono-sc">
       <span className="text-slate-500 uppercase">{label}</span>
@@ -102,11 +163,50 @@ function ErkulNodeRow({
   const isFr = language === 'fr';
 
   const hasChildren = node.children && node.children.length > 0;
+
   const isJumpModule =
     (node.port_type || '').toLowerCase().includes('jump') ||
     (node.component_type || '').toLowerCase().includes('jump') ||
+    (node.component_class_name || '').toUpperCase().startsWith('JDRV') ||
     (node.humanPortName || '').toLowerCase().includes('saut') ||
     (node.humanPortName || '').toLowerCase().includes('jump');
+
+  const isPds =
+    (node.port_name || '').toLowerCase().includes('pdc') ||
+    (node.port_name || '').toLowerCase().includes('pds') ||
+    (node.component_class_name || '').toLowerCase().includes('pdc');
+
+  const isDockedVehicle =
+    (node.port_name || '').toLowerCase().includes('dock') ||
+    (node.port_name || '').toLowerCase().includes('collar') ||
+    (node.component_class_name || '').toLowerCase().includes('merlin') ||
+    (node.component_class_name || '').toLowerCase().includes('archimedes') ||
+    (node.component_class_name || '').toLowerCase().includes('skylark');
+
+  const isMining =
+    (node.port_name || '').toLowerCase().includes('mining') ||
+    (node.component_class_name || '').toLowerCase().includes('mining');
+
+  const isSalvage =
+    (node.port_name || '').toLowerCase().includes('salvage') ||
+    (node.component_class_name || '').toLowerCase().includes('salvage');
+
+  const isTractor =
+    (node.port_name || '').toLowerCase().includes('tractor') ||
+    (node.component_class_name || '').toLowerCase().includes('tractor');
+
+  const isEmp =
+    (node.component_type || '').toLowerCase().includes('emp') ||
+    (node.component_class_name || '').toLowerCase().includes('emp');
+
+  const isQed =
+    (node.component_type || '').toLowerCase().includes('interdiction') ||
+    (node.component_class_name || '').toLowerCase().includes('qed');
+
+  const isPod =
+    (node.port_name || '').toLowerCase().includes('pod') ||
+    (node.component_class_name || '').toLowerCase().includes('pod') ||
+    (node.component_class_name || '').toLowerCase().includes('bag');
 
   const dmgStyle = node.weapon_damage_type ? DAMAGE_TYPE_STYLE[node.weapon_damage_type.toLowerCase()] : null;
   const trackStyle = node.component_sub_type ? TRACKING_TYPE_STYLE[node.component_sub_type.toLowerCase()] : null;
@@ -147,7 +247,7 @@ function ErkulNodeRow({
                   {node.component_name || (isFr ? 'Emplacement vide' : 'Empty Hardpoint')}
                 </span>
 
-                {node.component_uuid && (
+                {node.component_uuid ? (
                   <Link
                     href={`/database/components/${node.component_uuid}`}
                     className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 text-cyan-400 hover:text-cyan-200"
@@ -155,16 +255,79 @@ function ErkulNodeRow({
                   >
                     <ExternalLink size={11} />
                   </Link>
-                )}
+                ) : isDockedVehicle ? (
+                  <Link
+                    href={`/database/ships?search=${encodeURIComponent(node.component_name || '')}`}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 text-cyan-400 hover:text-cyan-200"
+                    title={isFr ? 'Voir fiche vaisseau parasite' : 'View parasite ship details'}
+                  >
+                    <ExternalLink size={11} />
+                  </Link>
+                ) : null}
               </div>
             </div>
           </div>
 
-          {/* Right: Badges (Grade, Damage Type, Jump Module indicator) */}
+          {/* Right: Badges (Grade, Damage Type, Jump Module indicator, Specialized tags) */}
           <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
             {isJumpModule && (
               <span className="px-1.5 py-0.5 rounded text-[9px] font-mono-sc bg-purple-950/80 text-purple-300 border border-purple-800/60 font-bold uppercase">
                 {isFr ? 'Module de saut' : 'Jump Module'}
+              </span>
+            )}
+            {isPds && (
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-mono-sc bg-red-950/80 text-red-300 border border-red-800/60 font-bold uppercase">
+                {isFr ? 'Défense PDC' : 'Point Defense'}
+              </span>
+            )}
+            {isDockedVehicle && (
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-mono-sc bg-indigo-950/80 text-indigo-300 border border-indigo-700/60 font-bold uppercase">
+                {isFr ? 'Parasite Arrimé' : 'Docked Craft'}
+              </span>
+            )}
+            {isMining && (
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-mono-sc bg-amber-950/80 text-amber-300 border border-amber-800/60 font-bold">
+                {isFr ? 'Minage' : 'Mining'}
+              </span>
+            )}
+            {isSalvage && (
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-mono-sc bg-emerald-950/80 text-emerald-300 border border-emerald-800/60 font-bold">
+                {isFr ? 'Récupération' : 'Salvage'}
+              </span>
+            )}
+            {isTractor && (
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-mono-sc bg-cyan-950/80 text-cyan-300 border border-cyan-800/60 font-bold">
+                {isFr ? 'Tracteur' : 'Tractor Beam'}
+              </span>
+            )}
+            {isEmp && (
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-mono-sc bg-blue-950/80 text-blue-300 border border-blue-800/60 font-bold">
+                EMP
+              </span>
+            )}
+            {isQed && (
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-mono-sc bg-purple-950/80 text-purple-300 border border-purple-800/60 font-bold">
+                QED
+              </span>
+            )}
+            {isPod && (
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-mono-sc bg-yellow-950/80 text-yellow-300 border border-yellow-800/60 font-bold">
+                {isFr ? 'Sac Amovible' : 'Saddlebag'}
+              </span>
+            )}
+            {node.thruster_type && (
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-mono-sc bg-sky-950/80 text-sky-300 border border-sky-800/60 font-bold capitalize">
+                {node.thruster_type === 'main'
+                  ? isFr
+                    ? 'Principal'
+                    : 'Main'
+                  : node.thruster_type === 'retro'
+                    ? isFr
+                      ? 'Freinage'
+                      : 'Retro'
+                    : isFr
+                      ? 'Manœuvre'
+                      : 'Maneuver'}
               </span>
             )}
             {dmgStyle && (
@@ -186,12 +349,15 @@ function ErkulNodeRow({
           node.weapon_damage ||
           node.weapon_fire_rate ||
           node.weapon_range ||
+          node.weapon_ammo_count ||
           node.shield_hp ||
           node.shield_regen ||
           node.quantum_speed ||
           node.quantum_range ||
+          node.quantum_spool_time ||
           node.cooler_cooling_rate ||
-          node.power_output) && (
+          node.power_output ||
+          node.thruster_max_thrust) && (
           <div className="flex flex-wrap items-center gap-1.5 mt-2 pt-2 border-t border-slate-800/50">
             {node.weapon_dps != null && (
               <StatChip label="DPS" value={Math.round(node.weapon_dps).toLocaleString()} color="text-amber-400" />
@@ -205,6 +371,9 @@ function ErkulNodeRow({
             {node.weapon_range != null && (
               <StatChip label="Range" value={Math.round(node.weapon_range).toLocaleString()} unit="m" />
             )}
+            {node.weapon_ammo_count != null && (
+              <StatChip label="Ammo" value={node.weapon_ammo_count.toLocaleString()} color="text-yellow-400" />
+            )}
             {node.shield_hp != null && (
               <StatChip label="HP" value={Math.round(node.shield_hp).toLocaleString()} color="text-cyan-400" />
             )}
@@ -217,11 +386,26 @@ function ErkulNodeRow({
             {node.quantum_range != null && (
               <StatChip label="Range" value={(node.quantum_range / 1_000_000).toFixed(1)} unit="Mkm" color="text-purple-400" />
             )}
+            {node.quantum_spool_time != null && (
+              <StatChip label="Spool" value={node.quantum_spool_time.toFixed(1)} unit="s" color="text-purple-300" />
+            )}
             {node.cooler_cooling_rate != null && (
               <StatChip label="Cooling" value={Math.round(node.cooler_cooling_rate).toLocaleString()} unit="kW" color="text-teal-400" />
             )}
             {node.power_output != null && (
               <StatChip label="Power" value={Math.round(node.power_output).toLocaleString()} unit="kW" color="text-yellow-400" />
+            )}
+            {node.thruster_max_thrust != null && (
+              <StatChip
+                label="Thrust"
+                value={
+                  node.thruster_max_thrust >= 1000
+                    ? (node.thruster_max_thrust / 1000).toFixed(1)
+                    : Math.round(node.thruster_max_thrust).toLocaleString()
+                }
+                unit={node.thruster_max_thrust >= 1000 ? 'kN' : 'N'}
+                color="text-sky-400"
+              />
             )}
           </div>
         )}
@@ -231,16 +415,84 @@ function ErkulNodeRow({
       {hasChildren && (
         <div className="ml-5 sm:ml-6 pl-2 sm:pl-3 border-l-2 border-cyan-500/20 space-y-2 mt-2">
           {node.children.map((child) => (
-            <ErkulNodeRow
-              key={child.id}
-              node={child}
-              depth={depth + 1}
-            />
+            <ErkulNodeRow key={child.id} node={child} depth={depth + 1} />
           ))}
         </div>
       )}
     </div>
   );
+}
+
+// ─────────────────────────────────────────────
+// Dynamic Tab Badge Helper
+// ─────────────────────────────────────────────
+
+function getSectionBadge(sec: GroupedLoadoutSection, isFr: boolean): string | undefined {
+  if (sec.key === 'fixed_weapons' || sec.key === 'turrets' || sec.key === 'pds') {
+    let dps = 0;
+    const addDps = (n: LoadoutNode) => {
+      if (n.weapon_dps) dps += Number(n.weapon_dps);
+      n.children.forEach(addDps);
+    };
+    sec.nodes.forEach(addDps);
+    if (dps > 0) return `${Math.round(dps).toLocaleString()} DPS`;
+  }
+
+  if (sec.key === 'ordnance') {
+    let count = 0;
+    const addCount = (n: LoadoutNode) => {
+      if (n.children.length === 0) {
+        count += n.count || 1;
+      }
+      n.children.forEach(addCount);
+    };
+    sec.nodes.forEach(addCount);
+    if (count > 0) return `${count} ${isFr ? 'mun.' : 'ord.'}`;
+  }
+
+  if (sec.key === 'shields') {
+    let hp = 0;
+    sec.nodes.forEach((n) => {
+      if (n.shield_hp) hp += Number(n.shield_hp);
+    });
+    if (hp > 0) return `${Math.round(hp).toLocaleString()} HP`;
+  }
+
+  if (sec.key === 'thrusters') {
+    let thrust = 0;
+    sec.nodes.forEach((n) => {
+      if (n.thruster_max_thrust) thrust += Number(n.thruster_max_thrust);
+    });
+    if (thrust >= 1000) return `${Math.round(thrust / 1000).toLocaleString()} kN`;
+    if (thrust > 0) return `${Math.round(thrust).toLocaleString()} N`;
+  }
+
+  if (sec.key === 'power_plants') {
+    let pwr = 0;
+    sec.nodes.forEach((n) => {
+      if (n.power_output) pwr += Number(n.power_output);
+    });
+    if (pwr > 0) return `${Math.round(pwr).toLocaleString()} kW`;
+  }
+
+  if (sec.key === 'coolers') {
+    let cool = 0;
+    sec.nodes.forEach((n) => {
+      if (n.cooler_cooling_rate) cool += Number(n.cooler_cooling_rate);
+    });
+    if (cool > 0) return `${Math.round(cool).toLocaleString()} kW`;
+  }
+
+  if (sec.key === 'quantum') {
+    const qd = sec.nodes.find((n) => n.quantum_speed);
+    if (qd?.quantum_speed) return `${Math.round(qd.quantum_speed / 1000).toLocaleString()} km/s`;
+  }
+
+  if (sec.key === 'docked_vehicles') {
+    return `${sec.nodes.length} ${isFr ? 'arrimé' : 'docked'}`;
+  }
+
+  return undefined;
 }
 
 // ─────────────────────────────────────────────
@@ -256,7 +508,7 @@ export function ShipLoadout({
   const { language } = useLanguage();
   const isFr = language === 'fr';
 
-  const [activeTab, setActiveTab] = useState<LoadoutGroupKey | 'modules'>('weapons');
+  const [activeTab, setActiveTab] = useState<string>('fixed_weapons');
   const [filterSearch, setFilterSearch] = useState('');
 
   // Process Erkul hierarchical tree
@@ -264,41 +516,102 @@ export function ShipLoadout({
     return buildLoadoutTree(nodes as any, language);
   }, [nodes, language]);
 
-  // Aggregate stats summary
-  const totals = useMemo(() => {
-    let weaponsCount = 0;
-    let missilesCount = 0;
-    let systemsCount = 0;
-    let totalDps = 0;
+  // Aggregate stats overview banner (Erkul telemetry top bar)
+  const shipTotals = useMemo(() => {
+    let totalGunDps = 0;
+    let totalMissiles = 0;
+    let totalShieldHp = 0;
+    let totalShieldRegen = 0;
+    let totalPower = 0;
+    let totalCooling = 0;
+    let maxQuantumSpeed = 0;
+    let totalThrust = 0;
+
+    const traverse = (node: LoadoutNode) => {
+      if (node.weapon_dps) totalGunDps += Number(node.weapon_dps);
+      if (node.shield_hp) totalShieldHp += Number(node.shield_hp);
+      if (node.shield_regen) totalShieldRegen += Number(node.shield_regen);
+      if (node.power_output) totalPower += Number(node.power_output);
+      if (node.cooler_cooling_rate) totalCooling += Number(node.cooler_cooling_rate);
+      if (node.quantum_speed && Number(node.quantum_speed) > maxQuantumSpeed) {
+        maxQuantumSpeed = Number(node.quantum_speed);
+      }
+      if (node.thruster_max_thrust) totalThrust += Number(node.thruster_max_thrust);
+
+      if (node.children && node.children.length > 0) {
+        node.children.forEach(traverse);
+      } else {
+        // leaf missile count
+        if (
+          (node.port_type || '').toLowerCase().includes('missile') ||
+          (node.component_type || '').toLowerCase().includes('missile') ||
+          (node.component_type || '').toLowerCase().includes('torpedo')
+        ) {
+          totalMissiles += node.count || 1;
+        }
+      }
+    };
 
     for (const sec of groupedSections) {
-      if (sec.key === 'weapons') {
-        for (const n of sec.nodes) {
-          weaponsCount++;
-          if (n.weapon_dps) totalDps += Number(n.weapon_dps);
-          for (const c of n.children) {
-            weaponsCount++;
-            if (c.weapon_dps) totalDps += Number(c.weapon_dps);
-          }
-        }
-      }
-      if (sec.key === 'missiles') {
-        for (const n of sec.nodes) {
-          missilesCount += n.count || 1;
-          for (const c of n.children) {
-            missilesCount += c.count || 1;
-          }
-        }
-      }
-      if (sec.key === 'systems' || sec.key === 'propulsion' || sec.key === 'jump') {
-        systemsCount += sec.nodes.length;
+      for (const root of sec.nodes) {
+        traverse(root);
       }
     }
 
-    return { weaponsCount, missilesCount, systemsCount, totalDps: Math.round(totalDps) };
+    return {
+      totalGunDps: Math.round(totalGunDps),
+      totalMissiles,
+      totalShieldHp: Math.round(totalShieldHp),
+      totalShieldRegen: Math.round(totalShieldRegen),
+      totalPower: Math.round(totalPower),
+      totalCooling: Math.round(totalCooling),
+      maxQuantumSpeed: Math.round(maxQuantumSpeed / 1000),
+      totalThrust: Math.round(totalThrust / 1000),
+    };
   }, [groupedSections]);
 
-  const activeSection = groupedSections.find((s) => s.key === activeTab);
+  // Build dynamic navigation tabs based strictly on present equipment
+  const tabs = useMemo(() => {
+    const list: Array<{
+      id: string;
+      label: string;
+      count: number;
+      icon: React.ElementType;
+      badge?: string;
+    }> = groupedSections.map((sec) => {
+      const Icon = SECTION_ICONS[sec.iconName] || LayersIcon;
+      const labelDef = TAB_LABELS[sec.key];
+      const label = labelDef ? (isFr ? labelDef.fr : labelDef.en) : sec.title;
+      const badge = getSectionBadge(sec, isFr);
+
+      return {
+        id: sec.key,
+        label,
+        count: sec.nodes.length,
+        icon: Icon,
+        badge,
+      };
+    });
+
+    if (activeModules.length > 0) {
+      list.push({
+        id: 'modules',
+        label: isFr ? 'Baies Modulaires' : 'Modular Bays',
+        count: activeModules.length,
+        icon: LayersIcon,
+      });
+    }
+
+    return list;
+  }, [groupedSections, activeModules, isFr]);
+
+  // Auto-switch to first non-empty tab if activeTab is not found
+  const effectiveTab = useMemo(() => {
+    if (tabs.some((t) => t.id === activeTab)) return activeTab;
+    return tabs[0]?.id ?? 'fixed_weapons';
+  }, [tabs, activeTab]);
+
+  const activeSection = groupedSections.find((s) => s.key === effectiveTab);
 
   // Filter nodes if search query is present
   const displayedNodes = useMemo(() => {
@@ -321,64 +634,106 @@ export function ShipLoadout({
     });
   }, [activeSection, filterSearch]);
 
-  const tabs: Array<{
-    id: LoadoutGroupKey | 'modules';
-    label: string;
-    count: number;
-    icon: React.ElementType;
-    badge?: string;
-  }> = [
-    {
-      id: 'weapons',
-      label: isFr ? 'Armement' : 'Armament',
-      count: totals.weaponsCount,
-      icon: Crosshair,
-      badge: totals.totalDps > 0 ? `${totals.totalDps} DPS` : undefined,
-    },
-    {
-      id: 'missiles',
-      label: isFr ? 'Missiles & Racks' : 'Missiles & Racks',
-      count: totals.missilesCount,
-      icon: Flame,
-    },
-    {
-      id: 'systems',
-      label: isFr ? 'Systèmes' : 'Systems',
-      count: totals.systemsCount,
-      icon: Shield,
-    },
-    {
-      id: 'jump',
-      label: isFr ? 'Module de saut' : 'Jump Module',
-      count: groupedSections.find((s) => s.key === 'jump')?.nodes.length ?? 0,
-      icon: Compass,
-    },
-    {
-      id: 'utility',
-      label: isFr ? 'Utilitaires' : 'Utility',
-      count: groupedSections.find((s) => s.key === 'utility')?.nodes.length ?? 0,
-      icon: Radio,
-    },
-  ];
-
-  if (activeModules.length > 0) {
-    tabs.push({
-      id: 'modules',
-      label: isFr ? 'Baies modulaires' : 'Ship Modules',
-      count: activeModules.length,
-      icon: Layers,
-    });
-  }
-
-  // Auto-switch to first non-empty tab if activeTab is empty
-  const currentTabDef = tabs.find((t) => t.id === activeTab);
-  const effectiveTab = currentTabDef && currentTabDef.count > 0 ? activeTab : tabs.find((t) => t.count > 0)?.id ?? 'weapons';
-
   return (
     <div className="space-y-4">
-      {/* ── Cockpit Header: Section Tabs with live counters & DPS badges ── */}
+      {/* ── Cockpit Telemetry Banner (Erkul Ship Metrics Overview) ── */}
+      {(shipTotals.totalGunDps > 0 ||
+        shipTotals.totalMissiles > 0 ||
+        shipTotals.totalShieldHp > 0 ||
+        shipTotals.totalPower > 0 ||
+        shipTotals.totalCooling > 0 ||
+        shipTotals.maxQuantumSpeed > 0 ||
+        shipTotals.totalThrust > 0) && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/80">
+          {shipTotals.totalGunDps > 0 && (
+            <div className="flex flex-col px-2 py-1 bg-slate-900/60 rounded border border-slate-800/60">
+              <span className="text-[10px] font-mono-sc text-slate-500 uppercase flex items-center gap-1">
+                <Crosshair size={11} className="text-amber-400" />
+                {isFr ? 'Feu Pilote' : 'Burst DPS'}
+              </span>
+              <span className="text-xs sm:text-sm font-bold font-mono-sc text-amber-400 tabular-nums">
+                {shipTotals.totalGunDps.toLocaleString()} DPS
+              </span>
+            </div>
+          )}
+
+          {shipTotals.totalMissiles > 0 && (
+            <div className="flex flex-col px-2 py-1 bg-slate-900/60 rounded border border-slate-800/60">
+              <span className="text-[10px] font-mono-sc text-slate-500 uppercase flex items-center gap-1">
+                <Rocket size={11} className="text-orange-400" />
+                {isFr ? 'Munitions' : 'Ordnance'}
+              </span>
+              <span className="text-xs sm:text-sm font-bold font-mono-sc text-orange-400 tabular-nums">
+                {shipTotals.totalMissiles} {isFr ? 'missiles' : 'missiles'}
+              </span>
+            </div>
+          )}
+
+          {shipTotals.totalShieldHp > 0 && (
+            <div className="flex flex-col px-2 py-1 bg-slate-900/60 rounded border border-slate-800/60">
+              <span className="text-[10px] font-mono-sc text-slate-500 uppercase flex items-center gap-1">
+                <Shield size={11} className="text-cyan-400" />
+                {isFr ? 'Bouclier' : 'Shields'}
+              </span>
+              <span className="text-xs sm:text-sm font-bold font-mono-sc text-cyan-400 tabular-nums">
+                {shipTotals.totalShieldHp.toLocaleString()} HP
+              </span>
+            </div>
+          )}
+
+          {shipTotals.maxQuantumSpeed > 0 && (
+            <div className="flex flex-col px-2 py-1 bg-slate-900/60 rounded border border-slate-800/60">
+              <span className="text-[10px] font-mono-sc text-slate-500 uppercase flex items-center gap-1">
+                <Compass size={11} className="text-purple-400" />
+                {isFr ? 'Vitesse QT' : 'QT Speed'}
+              </span>
+              <span className="text-xs sm:text-sm font-bold font-mono-sc text-purple-400 tabular-nums">
+                {shipTotals.maxQuantumSpeed.toLocaleString()} km/s
+              </span>
+            </div>
+          )}
+
+          {shipTotals.totalPower > 0 && (
+            <div className="flex flex-col px-2 py-1 bg-slate-900/60 rounded border border-slate-800/60">
+              <span className="text-[10px] font-mono-sc text-slate-500 uppercase flex items-center gap-1">
+                <Zap size={11} className="text-yellow-400" />
+                {isFr ? 'Énergie' : 'Power'}
+              </span>
+              <span className="text-xs sm:text-sm font-bold font-mono-sc text-yellow-400 tabular-nums">
+                {shipTotals.totalPower.toLocaleString()} kW
+              </span>
+            </div>
+          )}
+
+          {shipTotals.totalCooling > 0 && (
+            <div className="flex flex-col px-2 py-1 bg-slate-900/60 rounded border border-slate-800/60">
+              <span className="text-[10px] font-mono-sc text-slate-500 uppercase flex items-center gap-1">
+                <Snowflake size={11} className="text-teal-400" />
+                {isFr ? 'Refroid.' : 'Cooling'}
+              </span>
+              <span className="text-xs sm:text-sm font-bold font-mono-sc text-teal-400 tabular-nums">
+                {shipTotals.totalCooling.toLocaleString()} kW
+              </span>
+            </div>
+          )}
+
+          {shipTotals.totalThrust > 0 && (
+            <div className="flex flex-col px-2 py-1 bg-slate-900/60 rounded border border-slate-800/60">
+              <span className="text-[10px] font-mono-sc text-slate-500 uppercase flex items-center gap-1">
+                <Gauge size={11} className="text-sky-400" />
+                {isFr ? 'Poussée' : 'Thrust'}
+              </span>
+              <span className="text-xs sm:text-sm font-bold font-mono-sc text-sky-400 tabular-nums">
+                {shipTotals.totalThrust.toLocaleString()} kN
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Cockpit Header: Section Tabs with live counters & telemetry badges ── */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5 overflow-x-auto py-1">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = effectiveTab === tab.id;
@@ -389,7 +744,7 @@ export function ShipLoadout({
                   setActiveTab(tab.id);
                   setFilterSearch('');
                 }}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono-sc transition-all border ${
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono-sc transition-all border shrink-0 ${
                   isActive
                     ? 'bg-cyan-950/80 text-cyan-300 border-cyan-500/50 shadow-md shadow-cyan-950/50 font-bold'
                     : 'bg-slate-950/60 text-slate-400 hover:text-white border-slate-800 hover:border-slate-700'

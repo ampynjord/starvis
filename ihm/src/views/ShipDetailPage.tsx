@@ -11,6 +11,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import type { Ship, ShipGalleryImage, ShipModule } from '@/types/api';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { PageShell } from '@/components/ui/PageShell';
@@ -337,6 +338,7 @@ export default function ShipDetailPage({ initialShip }: { initialShip?: Ship | n
   const uuid = params?.uuid;
   const router = useRouter();
   const { env } = useEnv();
+  const { t } = useLanguage();
 
   // La page serveur interroge toujours l'environnement LIVE : ne réutiliser sa
   // réponse que si l'utilisateur consulte bien cet environnement et ce vaisseau.
@@ -621,7 +623,11 @@ export default function ShipDetailPage({ initialShip }: { initialShip?: Ship | n
 
           {/* Loadout */}
           {loadout && loadout.length > 0 && (
-            <ScifiPanel title="Loadout" subtitle="Stock equipment" actions={<Layers size={14} className="text-slate-600" />}>
+            <ScifiPanel
+              title={t('loadout_title')}
+              subtitle={t('loadout_subtitle')}
+              actions={<Layers size={14} className="text-slate-600" />}
+            >
               <ShipLoadout
                 nodes={loadout}
                 activeModules={activeModules}

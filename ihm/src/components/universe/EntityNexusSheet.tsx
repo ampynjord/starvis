@@ -452,7 +452,7 @@ export function EntityNexusSheet({ category, id, open, onClose, onOpenModel3D }:
                                 ? Shield
                                 : section.iconName === 'zap'
                                   ? Zap
-                                  : section.iconName === 'navigation'
+                                  : section.iconName === 'compass'
                                     ? Compass
                                     : section.iconName === 'rocket'
                                       ? Rocket
