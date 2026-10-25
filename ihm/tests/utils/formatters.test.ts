@@ -128,6 +128,8 @@ describe('fSize', () => {
     expect(fSize(1)).toBe('S1');
     expect(fSize(3)).toBe('S3');
     expect(fSize(10)).toBe('S10');
+    expect(fSize(2, 'fr')).toBe('T2');
+    expect(fSize(2, 'en')).toBe('S2');
   });
 });
 

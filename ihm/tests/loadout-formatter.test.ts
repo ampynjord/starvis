@@ -132,4 +132,106 @@ describe('buildLoadoutTree', () => {
     expect(dockedSection).toBeDefined();
     expect(dockedSection!.nodes[0].component_name).toBe('Kruger P-52 Merlin');
   });
+
+  it('prunes internal components of parasite docked snubs and attaches docked_ship_uuid', () => {
+    const slots: RawLoadoutSlot[] = [
+      // Docking bay
+      {
+        id: 10,
+        parent_id: null,
+        port_name: 'hardpoint_docking_collar_merlin',
+        port_type: 'Other',
+        component_class_name: 'RSI_Constellation_Rear_DockingTube',
+      },
+      // Docked parasite vehicle
+      {
+        id: 11,
+        parent_id: 10,
+        port_name: 'itemport_vehicle_attach',
+        port_type: 'Other',
+        component_class_name: 'KRIG_P52_Merlin',
+        component_name: 'Kruger P-52 Merlin',
+      },
+      // Merlin internal thruster (child of id 11) - MUST BE PRUNED
+      {
+        id: 12,
+        parent_id: 11,
+        port_name: 'hardpoint_thruster_merlin_main',
+        port_type: 'Thruster',
+        component_class_name: 'KRIG_P52_Merlin_Thruster_Main',
+        component_name: 'Merlin Thruster',
+      },
+      // Merlin internal fuel tank (child of id 11) - MUST BE PRUNED
+      {
+        id: 13,
+        parent_id: 11,
+        port_name: 'hardpoint_fuel_tank_merlin',
+        port_type: 'FuelTank',
+        component_class_name: 'HTNK_KRIG_P52_Merlin',
+        component_name: 'Merlin Tank',
+      },
+      // Carrier ship thruster (root) - MUST BE KEPT
+      {
+        id: 20,
+        parent_id: null,
+        port_name: 'hardpoint_thruster_main_01',
+        port_type: 'Thruster',
+        component_class_name: 'RSI_Constellation_Thruster_Main',
+        component_name: 'Constellation Main Thruster',
+        thruster_max_thrust: 500000,
+      },
+    ];
+
+    const tree = buildLoadoutTree(slots, 'fr');
+    const dockedSection = tree.find((s) => s.key === 'docked_vehicles');
+    expect(dockedSection).toBeDefined();
+
+    // The docked vehicle should have its canonical UUID resolved and NO children
+    const collar = dockedSection!.nodes.find((n) => n.id === 10);
+    expect(collar).toBeDefined();
+    expect(collar!.children.length).toBe(1);
+    const snubNode = collar!.children[0];
+    expect(snubNode.id).toBe(11);
+    expect(snubNode.docked_ship_uuid).toBe('939c4f7b-e4e5-a5a8-a4d5-56b57d5f48ab');
+    expect(snubNode.children.length).toBe(0);
+
+    // Merlin internal thrusters and tanks must NOT appear in thruster or fuel sections
+    const thrusterSection = tree.find((s) => s.key === 'thrusters');
+    expect(thrusterSection).toBeDefined();
+    expect(thrusterSection!.nodes.length).toBe(1);
+    expect(thrusterSection!.nodes[0].component_name).toBe('Constellation Main Thruster');
+
+    const fuelSection = tree.find((s) => s.key === 'fuel');
+    expect(fuelSection).toBeUndefined(); // No fuel tanks other than the pruned Merlin one
+  });
+
+  it('classifies countermeasures and includes telemetry in countermeasures section', () => {
+    const slots: RawLoadoutSlot[] = [
+      {
+        id: 50,
+        parent_id: null,
+        port_name: 'hardpoint_cm_launcher_right_top',
+        port_type: 'Other',
+        component_class_name: 'RSI_Constellation_CML_Decoy',
+        component_name: 'Constellation CML Decoy',
+        cm_ammo_count: 48,
+      },
+      {
+        id: 51,
+        parent_id: null,
+        port_name: 'hardpoint_cm_launcher_left_top',
+        port_type: 'Other',
+        component_class_name: 'RSI_Constellation_CML_Noise',
+        component_name: 'Constellation CML Noise',
+        cm_ammo_count: 5,
+      },
+    ];
+
+    const tree = buildLoadoutTree(slots, 'fr');
+    const cmSection = tree.find((s) => s.key === 'countermeasures');
+    expect(cmSection).toBeDefined();
+    expect(cmSection!.iconName).toBe('sparkles');
+    expect(cmSection!.nodes.length).toBe(2);
+    expect(cmSection!.nodes[0].cm_ammo_count).toBe(48);
+  });
 });

@@ -30,6 +30,18 @@ export interface RawLoadoutSlot {
   power_output?: number | null;
   thruster_max_thrust?: number | null;
   thruster_type?: string | null;
+  component_class?: string | null;
+  weapon_speed?: number | null;
+  weapon_burst_dps?: number | null;
+  weapon_sustained_dps?: number | null;
+  weapon_alpha_damage?: number | null;
+  shield_hardening?: number | null;
+  shield_faces?: number | null;
+  qd_fuel_rate?: number | null;
+  qd_cooldown?: number | null;
+  em_signature?: number | null;
+  ir_signature?: number | null;
+  cm_ammo_count?: number | null;
   children?: RawLoadoutSlot[];
   [key: string]: any;
 }
@@ -39,6 +51,7 @@ export type LoadoutGroupKey =
   | 'turrets'
   | 'pds'
   | 'ordnance'
+  | 'countermeasures'
   | 'quantum'
   | 'shields'
   | 'power_plants'
@@ -73,22 +86,38 @@ export interface LoadoutNode {
   component_sub_type?: string | null;
   component_size?: number | string | null;
   component_grade?: string | null;
+  component_class?: string | null;
   component_manufacturer?: string | null;
+  docked_ship_uuid?: string | null;
   weapon_dps?: number | null;
   weapon_damage?: number | null;
   weapon_fire_rate?: number | null;
   weapon_range?: number | null;
+  weapon_speed?: number | null;
+  weapon_burst_dps?: number | null;
+  weapon_sustained_dps?: number | null;
+  weapon_alpha_damage?: number | null;
   weapon_damage_type?: string | null;
   weapon_ammo_count?: number | null;
   shield_hp?: number | null;
   shield_regen?: number | null;
+  shield_regen_delay?: number | null;
+  shield_hardening?: number | null;
+  shield_faces?: number | null;
   quantum_speed?: number | null;
   quantum_range?: number | null;
   quantum_spool_time?: number | null;
+  qd_fuel_rate?: number | null;
+  qd_cooldown?: number | null;
   cooler_cooling_rate?: number | null;
   power_output?: number | null;
+  power_draw?: number | null;
+  power_base?: number | null;
+  em_signature?: number | null;
+  ir_signature?: number | null;
   thruster_max_thrust?: number | null;
   thruster_type?: string | null;
+  cm_ammo_count?: number | null;
   categoryTag?: string;
   count?: number;
   children: LoadoutNode[];
@@ -102,6 +131,7 @@ export interface GroupedLoadoutSection {
     | 'target'
     | 'shield-alert'
     | 'rocket'
+    | 'sparkles'
     | 'compass'
     | 'shield'
     | 'zap'
@@ -184,6 +214,14 @@ export function isNoisyPort(portName?: string | null, componentClassName?: strin
     c.includes('htnk') ||
     c.includes('qtnk') ||
     c.includes('intk') ||
+    p.includes('countermeasure') ||
+    c.includes('countermeasure') ||
+    p.includes('cml') ||
+    c.includes('cml') ||
+    p.includes('decoy') ||
+    p.includes('noise') ||
+    p.includes('flare') ||
+    p.includes('chaff') ||
     p.includes('dock') ||
     p.includes('snub') ||
     p.includes('parasite') ||
@@ -235,10 +273,46 @@ export function humanizeComponentName(
 
   // If already clean and meaningful
   if (cName && !cName.includes('PLACEHOLDER') && cName.trim() !== '') {
-    return cName;
+    return cName.replace(/\s+GS$/i, '').replace(/_GS\b/g, '');
   }
 
-  // 1. Docked Snub Fighters & Parasite Vehicles
+  // 1. Countermeasure Launchers (Decoy & Noise)
+  if (
+    cClass.includes('CML') ||
+    cClass.includes('DECOY') ||
+    cClass.includes('NOISE') ||
+    cClass.includes('FLARE') ||
+    cClass.includes('CHAFF') ||
+    pName.includes('countermeasure') ||
+    pName.includes('cml') ||
+    pName.includes('decoy') ||
+    pName.includes('noise') ||
+    pType.includes('countermeasure')
+  ) {
+    if (
+      cClass.includes('DECOY') ||
+      cClass.includes('FLARE') ||
+      pName.includes('decoy') ||
+      pName.includes('flare') ||
+      pName.includes('1') ||
+      pName.includes('left')
+    ) {
+      return isFr ? 'Lanceur de leurres (Decoy Launcher)' : 'Decoy Countermeasure Launcher';
+    }
+    if (
+      cClass.includes('NOISE') ||
+      cClass.includes('CHAFF') ||
+      pName.includes('noise') ||
+      pName.includes('chaff') ||
+      pName.includes('2') ||
+      pName.includes('right')
+    ) {
+      return isFr ? 'Lanceur de brouillage (Noise Launcher)' : 'Noise Countermeasure Launcher';
+    }
+    return isFr ? 'Lanceur de contre-mesures (CM Launcher)' : 'Countermeasure Launcher';
+  }
+
+  // 2. Docked Snub Fighters & Parasite Vehicles
   if (cClass.includes('P72') || cClass.includes('ARCHIMEDES'))
     return isFr ? 'Kruger P-72 Archimedes (Parasite arrimé)' : 'Kruger P-72 Archimedes (Docked Snub)';
   if (cClass.includes('P52') || cClass.includes('MERLIN'))
@@ -249,14 +323,14 @@ export function humanizeComponentName(
   if (cClass.includes('URSA')) return isFr ? 'Ursa Rover (Véhicule d’exploration)' : 'Ursa Rover (Exploration Vehicle)';
   if (cClass.includes('LYNX')) return isFr ? 'Lynx Rover (Véhicule de luxe)' : 'Lynx Rover (Luxury Ground Vehicle)';
 
-  // 2. Thrusters
+  // 3. Thrusters
   if (pType === 'thruster' || pName.includes('thruster') || cClass.includes('THRUSTER')) {
     if (cClass.includes('MAIN') || pName.includes('main')) return isFr ? 'Propulseur principal' : 'Main Thruster';
     if (cClass.includes('RETRO') || pName.includes('retro')) return isFr ? 'Rétrofusée de freinage' : 'Retro Thruster';
     return isFr ? 'Propulseur de manœuvre (MAV)' : 'Maneuvering Thruster (MAV)';
   }
 
-  // 3. Fuel Tanks & Intakes
+  // 4. Fuel Tanks & Intakes
   if (cClass.startsWith('QTNK') || pName.includes('quantum_fuel'))
     return isFr ? 'Réservoir quantique interne (QT)' : 'Internal Quantum Fuel Tank (QT)';
   if (cClass.startsWith('HTNK') || pName.includes('fuel_tank'))
@@ -264,7 +338,7 @@ export function humanizeComponentName(
   if (cClass.startsWith('INTK') || pName.includes('fuel_intake'))
     return isFr ? 'Collecteur d’admission d’hydrogène' : 'Hydrogen Fuel Intake';
 
-  // 4. Mining & Extraction Pods
+  // 5. Mining & Extraction Pods
   if (cClass.includes('MINING_POD') || pName.includes('mining_pod'))
     return isFr ? 'Sac d’extraction minier amovible (32 SCU)' : 'Removable Mining Saddlebag (32 SCU)';
   if (cClass.includes('COLLAPSED') || pName.includes('stored_pod'))
@@ -273,15 +347,19 @@ export function humanizeComponentName(
   if (cClass.includes('SALVAGE_ARM') || pName.includes('salvage_arm'))
     return isFr ? 'Bras articulé de recyclage' : 'Salvage Articulated Arm';
 
-  // 5. Flight Computers & Blades
+  // 6. Flight Computers & Blades
   if (cClass.includes('CONTROLLER_FLIGHT') || pName.includes('controller_flight'))
     return isFr ? 'Ordinateur de vol principal' : 'Main Flight Computer';
   if (cClass.includes('BLADE') || pName.includes('blade')) return isFr ? 'Lame d’avionique de vol (Blade)' : 'Avionics Flight Blade';
 
-  // 6. Docking Collars
+  // 7. Docking Collars
   if (pName.includes('docking_collar') || cClass.includes('DOCKINGTUBE')) return isFr ? 'Baie d’amarrage parasite' : 'Snub Docking Bay';
 
-  return cClass ? cClass.replace(/_/g, ' ') : isFr ? 'Composant installé' : 'Installed Component';
+  const sanitizedClass = cClass
+    .replace(/_GS\b/g, '')
+    .replace(/\s+GS$/i, '')
+    .replace(/_/g, ' ');
+  return sanitizedClass ? sanitizedClass : isFr ? 'Composant installé' : 'Installed Component';
 }
 
 /**
@@ -388,8 +466,22 @@ export function humanizePortName(portName: string, portType: string, lang: Suppo
     if (lowerName.includes('main')) baseLabel = isFr ? 'Propulseur principal' : 'Main Thruster';
     else if (lowerName.includes('retro')) baseLabel = isFr ? 'Propulseur de freinage' : 'Retro Thruster';
     else baseLabel = isFr ? 'Propulseur de manœuvre' : 'Maneuver Thruster';
-  } else if (lowerType === 'countermeasure' || lowerName.includes('countermeasure')) {
-    baseLabel = isFr ? 'Contre-mesures' : 'Countermeasures';
+  } else if (
+    lowerType === 'countermeasure' ||
+    lowerName.includes('countermeasure') ||
+    lowerName.includes('cml') ||
+    lowerName.includes('decoy') ||
+    lowerName.includes('noise') ||
+    lowerName.includes('flare') ||
+    lowerName.includes('chaff')
+  ) {
+    if (lowerName.includes('decoy') || lowerName.includes('flare') || lowerName.includes('1') || lowerName.includes('left')) {
+      baseLabel = isFr ? 'Lanceur de leurres (Decoy)' : 'Decoy Launcher';
+    } else if (lowerName.includes('noise') || lowerName.includes('chaff') || lowerName.includes('2') || lowerName.includes('right')) {
+      baseLabel = isFr ? 'Lanceur de brouillage (Noise)' : 'Noise Launcher';
+    } else {
+      baseLabel = isFr ? 'Point de contre-mesures' : 'Countermeasure Hardpoint';
+    }
   } else {
     baseLabel = portType || cleaned;
   }
@@ -523,6 +615,28 @@ export function determineDetailedGroup(slot: {
     return 'ordnance';
   }
 
+  // 6. Countermeasures (Decoy & Noise Launchers)
+  if (
+    pType === 'countermeasure' ||
+    cType === 'countermeasure' ||
+    pName.includes('countermeasure') ||
+    pName.includes('cml') ||
+    cClass.includes('cml') ||
+    pName.includes('decoy') ||
+    pName.includes('noise') ||
+    pName.includes('flare') ||
+    pName.includes('chaff') ||
+    cClass.includes('decoy') ||
+    cClass.includes('noise') ||
+    cClass.includes('flare') ||
+    cClass.includes('chaff') ||
+    cName.includes('decoy') ||
+    cName.includes('noise') ||
+    cName.includes('countermeasure')
+  ) {
+    return 'countermeasures';
+  }
+
   // 6. Fixed Weapons (pilot guns, weapon hardpoints, gimbals housing guns)
   if (
     pType === 'weapongun' ||
@@ -617,11 +731,6 @@ export function determineDetailedGroup(slot: {
     return 'avionics_blades';
   }
 
-  // 16. Countermeasures
-  if (pType === 'countermeasure' || cType === 'countermeasure' || pName.includes('countermeasure')) {
-    return 'specialized';
-  }
-
   return 'specialized';
 }
 
@@ -672,23 +781,130 @@ function flattenSlots(slots: RawLoadoutSlot[], parentId: number | null = null, i
  * - Quantum & Jump: Hardpoint -> Quantum drive -> Jump Module
  * - Shields, Power Plants, Coolers, Radar, Life Support, Thrusters, Docked Vehicles, Specialized
  */
+export const DOCKED_CRAFT_UUID_MAP: Record<string, string> = {
+  // Kruger P-52 Merlin
+  krig_p52_merlin: '939c4f7b-e4e5-a5a8-a4d5-56b57d5f48ab',
+  p52_merlin: '939c4f7b-e4e5-a5a8-a4d5-56b57d5f48ab',
+  merlin: '939c4f7b-e4e5-a5a8-a4d5-56b57d5f48ab',
+
+  // Kruger P-72 Archimedes
+  krig_p72_archimedes: '23474e96-0bce-7058-3d48-4f39e6de6092',
+  p72_archimedes: '23474e96-0bce-7058-3d48-4f39e6de6092',
+  archimedes: '23474e96-0bce-7058-3d48-4f39e6de6092',
+  krig_p72_archimedes_emerald: '8e4a4bed-8a7f-ebee-f0c9-242782765d9e',
+
+  // Anvil C8 Pisces
+  anvl_c8_pisces: '147a4530-f617-20d5-d15f-87d1afa753a7',
+  c8_pisces: '147a4530-f617-20d5-d15f-87d1afa753a7',
+  pisces: '147a4530-f617-20d5-d15f-87d1afa753a7',
+  anvl_c8x_pisces_expedition: '337a4350-dcfc-831f-eefe-9ed193e67d96',
+  c8x_pisces_expedition: '337a4350-dcfc-831f-eefe-9ed193e67d96',
+  anvl_c8r_pisces: 'e2844c0f-9058-1bed-9df9-b47aa56b61b5',
+  c8r_pisces: 'e2844c0f-9058-1bed-9df9-b47aa56b61b5',
+
+  // RSI Skylark
+  rsi_skylark: '87ef4d01-c8c6-6a77-74cc-3f1b4e020194',
+  skylark: '87ef4d01-c8c6-6a77-74cc-3f1b4e020194',
+
+  // RSI Ursa & Lynx
+  rsi_ursa_rover: '0e4442e8-5d7e-8c37-6c25-e1b2d6c84bb8',
+  ursa_rover: '0e4442e8-5d7e-8c37-6c25-e1b2d6c84bb8',
+  rsi_ursa_medivac: '7bf944e9-15be-ebf0-30c5-005fc6b59cad',
+  rsi_ursa_rover_emerald: '43a54f88-8277-953f-82c4-e57e99ee39b1',
+  rsi_lynx: '329c4336-4eef-4c03-156a-f0b1bf490e85',
+  lynx: '329c4336-4eef-4c03-156a-f0b1bf490e85',
+};
+
+export function isDockedVehicleSlot(slot: {
+  port_name?: string | null;
+  component_class_name?: string | null;
+  component_name?: string | null;
+}): boolean {
+  const p = (slot.port_name || '').toLowerCase();
+  const c = (slot.component_class_name || '').toLowerCase();
+  const n = (slot.component_name || '').toLowerCase();
+
+  if (p.includes('vehicle_attach')) return true;
+  if (c.includes('krig_p52') || c.includes('krig_p72') || c.includes('anvl_c8') || c.includes('skylark')) return true;
+  if (c.includes('rsi_ursa') || c.includes('rsi_lynx')) return true;
+  if (n.includes('merlin') || n.includes('archimedes') || n.includes('pisces') || n.includes('skylark')) {
+    if (p.includes('dock') || p.includes('snub') || p.includes('vehicle') || p.includes('bay')) return true;
+  }
+  return false;
+}
+
+export function resolveDockedShipUuid(slot: {
+  port_name?: string | null;
+  component_class_name?: string | null;
+  component_name?: string | null;
+}): string | null {
+  const c = (slot.component_class_name || '').toLowerCase();
+  const n = (slot.component_name || '').toLowerCase();
+  const p = (slot.port_name || '').toLowerCase();
+
+  for (const [key, uuid] of Object.entries(DOCKED_CRAFT_UUID_MAP)) {
+    if (c === key || c.includes(key) || n.includes(key) || p.includes(key)) {
+      return uuid;
+    }
+  }
+  return null;
+}
+
 export function buildLoadoutTree(slots: RawLoadoutSlot[], lang: SupportedLanguage): GroupedLoadoutSection[] {
   const isFr = lang === 'fr';
 
   const flat = flattenSlots(slots);
+
+  // 1. Trace parasite/docked vehicle slots and find all their descendants
+  const childrenMap = new Map<number, number[]>();
+  const dockedVehicleIds = new Set<number>();
+
+  for (const s of flat) {
+    const id = s.id != null ? Number(s.id) : null;
+    const parentId = s.parent_id != null ? Number(s.parent_id) : null;
+    if (id != null && parentId != null) {
+      const list = childrenMap.get(parentId) || [];
+      list.push(id);
+      childrenMap.set(parentId, list);
+    }
+    if (id != null && isDockedVehicleSlot(s)) {
+      dockedVehicleIds.add(id);
+    }
+  }
+
+  // Find all descendants of docked vehicle slots to completely exclude them
+  const parasiteDescendantIds = new Set<number>();
+  function markDescendants(parentId: number) {
+    const children = childrenMap.get(parentId) || [];
+    for (const childId of children) {
+      parasiteDescendantIds.add(childId);
+      markDescendants(childId);
+    }
+  }
+  for (const dockedId of dockedVehicleIds) {
+    markDescendants(dockedId);
+  }
+
   const nodeMap = new Map<number, LoadoutNode>();
   const allNodes: LoadoutNode[] = [];
 
   for (let idx = 0; idx < flat.length; idx++) {
     const s = flat[idx];
+    const id = s.id != null ? Number(s.id) : idx + 1000;
+
+    // Prune parasite internal descendants and noisy ports
+    if (parasiteDescendantIds.has(id)) {
+      continue;
+    }
     if (isNoisyPort(s.port_name, s.component_class_name, s.component_name)) {
       continue;
     }
 
-    const id = s.id != null ? Number(s.id) : idx + 1000;
     const parentId = s.parent_id != null ? Number(s.parent_id) : null;
+    const isDocked = dockedVehicleIds.has(id);
     const humanPort = humanizePortName(s.port_name || '', s.component_type || s.port_type || '', lang);
     const resolvedCompName = humanizeComponentName(s, lang);
+    const dockedUuid = isDocked ? resolveDockedShipUuid(s) : null;
 
     const node: LoadoutNode = {
       id,
@@ -703,22 +919,35 @@ export function buildLoadoutTree(slots: RawLoadoutSlot[], lang: SupportedLanguag
       component_sub_type: s.component_sub_type,
       component_size: s.component_size ?? s.port_max_size ?? s.port_min_size,
       component_grade: s.component_grade ?? s.grade,
+      component_class: s.component_class,
       component_manufacturer: s.component_manufacturer ?? s.manufacturer_code,
+      docked_ship_uuid: dockedUuid,
       weapon_dps: s.weapon_dps ? Number(s.weapon_dps) : null,
       weapon_damage: s.weapon_damage ? Number(s.weapon_damage) : null,
       weapon_fire_rate: s.weapon_fire_rate ? Number(s.weapon_fire_rate) : null,
       weapon_range: s.weapon_range ? Number(s.weapon_range) : null,
+      weapon_speed: s.weapon_speed ? Number(s.weapon_speed) : null,
+      weapon_burst_dps: s.weapon_burst_dps ? Number(s.weapon_burst_dps) : null,
+      weapon_sustained_dps: s.weapon_sustained_dps ? Number(s.weapon_sustained_dps) : null,
+      weapon_alpha_damage: s.weapon_alpha_damage ? Number(s.weapon_alpha_damage) : null,
       weapon_damage_type: s.weapon_damage_type,
       weapon_ammo_count: s.weapon_ammo_count,
       shield_hp: s.shield_hp ? Number(s.shield_hp) : null,
       shield_regen: s.shield_regen ? Number(s.shield_regen) : null,
+      shield_hardening: s.shield_hardening ? Number(s.shield_hardening) : null,
+      shield_faces: s.shield_faces ? Number(s.shield_faces) : null,
       quantum_speed: s.quantum_speed ? Number(s.quantum_speed) : s.qd_speed ? Number(s.qd_speed) : null,
       quantum_range: s.quantum_range ? Number(s.quantum_range) : s.qd_range ? Number(s.qd_range) : null,
       quantum_spool_time: s.quantum_spool_time ? Number(s.quantum_spool_time) : s.qd_spool_time ? Number(s.qd_spool_time) : null,
+      qd_fuel_rate: s.qd_fuel_rate ? Number(s.qd_fuel_rate) : null,
+      qd_cooldown: s.qd_cooldown ? Number(s.qd_cooldown) : null,
       cooler_cooling_rate: s.cooler_cooling_rate ? Number(s.cooler_cooling_rate) : s.cooling_rate ? Number(s.cooling_rate) : null,
       power_output: s.power_output ? Number(s.power_output) : null,
+      em_signature: s.em_signature ? Number(s.em_signature) : null,
+      ir_signature: s.ir_signature ? Number(s.ir_signature) : null,
       thruster_max_thrust: s.thruster_max_thrust ? Number(s.thruster_max_thrust) : null,
       thruster_type: s.thruster_type,
+      cm_ammo_count: s.cm_ammo_count ? Number(s.cm_ammo_count) : null,
       children: [],
     };
     nodeMap.set(id, node);
@@ -728,9 +957,15 @@ export function buildLoadoutTree(slots: RawLoadoutSlot[], lang: SupportedLanguag
   // Link children to parents
   const rootNodes: LoadoutNode[] = [];
   for (const node of allNodes) {
+    if (dockedVehicleIds.has(node.id)) {
+      node.children = [];
+    }
+
     if (node.parentId != null && nodeMap.has(node.parentId)) {
       const parent = nodeMap.get(node.parentId)!;
-      parent.children.push(node);
+      if (!dockedVehicleIds.has(parent.id)) {
+        parent.children.push(node);
+      }
     } else {
       rootNodes.push(node);
     }
@@ -773,6 +1008,11 @@ export function buildLoadoutTree(slots: RawLoadoutSlot[], lang: SupportedLanguag
       key: 'ordnance',
       title: isFr ? 'Munitions & Râteliers (Missiles, Torpilles, Bombes)' : 'Ordnance (Missiles, Torpedoes, Bombs)',
       iconName: 'rocket',
+    },
+    {
+      key: 'countermeasures',
+      title: isFr ? 'Contre-mesures (Leurres & Brouillage)' : 'Countermeasures (Decoy & Noise)',
+      iconName: 'sparkles',
     },
     { key: 'quantum', title: isFr ? 'Voyage Quantique & Module de Saut' : 'Quantum Drive & Jump Module', iconName: 'compass' },
     { key: 'shields', title: isFr ? 'Générateurs de Boucliers' : 'Shield Generators', iconName: 'shield' },

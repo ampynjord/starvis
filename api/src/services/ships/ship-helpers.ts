@@ -13,7 +13,7 @@ export const SHIP_SELECT_COLUMNS = [
   // Identity
   's.uuid',
   's.class_name',
-  'COALESCE(sm.name, s.name) as name',
+  "REGEXP_REPLACE(COALESCE(sm.name, s.name), '\\s+GS$', '') as name",
   's.manufacturer_code',
   'm.name as manufacturer_name',
   // Role & career

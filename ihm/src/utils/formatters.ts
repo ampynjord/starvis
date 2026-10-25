@@ -51,9 +51,12 @@ export const fDateTime = (iso: string | null | undefined): string => {
   });
 };
 
-export const fSize = (s: number | null | undefined): string => {
+export const fSize = (s: number | string | null | undefined, lang?: 'fr' | 'en' | string): string => {
   if (s == null) return '—';
-  return `S${s}`;
+  const prefix = lang === 'fr' ? 'T' : 'S';
+  const clean = typeof s === 'string' ? s.replace(/^[ST]/i, '').trim() : s;
+  if (clean === '') return '—';
+  return `${prefix}${clean}`;
 };
 
 export const fTime = (seconds: number | null | undefined): string => {

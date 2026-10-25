@@ -7,6 +7,7 @@ import {
   Target,
   ShieldAlert,
   Rocket,
+  Sparkles,
   Compass,
   Shield,
   Zap,
@@ -26,6 +27,7 @@ import {
 } from 'lucide-react';
 import type { LoadoutNode as ApiLoadoutNode, ShipModule } from '@/types/api';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { fSize } from '@/utils/formatters';
 import {
   buildLoadoutTree,
   type GroupedLoadoutSection,
@@ -43,12 +45,37 @@ interface ShipLoadoutProps {
 // Atoms & Badges
 // ─────────────────────────────────────────────
 
-const GRADE_INFO: Record<string, { label: string; color: string }> = {
-  A: { label: 'MIL A', color: 'text-emerald-300 bg-emerald-950/70 border-emerald-500/40' },
-  B: { label: 'MIL B', color: 'text-cyan-300 bg-cyan-950/70 border-cyan-500/40' },
-  C: { label: 'CIV C', color: 'text-slate-300 bg-slate-900/80 border-slate-700/60' },
-  D: { label: 'IND D', color: 'text-amber-300 bg-amber-950/70 border-amber-500/40' },
-  E: { label: 'IND E', color: 'text-red-300 bg-red-950/70 border-red-500/40' },
+const COMPONENT_CLASS_STYLES: Record<string, { labelFr: string; labelEn: string; color: string }> = {
+  military: {
+    labelFr: 'Militaire',
+    labelEn: 'Military',
+    color: 'text-emerald-300 bg-emerald-950/70 border-emerald-500/40',
+  },
+  civilian: {
+    labelFr: 'Civil',
+    labelEn: 'Civilian',
+    color: 'text-slate-300 bg-slate-900/80 border-slate-700/60',
+  },
+  industrial: {
+    labelFr: 'Industriel',
+    labelEn: 'Industrial',
+    color: 'text-amber-300 bg-amber-950/70 border-amber-500/40',
+  },
+  stealth: {
+    labelFr: 'Furtif',
+    labelEn: 'Stealth',
+    color: 'text-purple-300 bg-purple-950/70 border-purple-500/40',
+  },
+  competition: {
+    labelFr: 'Course',
+    labelEn: 'Racing',
+    color: 'text-rose-300 bg-rose-950/70 border-rose-500/40',
+  },
+  racing: {
+    labelFr: 'Course',
+    labelEn: 'Racing',
+    color: 'text-rose-300 bg-rose-950/70 border-rose-500/40',
+  },
 };
 
 const DAMAGE_TYPE_STYLE: Record<string, { label: string; color: string }> = {
@@ -69,6 +96,7 @@ const SECTION_ICONS: Record<GroupedLoadoutSection['iconName'], React.ElementType
   target: Target,
   'shield-alert': ShieldAlert,
   rocket: Rocket,
+  sparkles: Sparkles,
   compass: Compass,
   shield: Shield,
   zap: Zap,
@@ -89,6 +117,7 @@ const TAB_LABELS: Record<string, { fr: string; en: string }> = {
   turrets: { fr: 'Tourelles', en: 'Turrets' },
   pds: { fr: 'Défense PDS', en: 'Point Defense' },
   ordnance: { fr: 'Munitions & Racks', en: 'Ordnance' },
+  countermeasures: { fr: 'Contre-mesures', en: 'Countermeasures' },
   quantum: { fr: 'Quantique & Saut', en: 'Quantum & Jump' },
   shields: { fr: 'Boucliers', en: 'Shields' },
   power_plants: { fr: 'Énergie', en: 'Power Plants' },
@@ -104,24 +133,44 @@ const TAB_LABELS: Record<string, { fr: string; en: string }> = {
   paints: { fr: 'Peintures', en: 'Liveries' },
 };
 
-function SizeBadge({ size }: { size?: number | string | null }) {
+function SizeBadge({ size, lang = 'en' }: { size?: number | string | null; lang?: string }) {
   if (size == null) return null;
   return (
     <span className="text-[10px] font-mono-sc font-bold px-1.5 py-0.5 rounded bg-cyan-950/70 text-cyan-300 border border-cyan-500/30 leading-none shrink-0 shadow-sm">
-      S{size}
+      {fSize(size, lang as any)}
+    </span>
+  );
+}
+
+function ComponentClassBadge({
+  componentClass,
+  lang = 'en',
+}: {
+  componentClass?: string | null;
+  lang?: string;
+}) {
+  if (!componentClass) return null;
+  const key = componentClass.trim().toLowerCase();
+  const info = COMPONENT_CLASS_STYLES[key] ?? {
+    labelFr: componentClass,
+    labelEn: componentClass,
+    color: 'text-slate-400 bg-slate-900 border-slate-800',
+  };
+  return (
+    <span
+      className={`text-[9px] font-mono-sc font-bold px-1.5 py-0.5 rounded border leading-none shrink-0 ${info.color}`}
+    >
+      {lang === 'fr' ? info.labelFr : info.labelEn}
     </span>
   );
 }
 
 function GradeBadge({ grade }: { grade?: string | null }) {
   if (!grade) return null;
-  const info = GRADE_INFO[grade.toUpperCase()] ?? {
-    label: grade,
-    color: 'text-slate-400 bg-slate-900 border-slate-800',
-  };
+  const g = grade.trim().toUpperCase();
   return (
-    <span className={`text-[9px] font-mono-sc font-bold px-1.5 py-0.5 rounded border leading-none shrink-0 ${info.color}`}>
-      {info.label}
+    <span className="text-[9px] font-mono-sc font-bold px-1.5 py-0.5 rounded border leading-none shrink-0 text-cyan-300 bg-cyan-950/60 border-cyan-500/40 shadow-sm">
+      Grade {g}
     </span>
   );
 }
@@ -231,7 +280,7 @@ function ErkulNodeRow({
         <div className="flex flex-wrap items-center justify-between gap-2">
           {/* Left: Port location & component name */}
           <div className="flex items-center gap-2 min-w-0">
-            <SizeBadge size={node.component_size} />
+            <SizeBadge size={node.component_size} lang={language} />
 
             <div className="min-w-0">
               <div className="flex items-center gap-1.5 text-[10px] font-mono-sc text-slate-400">
@@ -257,7 +306,11 @@ function ErkulNodeRow({
                   </Link>
                 ) : isDockedVehicle ? (
                   <Link
-                    href={`/database/ships?search=${encodeURIComponent(node.component_name || '')}`}
+                    href={
+                      node.docked_ship_uuid
+                        ? `/ships/${node.docked_ship_uuid}`
+                        : `/database/ships?search=${encodeURIComponent(node.component_name || '')}`
+                    }
                     className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 text-cyan-400 hover:text-cyan-200"
                     title={isFr ? 'Voir fiche vaisseau parasite' : 'View parasite ship details'}
                   >
@@ -281,9 +334,19 @@ function ErkulNodeRow({
               </span>
             )}
             {isDockedVehicle && (
-              <span className="px-1.5 py-0.5 rounded text-[9px] font-mono-sc bg-indigo-950/80 text-indigo-300 border border-indigo-700/60 font-bold uppercase">
-                {isFr ? 'Parasite Arrimé' : 'Docked Craft'}
-              </span>
+              <div className="flex items-center gap-1">
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-mono-sc bg-indigo-950/80 text-indigo-300 border border-indigo-700/60 font-bold uppercase">
+                  {isFr ? 'Parasite Arrimé' : 'Docked Craft'}
+                </span>
+                {node.docked_ship_uuid && (
+                  <Link
+                    href={`/ships/${node.docked_ship_uuid}`}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-950 hover:bg-indigo-900 border border-indigo-500/50 text-[10px] font-mono-sc text-indigo-200 transition-colors shadow-sm"
+                  >
+                    <span>{isFr ? 'Fiche vaisseau ↗' : 'Ship Sheet ↗'}</span>
+                  </Link>
+                )}
+              </div>
             )}
             {isMining && (
               <span className="px-1.5 py-0.5 rounded text-[9px] font-mono-sc bg-amber-950/80 text-amber-300 border border-amber-800/60 font-bold">
@@ -340,30 +403,58 @@ function ErkulNodeRow({
                 {trackStyle.label}
               </span>
             )}
+            <ComponentClassBadge componentClass={node.component_class} lang={language} />
             <GradeBadge grade={node.component_grade} />
           </div>
         </div>
 
         {/* Inline Component Stats (Erkul-like telemetry chips) */}
         {(node.weapon_dps ||
+          node.weapon_burst_dps ||
           node.weapon_damage ||
+          node.weapon_alpha_damage ||
+          node.weapon_speed ||
           node.weapon_fire_rate ||
           node.weapon_range ||
           node.weapon_ammo_count ||
           node.shield_hp ||
           node.shield_regen ||
+          node.shield_hardening ||
+          node.shield_faces ||
           node.quantum_speed ||
           node.quantum_range ||
           node.quantum_spool_time ||
+          node.qd_cooldown ||
           node.cooler_cooling_rate ||
           node.power_output ||
+          node.em_signature ||
+          node.ir_signature ||
+          node.cm_ammo_count ||
           node.thruster_max_thrust) && (
           <div className="flex flex-wrap items-center gap-1.5 mt-2 pt-2 border-t border-slate-800/50">
             {node.weapon_dps != null && (
               <StatChip label="DPS" value={Math.round(node.weapon_dps).toLocaleString()} color="text-amber-400" />
             )}
-            {node.weapon_damage != null && (
-              <StatChip label="Alpha" value={Math.round(node.weapon_damage).toLocaleString()} />
+            {node.weapon_burst_dps != null && (
+              <StatChip
+                label={isFr ? 'Rafale' : 'Burst'}
+                value={Math.round(node.weapon_burst_dps).toLocaleString()}
+                color="text-amber-300"
+              />
+            )}
+            {(node.weapon_alpha_damage != null || node.weapon_damage != null) && (
+              <StatChip
+                label="Alpha"
+                value={Math.round(node.weapon_alpha_damage ?? node.weapon_damage!).toLocaleString()}
+              />
+            )}
+            {node.weapon_speed != null && (
+              <StatChip
+                label={isFr ? 'Vitesse' : 'Speed'}
+                value={Math.round(node.weapon_speed).toLocaleString()}
+                unit="m/s"
+                color="text-emerald-400"
+              />
             )}
             {node.weapon_fire_rate != null && (
               <StatChip label="RPM" value={Math.round(node.weapon_fire_rate).toLocaleString()} />
@@ -374,26 +465,77 @@ function ErkulNodeRow({
             {node.weapon_ammo_count != null && (
               <StatChip label="Ammo" value={node.weapon_ammo_count.toLocaleString()} color="text-yellow-400" />
             )}
+            {node.cm_ammo_count != null && (
+              <StatChip
+                label={isFr ? 'Munitions CM' : 'CM Ammo'}
+                value={node.cm_ammo_count.toLocaleString()}
+                color="text-purple-400"
+              />
+            )}
             {node.shield_hp != null && (
               <StatChip label="HP" value={Math.round(node.shield_hp).toLocaleString()} color="text-cyan-400" />
             )}
             {node.shield_regen != null && (
-              <StatChip label="Regen" value={Math.round(node.shield_regen).toLocaleString()} unit="/s" color="text-cyan-400" />
+              <StatChip
+                label="Regen"
+                value={Math.round(node.shield_regen).toLocaleString()}
+                unit="/s"
+                color="text-cyan-400"
+              />
+            )}
+            {node.shield_hardening != null && (
+              <StatChip
+                label={isFr ? 'Dureté' : 'Hardening'}
+                value={`${Math.round(node.shield_hardening * 100)}%`}
+                color="text-cyan-300"
+              />
+            )}
+            {node.shield_faces != null && (
+              <StatChip label="Faces" value={node.shield_faces} color="text-cyan-300" />
             )}
             {node.quantum_speed != null && (
-              <StatChip label="Speed" value={Math.round(node.quantum_speed / 1000).toLocaleString()} unit="km/s" color="text-purple-400" />
+              <StatChip
+                label="Speed"
+                value={Math.round(node.quantum_speed / 1000).toLocaleString()}
+                unit="km/s"
+                color="text-purple-400"
+              />
             )}
             {node.quantum_range != null && (
-              <StatChip label="Range" value={(node.quantum_range / 1_000_000).toFixed(1)} unit="Mkm" color="text-purple-400" />
+              <StatChip
+                label="Range"
+                value={(node.quantum_range / 1_000_000).toFixed(1)}
+                unit="Mkm"
+                color="text-purple-400"
+              />
             )}
             {node.quantum_spool_time != null && (
               <StatChip label="Spool" value={node.quantum_spool_time.toFixed(1)} unit="s" color="text-purple-300" />
             )}
+            {node.qd_cooldown != null && (
+              <StatChip label="Cooldown" value={node.qd_cooldown.toFixed(1)} unit="s" color="text-purple-300" />
+            )}
             {node.cooler_cooling_rate != null && (
-              <StatChip label="Cooling" value={Math.round(node.cooler_cooling_rate).toLocaleString()} unit="kW" color="text-teal-400" />
+              <StatChip
+                label="Cooling"
+                value={Math.round(node.cooler_cooling_rate).toLocaleString()}
+                unit="kW"
+                color="text-teal-400"
+              />
             )}
             {node.power_output != null && (
-              <StatChip label="Power" value={Math.round(node.power_output).toLocaleString()} unit="kW" color="text-yellow-400" />
+              <StatChip
+                label="Power"
+                value={Math.round(node.power_output).toLocaleString()}
+                unit="kW"
+                color="text-yellow-400"
+              />
+            )}
+            {node.em_signature != null && (
+              <StatChip label="EM" value={Math.round(node.em_signature).toLocaleString()} color="text-blue-400" />
+            )}
+            {node.ir_signature != null && (
+              <StatChip label="IR" value={Math.round(node.ir_signature).toLocaleString()} color="text-orange-400" />
             )}
             {node.thruster_max_thrust != null && (
               <StatChip
@@ -448,6 +590,14 @@ function getSectionBadge(sec: GroupedLoadoutSection, isFr: boolean): string | un
     };
     sec.nodes.forEach(addCount);
     if (count > 0) return `${count} ${isFr ? 'mun.' : 'ord.'}`;
+  }
+
+  if (sec.key === 'countermeasures') {
+    let count = 0;
+    sec.nodes.forEach((n) => {
+      if (n.cm_ammo_count) count += Number(n.cm_ammo_count);
+    });
+    if (count > 0) return `${count} ${isFr ? 'charges' : 'ammo'}`;
   }
 
   if (sec.key === 'shields') {

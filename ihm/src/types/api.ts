@@ -142,6 +142,7 @@ export interface LoadoutNode {
   component_class_name: string | null;
   sub_type: string | null;
   grade: string | null;
+  component_class?: string | null;
   manufacturer_code: string | null;
   // Weapons
   weapon_dps: number | null;
@@ -150,20 +151,30 @@ export interface LoadoutNode {
   weapon_range: number | null;
   weapon_ammo_count: number | null;
   weapon_damage_type: string | null;
+  weapon_speed?: number | null;
+  weapon_burst_dps?: number | null;
+  weapon_sustained_dps?: number | null;
+  weapon_alpha_damage?: number | null;
   // Shield
   shield_hp: number | null;
   shield_regen: number | null;
   shield_regen_delay: number | null;
+  shield_hardening?: number | null;
+  shield_faces?: number | null;
   // QD
   qd_speed: number | null;
   qd_spool_time: number | null;
   qd_range: number | null;
+  qd_fuel_rate?: number | null;
+  qd_cooldown?: number | null;
   // Power / heat
   power_output: number | null;
   power_draw: number | null;
   power_base: number | null;
   heat_generation: number | null;
   cooling_rate: number | null;
+  em_signature?: number | null;
+  ir_signature?: number | null;
   // Thruster
   thruster_max_thrust: number | null;
   thruster_type: string | null;
