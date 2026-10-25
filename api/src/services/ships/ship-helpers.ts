@@ -199,8 +199,9 @@ export function selectAlias(expression: string): string {
   return expression.replace(/^[a-zA-Z0-9_]+\./, '').trim();
 }
 
-export const SHIP_MATRIX_UPCOMING_STATUSES = new Set(['in-concept', 'in-production', 'in-development']);
-export const SHIP_MATRIX_UPCOMING_SQL = "sm2.production_status IN ('in-concept', 'in-production', 'in-development')";
+export const SHIP_MATRIX_UPCOMING_STATUSES = new Set(['in-concept', 'in-production', 'in-development', 'lore', 'flight-ready']);
+export const SHIP_MATRIX_UPCOMING_SQL =
+  "COALESCE(sm2.production_status, 'in-concept') IN ('in-concept', 'in-production', 'in-development', 'lore', 'flight-ready')";
 
 export const SHIP_JOINS = `FROM game.ships s
   LEFT JOIN game.manufacturers m ON s.manufacturer_code = m.code

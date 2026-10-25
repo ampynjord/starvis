@@ -44,9 +44,11 @@ function crewLabel(min: number | null | undefined, max: number | null | undefine
 }
 
 const STATUS_LABELS: Record<string, string> = {
+  'flight-ready': 'Flight Ready',
   'in-concept': 'In Concept',
   'in-production': 'In Production',
   'in-development': 'In Development',
+  lore: 'Lore / SQ42',
   'in-game-only': 'In Game Only',
 };
 
@@ -507,12 +509,15 @@ export default function ShipDetailPage({ initialShip }: { initialShip?: Ship | n
                     {VARIANT_TYPE_LABELS[ship.variant_type] ?? ship.variant_type}
                   </GlowBadge>
                 )}
-                {ship.is_concept_only && <GlowBadge color="amber">In Concept</GlowBadge>}
-                {!ship.is_concept_only && ship.production_status && !['flight-ready', 'flight_ready'].includes(ship.production_status) && (
-                  <GlowBadge color="amber">
+                {ship.production_status === 'lore' ? (
+                  <GlowBadge color="purple">Lore / SQ42</GlowBadge>
+                ) : ship.is_concept_only ? (
+                  <GlowBadge color="amber">In Concept</GlowBadge>
+                ) : ship.production_status && !['flight-ready', 'flight_ready'].includes(ship.production_status) ? (
+                  <GlowBadge color="cyan">
                     {statusLabel(ship.production_status)}
                   </GlowBadge>
-                )}
+                ) : null}
               </div>
             </div>
             <div className="flex items-center gap-3 shrink-0">

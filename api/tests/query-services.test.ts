@@ -146,7 +146,7 @@ describe('ShipQueryService', () => {
       expect(result.total).toBe(1);
       expect(result.data).toEqual([conceptShip]);
       const calls = ((prisma as any).$queryRawUnsafe as any).mock.calls;
-      expect(calls[1][0]).toContain("sm2.production_status IN ('in-concept', 'in-production', 'in-development')");
+      expect(calls[1][0]).toContain("IN ('in-concept', 'in-production', 'in-development', 'lore', 'flight-ready')");
       expect(calls[1][0]).toContain('END = $2');
       expect(calls[2][0]).toContain('UNION ALL');
       expect(calls[2][0]).toContain('as vehicle_category');

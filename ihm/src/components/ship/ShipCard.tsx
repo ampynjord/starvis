@@ -25,6 +25,8 @@ function crewLabel(ship: ShipListItem): string {
 export function ShipCard({ ship, index = 0 }: Props) {
   const isGround = ship.vehicle_category === 'ground' || ship.vehicle_category === 'gravlev';
   const isInConcept = ship.production_status === 'in-concept';
+  const isLore = ship.production_status === 'lore';
+  const isInProduction = ship.production_status === 'in-production' || ship.production_status === 'in-development';
 
   return (
     <motion.div
@@ -50,9 +52,11 @@ export function ShipCard({ ship, index = 0 }: Props) {
                 </span>
               </div>
             )}
-            {(isInConcept || (ship.variant_type && ship.variant_type !== 'standard')) && (
+            {(isInConcept || isLore || isInProduction || (ship.variant_type && ship.variant_type !== 'standard')) && (
               <div className="absolute top-1.5 right-1.5 flex flex-col items-end gap-1">
+                {isLore && <GlowBadge color="purple">Lore / SQ42</GlowBadge>}
                 {isInConcept && <GlowBadge color="amber">In Concept</GlowBadge>}
+                {isInProduction && <GlowBadge color="cyan">In Production</GlowBadge>}
                 {ship.variant_type && ship.variant_type !== 'standard' && (
                   <GlowBadge
                     color={

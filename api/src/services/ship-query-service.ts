@@ -1,4 +1,4 @@
-﻿/**
+/**
  * ShipQueryService — Ship listing, search, filters, manufacturers
  */
 import type { PrismaLike as PrismaClient } from '@starvis/db';
@@ -368,7 +368,8 @@ export class ShipQueryService {
            WHEN 'in-production' THEN 2
            WHEN 'in-development' THEN 3
            WHEN 'in-concept' THEN 4
-           WHEN 'in-game-only' THEN 5
+           WHEN 'lore' THEN 5
+           WHEN 'in-game-only' THEN 6
            ELSE 9
          END, value`
       : `SELECT COALESCE(sm.production_status, 'in-game-only') as value, COUNT(*) as count
@@ -586,7 +587,7 @@ export class ShipQueryService {
                 sm2.media_store_small as thumbnail, sm2.media_store_large as thumbnail_large,
                 ${SHIP_MATRIX_CATEGORY_SQL} as vehicle_category, sm2.production_status, TRUE as is_concept_only
          FROM rsi.ship_matrix sm2
-         WHERE sm2.production_status IN ('in-concept', 'in-production', 'in-development')
+         WHERE ${SHIP_MATRIX_UPCOMING_SQL}
            AND sm2.id NOT IN (SELECT ship_matrix_id FROM game.ships WHERE ship_matrix_id IS NOT NULL AND env = ?)
            AND (sm2.name ILIKE ? OR sm2.manufacturer_name ILIKE ? OR sm2.focus ILIKE ?)
       ) rows

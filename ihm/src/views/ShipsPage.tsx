@@ -42,6 +42,7 @@ const STATUS_LABELS: Record<string, string> = {
   'in-production': 'In Production',
   'in-development': 'In Development',
   'in-concept': 'In Concept',
+  lore: 'Lore / SQ42',
   'in-game-only': 'In Game Only',
 };
 

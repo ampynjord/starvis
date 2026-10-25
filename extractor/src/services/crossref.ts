@@ -78,6 +78,10 @@ export const SM_TO_P4K_ALIASES: Record<string, string> = {
   'ROC-DS': 'ROC DS',
   'L-21 Wolf': 'L21 Wolf',
   'L-22 Alpha Wolf': 'L22 AlphaWolf',
+  'S-65 Stingray': 'S65 Stingray',
+  'S-65 Stingray Ballistic': 'S65 Stingray Ballistic',
+  'Kruger S-65 Stingray': 'S65 Stingray',
+  Stingray: 'S65 Stingray',
 };
 
 function normalizeForMatch(name: string): string {
@@ -92,6 +96,7 @@ function normalizeForMatch(name: string): string {
       .replace(/-/g, ' ')
       .replace(/\./g, '')
       .replace(/\//g, '')
+      .replace(/\b([a-z])\s+(\d+)\b/g, '$1$2')
       // Unify "Mk IV/III/II/I" and "Mk4/3/2/1" so Ship Matrix ↔ P4K always match
       .replace(/\bmk\s*iv\b/g, 'mk 4')
       .replace(/\bmk\s*iii\b/g, 'mk 3')
@@ -483,12 +488,10 @@ export async function tagVariantTypes(conn: PoolClient, env: GameEnv): Promise<v
   }
 
   // Brand-new flyable ships ship in the P4K one or more patches before RSI adds
-  // them to the Ship Matrix (e.g. GLSN_Basher, GAMA_Tyilui in 4.9.0). A clean
-  // two-segment MFG_Name class name with no variant suffix is the signature of a
-  // base hull, not a one-off oddity: keep those visible instead of letting the
-  // 'special' catch-all prune them.
+  // them to the Ship Matrix (e.g. GLSN_Basher, GAMA_Tyilui in 4.9.0, KRIG_S65_Stingray in 4.10.2).
+  // Keep valid manufacturer class names visible unless they have explicit mission/temp/wreck suffixes.
   await conn.query(
-    "UPDATE game.ships SET variant_type = 'standalone' WHERE ship_matrix_id IS NULL AND variant_type IS NULL AND class_name ~ '^[A-Z]{2,5}_[A-Za-z0-9]+$' AND env = $1",
+    "UPDATE game.ships SET variant_type = 'standalone' WHERE ship_matrix_id IS NULL AND variant_type IS NULL AND class_name ~ '^[A-Z]{2,5}_[A-Za-z0-9_]+$' AND class_name !~* '(_temp|_teach|_tutorial|_swarm|_ea|_pir|_showdown|_wreck|_derelict|_drug|_hijacked|_lootable)' AND env = $1",
     [env],
   );
 
