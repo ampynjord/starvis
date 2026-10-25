@@ -63,7 +63,8 @@ const EN_TO_FR: Record<string, string> = {
   Handheld: 'Portable',
   Radar: 'Radar',
   Scanner: 'Scanner',
-  JumpDrive: 'Moteur de saut',
+  JumpDrive: 'Module de saut',
+  JumpModule: 'Module de saut',
   Emp: 'IEM',
   SpaceStation: 'Station spatiale',
   LandingZone: 'Zone d’atterrissage',
@@ -73,6 +74,18 @@ const EN_TO_FR: Record<string, string> = {
   Moon: 'Lune',
   Settlement: 'Colonie',
   LagrangePoint: 'Point de Lagrange',
+  landing_zone: 'Zone d’atterrissage',
+  station: 'Station spatiale',
+  rest_stop: 'Relais spatial',
+  planet: 'Planète',
+  moon: 'Lune',
+  outpost: 'Avant-poste',
+  bunker: 'Bunker',
+  jump_point: 'Point de saut',
+  comm_array: 'Balise de com',
+  mining_claim: 'Site minier',
+  system: 'Système stellaire',
+  star: 'Étoile',
 };
 
 const FR_TO_EN: Record<string, string> = Object.fromEntries(Object.entries(EN_TO_FR).map(([english, french]) => [french, english]));

@@ -40,6 +40,7 @@ export function mountUniverseNexusRoutes(router: Router, deps: RouteDependencies
       const manufacturer = getQueryString(req, 'manufacturer');
       const type = getQueryString(req, 'type');
       const system = getQueryString(req, 'system');
+      const status = getQueryString(req, 'status');
       const page = Number(req.query.page ?? 1);
       const limit = Number(req.query.limit ?? 24);
       const env = getQueryString(req, 'env') ?? 'live';
@@ -51,6 +52,7 @@ export function mountUniverseNexusRoutes(router: Router, deps: RouteDependencies
         manufacturer,
         type,
         system,
+        status,
         page,
         limit,
         env,

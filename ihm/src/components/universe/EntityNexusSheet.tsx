@@ -14,6 +14,7 @@ import {
   Crosshair,
   Shield,
   Wrench,
+  Compass,
 } from 'lucide-react';
 import { useEnv } from '@/contexts/EnvContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -21,7 +22,7 @@ import { fetchEntityNexus } from '@/services/universe-api';
 import type { UniverseEntityNexus } from '@/types/universe';
 import { fNumber } from '@/utils/formatters';
 import { localizeCatalogLabel } from '@/lib/catalog-labels';
-import { groupLoadoutSlots } from '@/lib/loadout-formatter';
+import { buildLoadoutTree, type LoadoutNode } from '@/lib/loadout-formatter';
 import { ShipHoloViewer } from '@/components/ship/ShipHoloViewer';
 
 interface EntityNexusSheetProps {
@@ -36,6 +37,88 @@ interface HistoryItem {
   category: 'ships' | 'components' | 'items' | 'locations' | 'commodities';
   id: string;
   name: string;
+}
+
+function LoadoutNodeCard({
+  node,
+  depth = 0,
+  language,
+  onPivot,
+}: {
+  node: LoadoutNode;
+  depth?: number;
+  language: string;
+  onPivot: (cat: 'ships' | 'components' | 'items' | 'locations' | 'commodities', id: string, name: string) => void;
+}) {
+  const hasChildren = node.children && node.children.length > 0;
+  const isJumpModule =
+    (node.component_type || '').toLowerCase().includes('jump') ||
+    node.port_name.toLowerCase().includes('jump');
+
+  return (
+    <div className={`space-y-1.5 ${depth > 0 ? 'ml-3 sm:ml-4 pl-2 sm:pl-3 border-l-2 border-cyan-500/30' : ''}`}>
+      <div
+        onClick={() =>
+          node.component_uuid &&
+          onPivot('components', node.component_uuid, node.component_name || '')
+        }
+        className={`p-2.5 rounded-lg border transition-all flex items-center justify-between ${
+          node.component_uuid
+            ? depth === 0
+              ? 'bg-slate-900/80 hover:bg-cyan-950/40 border-slate-800 hover:border-cyan-500/50 cursor-pointer group'
+              : 'bg-slate-950/70 hover:bg-cyan-950/30 border-slate-800/80 hover:border-cyan-500/40 cursor-pointer group'
+            : 'bg-slate-950/40 border-slate-800/40 opacity-75'
+        }`}
+      >
+        <div className="min-w-0 pr-2">
+          <div className="flex items-center gap-1.5">
+            {depth > 0 && <span className="text-[10px] font-mono-sc text-cyan-400 font-bold">↳</span>}
+            <span className="text-[10px] font-mono-sc text-slate-400 block truncate group-hover:text-slate-300">
+              {node.humanPortName}
+            </span>
+          </div>
+          <span className="text-xs font-semibold text-white font-rajdhani truncate block group-hover:text-cyan-300">
+            {node.count && node.count > 1 ? `${node.count}x ` : ''}
+            {node.component_name ||
+              localizeCatalogLabel(language as any, node.component_type) ||
+              node.port_type}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-1.5 shrink-0">
+          {isJumpModule && (
+            <span className="px-1.5 py-0.5 rounded text-[9px] font-mono-sc bg-purple-950/80 text-purple-300 border border-purple-800/60 font-semibold uppercase">
+              {language === 'fr' ? 'Saut' : 'Jump'}
+            </span>
+          )}
+          {node.component_grade && (
+            <span className="px-1 py-0.2 rounded text-[9px] font-mono-sc bg-slate-800 text-slate-400 border border-slate-700">
+              {node.component_grade}
+            </span>
+          )}
+          {node.component_size && (
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono-sc bg-cyan-950/70 text-cyan-300 border border-cyan-800/60 font-bold">
+              T{node.component_size}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {hasChildren && (
+        <div className="space-y-1.5 pt-0.5">
+          {node.children.map((child) => (
+            <LoadoutNodeCard
+              key={child.id}
+              node={child}
+              depth={depth + 1}
+              language={language}
+              onPivot={onPivot}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function EntityNexusSheet({ category, id, open, onClose, onOpenModel3D }: EntityNexusSheetProps) {
@@ -360,8 +443,8 @@ export function EntityNexusSheet({ category, id, open, onClose, onOpenModel3D }:
                         </span>
                       </div>
 
-                      <div className="space-y-3.5">
-                        {groupLoadoutSlots(connections.loadout as any, language).map((section) => {
+                      <div className="space-y-4">
+                        {buildLoadoutTree(connections.loadout as any, language).map((section) => {
                           const IconComp =
                             section.iconName === 'crosshair'
                               ? Crosshair
@@ -369,7 +452,11 @@ export function EntityNexusSheet({ category, id, open, onClose, onOpenModel3D }:
                                 ? Shield
                                 : section.iconName === 'zap'
                                   ? Zap
-                                  : Wrench;
+                                  : section.iconName === 'navigation'
+                                    ? Compass
+                                    : section.iconName === 'rocket'
+                                      ? Rocket
+                                      : Wrench;
 
                           return (
                             <div key={section.key} className="space-y-2">
@@ -377,43 +464,15 @@ export function EntityNexusSheet({ category, id, open, onClose, onOpenModel3D }:
                                 <IconComp size={12} className="text-cyan-400 shrink-0" />
                                 <span>{section.title}</span>
                               </div>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                {section.slots.map((slot, i) => (
-                                  <div
-                                    key={i}
-                                    onClick={() =>
-                                      slot.component_uuid &&
-                                      handlePivot('components', slot.component_uuid, slot.component_name || '')
-                                    }
-                                    className={`p-2.5 rounded-lg border transition-all flex items-center justify-between ${
-                                      slot.component_uuid
-                                        ? 'bg-slate-900/60 hover:bg-cyan-950/40 border-slate-800/80 hover:border-cyan-500/50 cursor-pointer group'
-                                        : 'bg-slate-900/20 border-slate-800/40 opacity-70'
-                                    }`}
-                                  >
-                                    <div className="min-w-0 pr-2">
-                                      <span className="text-[10px] font-mono-sc text-slate-400 block truncate group-hover:text-slate-300">
-                                        {slot.humanPortName}
-                                      </span>
-                                      <span className="text-xs font-semibold text-white font-rajdhani truncate block group-hover:text-cyan-300">
-                                        {slot.component_name ||
-                                          localizeCatalogLabel(language, slot.component_type) ||
-                                          t('cat_components')}
-                                      </span>
-                                    </div>
-                                    <div className="flex items-center gap-1 shrink-0">
-                                      {slot.component_grade && (
-                                        <span className="px-1 py-0.2 rounded text-[9px] font-mono-sc bg-slate-800 text-slate-400 border border-slate-700">
-                                          {slot.component_grade}
-                                        </span>
-                                      )}
-                                      {slot.component_size && (
-                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-mono-sc bg-cyan-950/70 text-cyan-300 border border-cyan-800/60 font-bold">
-                                          T{slot.component_size}
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                {section.nodes.map((node) => (
+                                  <LoadoutNodeCard
+                                    key={node.id}
+                                    node={node}
+                                    depth={0}
+                                    language={language}
+                                    onPivot={handlePivot}
+                                  />
                                 ))}
                               </div>
                             </div>

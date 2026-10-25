@@ -23,6 +23,7 @@ export async function fetchUniverseExplore(params: {
   search?: string;
   manufacturer?: string;
   type?: string;
+  status?: string;
   page?: number;
   limit?: number;
   env?: string;
@@ -33,6 +34,7 @@ export async function fetchUniverseExplore(params: {
   if (params.search) query.set('search', params.search);
   if (params.manufacturer) query.set('manufacturer', params.manufacturer);
   if (params.type) query.set('type', params.type);
+  if (params.status && params.status !== 'all') query.set('status', params.status);
   if (params.page) query.set('page', String(params.page));
   if (params.limit) query.set('limit', String(params.limit));
   if (params.env) query.set('env', params.env);

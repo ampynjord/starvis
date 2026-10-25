@@ -51,11 +51,12 @@ export function UniverseNexusView() {
   }, [language, t]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['universe-explore', selectedCategory, search, page, env, language],
+    queryKey: ['universe-explore', selectedCategory, statusFilter, search, page, env, language],
     queryFn: () =>
       fetchUniverseExplore({
         category: selectedCategory,
         search: search || undefined,
+        status: statusFilter !== 'all' ? statusFilter : undefined,
         page,
         limit: 24,
         env,
@@ -64,16 +65,7 @@ export function UniverseNexusView() {
     staleTime: 30_000,
   });
 
-  const rawEntities: UniverseOmniResult[] = data?.data || [];
-  const entities =
-    statusFilter === 'all'
-      ? rawEntities
-      : rawEntities.filter((e) => {
-          if (statusFilter === 'in-concept') {
-            return e.productionStatus === 'in-concept' || e.productionStatus === 'in-development';
-          }
-          return e.productionStatus === statusFilter;
-        });
+  const entities: UniverseOmniResult[] = data?.data || [];
   const total = data?.total || 0;
   const pages = data?.pages || 1;
 
@@ -171,7 +163,10 @@ export function UniverseNexusView() {
               ].map((st) => (
                 <button
                   key={st.id}
-                  onClick={() => setStatusFilter(st.id as any)}
+                  onClick={() => {
+                    setStatusFilter(st.id as any);
+                    setPage(1);
+                  }}
                   className={`px-2.5 py-1 rounded-md transition-all shrink-0 border ${
                     statusFilter === st.id
                       ? 'bg-slate-800 text-white border-cyan-500/50 font-bold'

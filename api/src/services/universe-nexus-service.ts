@@ -29,6 +29,7 @@ export interface UniverseExploreParams {
   manufacturer?: string;
   type?: string;
   system?: string;
+  status?: string;
   page?: number;
   limit?: number;
   env?: string;
@@ -84,10 +85,19 @@ function readableShipNameSql(alias: string, column = 'name'): string {
 }
 
 /** Concept / lore / upcoming rows that exist only in Ship Matrix (not yet in game.ships). */
-function conceptShipsSelectSql(searchParam: string | null): string {
+function conceptShipsSelectSql(searchParam: string | null, statusParam?: string | null): string {
   const search = searchParam
     ? `AND (sm2.name ILIKE ${searchParam} OR COALESCE(sm2.manufacturer_name, '') ILIKE ${searchParam} OR COALESCE(sm2.focus, '') ILIKE ${searchParam})`
     : '';
+  let statusCondition =
+    "COALESCE(sm2.production_status, 'in-concept') IN ('in-concept', 'in-production', 'in-development', 'lore', 'flight-ready')";
+  if (statusParam === 'flight-ready') {
+    statusCondition = "sm2.production_status = 'flight-ready'";
+  } else if (statusParam === 'in-concept') {
+    statusCondition = "sm2.production_status IN ('in-concept', 'in-production', 'in-development')";
+  } else if (statusParam === 'lore') {
+    statusCondition = "sm2.production_status = 'lore'";
+  }
   return `
     SELECT
       ('concept-' || sm2.id::text) AS uuid,
@@ -101,11 +111,24 @@ function conceptShipsSelectSql(searchParam: string | null): string {
       COALESCE(sm2.media_store_small, sm2.media_store_large) AS thumbnail,
       sm2.production_status
     FROM rsi.ship_matrix sm2
-    WHERE COALESCE(sm2.production_status, 'in-concept') IN ('in-concept', 'in-production', 'in-development', 'lore', 'flight-ready')
+    WHERE ${statusCondition}
       AND sm2.id NOT IN (SELECT ship_matrix_id FROM game.ships WHERE ship_matrix_id IS NOT NULL)
       AND sm2.name NOT ILIKE '%placeholder%'
       ${search}
   `;
+}
+
+function shipStatusFilterSql(status?: string): string {
+  if (status === 'flight-ready') {
+    return "AND (sm.production_status = 'flight-ready' OR sm.production_status IS NULL)";
+  }
+  if (status === 'in-concept') {
+    return "AND sm.production_status IN ('in-concept', 'in-production', 'in-development')";
+  }
+  if (status === 'lore') {
+    return "AND sm.production_status = 'lore'";
+  }
+  return '';
 }
 
 function readTranslation(
@@ -283,7 +306,7 @@ export class UniverseNexusService {
           AND ${nameMatchSql('l', 'name', '$2')}
           AND l.name NOT ILIKE '%placeholder%'
           AND l.name != ''
-          AND l.type IN ('SpaceStation', 'LandingZone', 'City', 'Outpost', 'Planet', 'Moon', 'Settlement', 'LagrangePoint')
+          AND LOWER(l.type) IN ('landing_zone', 'station', 'rest_stop', 'planet', 'moon', 'outpost', 'bunker', 'jump_point', 'comm_array', 'mining_claim', 'system', 'star', 'spacestation', 'city', 'settlement', 'lagrangepoint')
         ORDER BY 
           CASE WHEN ${displayNameSql('l', 'name', language)} ILIKE $3 THEN 0 ELSE 1 END,
           ${displayNameSql('l', 'name', language)} ASC
@@ -427,7 +450,7 @@ export class UniverseNexusService {
    * Can browse everything or focus on a specific category with intelligent facets.
    */
   async explore(params: UniverseExploreParams): Promise<PaginatedResult<UniverseOmniResult> & { facets: Row }> {
-    const { category = 'all', search, manufacturer, type, page = 1, limit = 24, env = 'live', lang } = params;
+    const { category = 'all', search, manufacturer, type, status, page = 1, limit = 24, env = 'live', lang } = params;
     const language = asLang(lang);
     const offset = Math.max(0, (page - 1) * limit);
     const safeLimit = Math.min(Math.max(1, limit), 100);
@@ -438,25 +461,17 @@ export class UniverseNexusService {
     if (category === 'all') {
       const shipSearch = whereSearch ? `AND ${nameMatchSql('s', 'name', '$2')}` : '';
       const conceptSearch = whereSearch ? '$2' : null;
+      const shipStatusSql = shipStatusFilterSql(status);
+      const isOnlyConceptOrLore = status === 'in-concept' || status === 'lore';
+
       const componentSearch = whereSearch ? `AND ${nameMatchSql('c', 'name', '$2')}` : '';
       const itemSearch = whereSearch ? `AND ${nameMatchSql('i', 'name', '$2')}` : '';
       const locationSearch = whereSearch ? `AND ${nameMatchSql('l', 'name', '$2')}` : '';
       const commoditySearch = whereSearch ? `AND ${nameMatchSql('cm', 'name', '$2')}` : '';
-      const universeSql = `
-        SELECT s.uuid::text AS id, s.class_name, ${displayNameSql('s', 'name', language)} AS name,
-          'ships'::text AS category, COALESCE(s.role, 'Ship') AS type, s.career AS sub_type,
-          COALESCE(m.name, s.manufacturer_code) AS manufacturer_name, s.manufacturer_code,
-          COALESCE(sm.media_store_small, sm.media_store_large) AS thumbnail,
-          NULL::text AS system_code, sm.production_status, NULL::int AS size
-        FROM game.ships s
-        LEFT JOIN game.manufacturers m ON m.code = s.manufacturer_code
-        LEFT JOIN rsi.ship_matrix sm ON sm.id = s.ship_matrix_id
-        ${translationJoin('s')}
-        WHERE s.env = $1 AND ${readableShipNameSql('s')} ${shipSearch}
-        UNION ALL
-        SELECT cs.uuid AS id, cs.class_name, cs.name, 'ships', COALESCE(cs.role, 'Ship'), cs.career,
-          cs.manufacturer_name, cs.manufacturer_code, cs.thumbnail, NULL::text, cs.production_status, NULL::int
-        FROM (${conceptShipsSelectSql(conceptSearch)}) cs
+
+      const nonShipSql = isOnlyConceptOrLore
+        ? ''
+        : `
         UNION ALL
         SELECT c.uuid::text, c.class_name, ${displayNameSql('c', 'name', language)},
           'components', COALESCE(c.type, 'Component'), c.sub_type,
@@ -489,7 +504,7 @@ export class UniverseNexusService {
         FROM game.locations l
         ${translationJoin('l')}
         WHERE l.env = $1 AND l.name NOT ILIKE '%placeholder%' AND l.name != ''
-          AND l.type IN ('SpaceStation', 'LandingZone', 'City', 'Outpost', 'Planet', 'Moon', 'Settlement', 'LagrangePoint')
+          AND LOWER(l.type) IN ('landing_zone', 'station', 'rest_stop', 'planet', 'moon', 'outpost', 'bunker', 'jump_point', 'comm_array', 'mining_claim', 'system', 'star', 'spacestation', 'city', 'settlement', 'lagrangepoint')
           ${locationSearch}
         UNION ALL
         SELECT cm.uuid::text, NULL::text, ${displayNameSql('cm', 'name', language)},
@@ -499,6 +514,24 @@ export class UniverseNexusService {
         ${translationJoin('cm')}
         WHERE cm.env = $1 AND cm.name NOT ILIKE '%placeholder%' AND cm.name != ''
           ${commoditySearch}
+      `;
+
+      const universeSql = `
+        SELECT s.uuid::text AS id, s.class_name, ${displayNameSql('s', 'name', language)} AS name,
+          'ships'::text AS category, COALESCE(s.role, 'Ship') AS type, s.career AS sub_type,
+          COALESCE(m.name, s.manufacturer_code) AS manufacturer_name, s.manufacturer_code,
+          COALESCE(sm.media_store_small, sm.media_store_large) AS thumbnail,
+          NULL::text AS system_code, sm.production_status, NULL::int AS size
+        FROM game.ships s
+        LEFT JOIN game.manufacturers m ON m.code = s.manufacturer_code
+        LEFT JOIN rsi.ship_matrix sm ON sm.id = s.ship_matrix_id
+        ${translationJoin('s')}
+        WHERE s.env = $1 AND ${readableShipNameSql('s')} ${shipStatusSql} ${shipSearch}
+        UNION ALL
+        SELECT cs.uuid AS id, cs.class_name, cs.name, 'ships', COALESCE(cs.role, 'Ship'), cs.career,
+          cs.manufacturer_name, cs.manufacturer_code, cs.thumbnail, NULL::text, cs.production_status, NULL::int
+        FROM (${conceptShipsSelectSql(conceptSearch, status)}) cs
+        ${nonShipSql}
       `;
       const countParams: unknown[] = [toPostgres(env)];
       if (whereSearch) countParams.push(whereSearch);
@@ -544,6 +577,7 @@ export class UniverseNexusService {
 
     if (category === 'ships') {
       const conceptSearch = whereSearch ? '$2' : null;
+      const shipStatusSql = shipStatusFilterSql(status);
       const shipsUnionSql = `
         SELECT s.uuid::text AS uuid, s.class_name, ${displayNameSql('s', 'name', language)} AS name,
           COALESCE(m.name, s.manufacturer_code) AS manufacturer_name, s.manufacturer_code,
@@ -552,12 +586,12 @@ export class UniverseNexusService {
         LEFT JOIN game.manufacturers m ON m.code = s.manufacturer_code
         LEFT JOIN rsi.ship_matrix sm ON sm.id = s.ship_matrix_id
         ${translationJoin('s')}
-        WHERE s.env = $1 AND ${readableShipNameSql('s')}
+        WHERE s.env = $1 AND ${readableShipNameSql('s')} ${shipStatusSql}
           ${whereSearch ? `AND ${nameMatchSql('s', 'name', '$2')}` : ''}
         UNION ALL
         SELECT cs.uuid, cs.class_name, cs.name, cs.manufacturer_name, cs.manufacturer_code,
           cs.role, cs.career, cs.thumbnail, cs.production_status
-        FROM (${conceptShipsSelectSql(conceptSearch)}) cs
+        FROM (${conceptShipsSelectSql(conceptSearch, status)}) cs
       `;
       const countParams = whereSearch ? [toPostgres(env), whereSearch] : [toPostgres(env)];
       const totalCountRow = await this.prisma.$queryRawUnsafe<Row[]>(
@@ -760,7 +794,7 @@ export class UniverseNexusService {
         WHERE l.env = $1
           AND l.name NOT ILIKE '%placeholder%' 
           AND l.name != '' 
-          AND l.type IN ('SpaceStation', 'LandingZone', 'City', 'Outpost', 'Planet', 'Moon', 'Settlement', 'LagrangePoint')
+          AND LOWER(l.type) IN ('landing_zone', 'station', 'rest_stop', 'planet', 'moon', 'outpost', 'bunker', 'jump_point', 'comm_array', 'mining_claim', 'system', 'star', 'spacestation', 'city', 'settlement', 'lagrangepoint')
           ${whereSearch ? `AND ${nameMatchSql('l', 'name', '$2')}` : ''}`;
       const countParams: unknown[] = [toPostgres(env)];
       if (whereSearch) countParams.push(whereSearch);
@@ -779,7 +813,7 @@ export class UniverseNexusService {
       WHERE l.env = $1
         AND l.name NOT ILIKE '%placeholder%'
         AND l.name != ''
-        AND l.type IN ('SpaceStation', 'LandingZone', 'City', 'Outpost', 'Planet', 'Moon', 'Settlement', 'LagrangePoint')
+        AND LOWER(l.type) IN ('landing_zone', 'station', 'rest_stop', 'planet', 'moon', 'outpost', 'bunker', 'jump_point', 'comm_array', 'mining_claim', 'system', 'star', 'spacestation', 'city', 'settlement', 'lagrangepoint')
         ${whereSearch ? `AND ${nameMatchSql('l', 'name', '$2')}` : ''}
       ORDER BY ${displayNameSql('l', 'name', language)} ASC
       LIMIT $${countParams.length + 1} OFFSET $${countParams.length + 2}`;
@@ -941,10 +975,11 @@ export class UniverseNexusService {
       if (!shipRows || shipRows.length === 0) return null;
       const ship = applyLanguage(convertBigIntToNumber(shipRows[0]), language);
 
-      // Fetch equipped loadout with human component names
+      // Fetch equipped loadout with human component names and tree relationships (parent_id)
       const loadoutRows = await this.prisma.$queryRawUnsafe<Row[]>(
         `SELECT 
           sl.id,
+          sl.parent_id,
           sl.port_name,
           sl.port_type,
           sl.port_min_size,
@@ -952,20 +987,20 @@ export class UniverseNexusService {
           sl.component_class_name,
           sl.component_uuid,
           ${displayNameSql('c', 'name', language)} AS component_name,
-          c.type AS component_type,
+          COALESCE(c.type, sl.port_type) AS component_type,
           c.sub_type AS component_sub_type,
-          c.size AS component_size,
+          COALESCE(c.size, sl.port_max_size, sl.port_min_size) AS component_size,
           c.grade AS component_grade,
           c.manufacturer_code AS component_manufacturer
         FROM game.ship_loadouts sl
         LEFT JOIN game.components c ON (c.uuid = sl.component_uuid OR c.class_name = sl.component_class_name) AND c.env = $1
         ${translationJoin('c')}
         WHERE sl.ship_uuid = $2 AND sl.env = $1
-          AND sl.component_class_name !~* '(door|interior|airlock|seat|light|hatch|bed|toilet|ladder|cockpit)'
-          AND c.name IS NOT NULL
-          AND c.name NOT ILIKE '%placeholder%'
-          AND c.name !~ '^[A-Z]{2,5}_'
-        ORDER BY sl.port_type ASC, sl.port_name ASC`,
+          AND sl.component_class_name !~* '(door|interior|airlock|seat|light|hatch|bed|toilet|ladder|cockpit|flair|dashboard|radar_helper|screen_mfd|controller_|screen_annunciator|display_hud)'
+          AND sl.port_name !~* '(door|interior|airlock|seat|light|hatch|bed|toilet|ladder|cockpit|flair|screen_|display_|controller_|^\\$.*|^bar\\d|^mec|^pow|^ven|landingpad)'
+          AND (c.name IS NOT NULL OR sl.port_type IN ('Turret', 'WeaponGun', 'MissileRack', 'Gimbal', 'QuantumDrive'))
+          AND (c.name IS NULL OR (c.name NOT ILIKE '%placeholder%' AND c.name !~ '^[A-Z]{2,5}_'))
+        ORDER BY sl.id ASC`,
         toPostgres(env),
         ship.uuid,
       );
