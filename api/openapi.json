@@ -3791,6 +3791,7 @@
               "maxLength": 10,
               "pattern": "^(?:live|ptu|eptu|tech-preview|custom|\\d+\\.\\d+(?:\\.\\d+)?)$"
             },
+            "required": true,
             "description": "Game environment"
           },
           {
@@ -4224,6 +4225,7 @@
               "maxLength": 10,
               "pattern": "^(?:live|ptu|eptu|tech-preview|custom|\\d+\\.\\d+(?:\\.\\d+)?)$"
             },
+            "required": true,
             "description": "Game environment"
           },
           {
@@ -4262,6 +4264,7 @@
               "minimum": 1,
               "default": 50
             },
+            "required": true,
             "description": "Items per page"
           },
           {
@@ -4306,6 +4309,7 @@
               "minimum": 1,
               "default": 1
             },
+            "required": true,
             "description": "Page number"
           },
           {
@@ -4917,6 +4921,7 @@
               "maxLength": 10,
               "pattern": "^(?:live|ptu|eptu|tech-preview|custom|\\d+\\.\\d+(?:\\.\\d+)?)$"
             },
+            "required": true,
             "description": "Game environment"
           },
           {
@@ -4962,6 +4967,7 @@
               "minimum": 1,
               "default": 50
             },
+            "required": true,
             "description": "Items per page"
           },
           {
@@ -4990,6 +4996,7 @@
               "minimum": 1,
               "default": 1
             },
+            "required": true,
             "description": "Page number"
           },
           {
@@ -5325,6 +5332,7 @@
               "maxLength": 10,
               "pattern": "^(?:live|ptu|eptu|tech-preview|custom|\\d+\\.\\d+(?:\\.\\d+)?)$"
             },
+            "required": true,
             "description": "Game environment"
           },
           {
@@ -5370,6 +5378,7 @@
               "minimum": 1,
               "default": 50
             },
+            "required": true,
             "description": "Items per page"
           },
           {
@@ -5398,6 +5407,7 @@
               "minimum": 1,
               "default": 1
             },
+            "required": true,
             "description": "Page number"
           },
           {
@@ -5543,6 +5553,7 @@
               "maxLength": 10,
               "pattern": "^(?:live|ptu|eptu|tech-preview|custom|\\d+\\.\\d+(?:\\.\\d+)?)$"
             },
+            "required": true,
             "description": "Game environment"
           },
           {
@@ -5563,6 +5574,7 @@
               "minimum": 1,
               "default": 50
             },
+            "required": true,
             "description": "Items per page"
           },
           {
@@ -5582,6 +5594,7 @@
               "minimum": 1,
               "default": 1
             },
+            "required": true,
             "description": "Page number"
           },
           {
@@ -5776,6 +5789,7 @@
               "maxLength": 10,
               "pattern": "^(?:live|ptu|eptu|tech-preview|custom|\\d+\\.\\d+(?:\\.\\d+)?)$"
             },
+            "required": true,
             "description": "Game environment"
           },
           {
@@ -5796,6 +5810,7 @@
               "minimum": 1,
               "default": 50
             },
+            "required": true,
             "description": "Items per page"
           },
           {
@@ -5806,6 +5821,7 @@
               "minimum": 1,
               "default": 1
             },
+            "required": true,
             "description": "Page number"
           },
           {
@@ -5914,6 +5930,7 @@
               "maxLength": 10,
               "pattern": "^(?:live|ptu|eptu|tech-preview|custom|\\d+\\.\\d+(?:\\.\\d+)?)$"
             },
+            "required": true,
             "description": "Game environment"
           },
           {
@@ -5934,6 +5951,7 @@
               "minimum": 1,
               "default": 20
             },
+            "required": true,
             "description": "Items per page"
           },
           {
@@ -5952,6 +5970,7 @@
               "minimum": 1,
               "default": 1
             },
+            "required": true,
             "description": "Page number"
           },
           {
@@ -6797,6 +6816,7 @@
               "maxLength": 10,
               "pattern": "^(?:live|ptu|eptu|tech-preview|custom|\\d+\\.\\d+(?:\\.\\d+)?)$"
             },
+            "required": true,
             "description": "Game environment"
           },
           {
@@ -7814,6 +7834,7 @@
               "maxLength": 10,
               "pattern": "^(?:live|ptu|eptu|tech-preview|custom|\\d+\\.\\d+(?:\\.\\d+)?)$"
             },
+            "required": true,
             "description": "Game environment"
           },
           {
@@ -7887,6 +7908,7 @@
               "minimum": 1,
               "default": 20
             },
+            "required": true,
             "description": "Items per page"
           },
           {
@@ -7896,7 +7918,8 @@
               "type": "integer",
               "minimum": 0,
               "default": 0
-            }
+            },
+            "required": true
           }
         ],
         "responses": {
@@ -8443,6 +8466,7 @@
               "maxLength": 10,
               "pattern": "^(?:live|ptu|eptu|tech-preview|custom|\\d+\\.\\d+(?:\\.\\d+)?)$"
             },
+            "required": true,
             "description": "Game environment"
           },
           {
@@ -8505,6 +8529,7 @@
               "maxLength": 10,
               "pattern": "^(?:live|ptu|eptu|tech-preview|custom|\\d+\\.\\d+(?:\\.\\d+)?)$"
             },
+            "required": true,
             "description": "Game environment"
           },
           {
