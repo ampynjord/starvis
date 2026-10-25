@@ -5,7 +5,6 @@ import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import {
   Rocket,
-  Zap,
   Shield,
   MapPin,
   TrendingUp,
@@ -17,14 +16,71 @@ import {
   LayoutGrid,
   List,
   X,
+  Shirt,
+  Crosshair,
+  Wrench,
+  Disc,
+  Coffee,
+  Cpu,
 } from 'lucide-react';
 import { useEnv } from '@/contexts/EnvContext';
 import { useEntityNexus } from '@/contexts/NexusContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { fetchUniverseExplore } from '@/services/universe-api';
+import { fetchUniverseExplore, fetchUniverseTaxonomy } from '@/services/universe-api';
 import { localizeCatalogLabel } from '@/lib/catalog-labels';
-import type { UniverseOmniResult } from '@/types/universe';
+import type { TaxonomyCategory, UniverseOmniResult } from '@/types/universe';
 import { fNumber } from '@/utils/formatters';
+
+function getBadgeClass(color?: string): string {
+  switch (color) {
+    case 'purple':
+      return 'bg-purple-950/90 text-purple-300 border-purple-600';
+    case 'amber':
+      return 'bg-amber-950/90 text-amber-300 border-amber-600';
+    case 'cyan':
+      return 'bg-cyan-950/90 text-cyan-300 border-cyan-600';
+    case 'emerald':
+      return 'bg-emerald-950/90 text-emerald-300 border-emerald-600';
+    case 'blue':
+      return 'bg-blue-950/90 text-blue-300 border-blue-600';
+    case 'rose':
+      return 'bg-rose-950/90 text-rose-300 border-rose-600';
+    case 'indigo':
+      return 'bg-indigo-950/90 text-indigo-300 border-indigo-600';
+    case 'lime':
+      return 'bg-lime-950/90 text-lime-300 border-lime-600';
+    default:
+      return 'bg-slate-900 text-slate-300 border-slate-700';
+  }
+}
+
+function renderCategoryIcon(category: string, size = 40) {
+  switch (category) {
+    case 'ships':
+      return <Rocket size={size} />;
+    case 'vehicles':
+    case 'components':
+      return <Cpu size={size} />;
+    case 'armor':
+      return <Shield size={size} />;
+    case 'clothing':
+      return <Shirt size={size} />;
+    case 'weapons':
+      return <Crosshair size={size} />;
+    case 'utility':
+      return <Wrench size={size} />;
+    case 'ammo':
+      return <Disc size={size} />;
+    case 'sustenance':
+      return <Coffee size={size} />;
+    case 'locations':
+      return <MapPin size={size} />;
+    case 'commodities':
+      return <TrendingUp size={size} />;
+    default:
+      return <Shield size={size} />;
+  }
+}
 
 export function UniverseNexusView() {
   const { env } = useEnv();
@@ -34,13 +90,19 @@ export function UniverseNexusView() {
   const categories = [
     { id: 'all', label: t('cat_all'), icon: Sparkles, color: 'text-cyan-400' },
     { id: 'ships', label: t('cat_ships'), icon: Rocket, color: 'text-cyan-400' },
-    { id: 'components', label: t('cat_components'), icon: Zap, color: 'text-amber-400' },
-    { id: 'items', label: t('cat_items'), icon: Shield, color: 'text-emerald-400' },
+    { id: 'vehicles', label: t('cat_vehicles'), icon: Cpu, color: 'text-amber-400' },
+    { id: 'armor', label: t('cat_armor'), icon: Shield, color: 'text-emerald-400' },
+    { id: 'clothing', label: t('cat_clothing'), icon: Shirt, color: 'text-indigo-400' },
+    { id: 'weapons', label: t('cat_weapons'), icon: Crosshair, color: 'text-rose-400' },
+    { id: 'utility', label: t('cat_utility'), icon: Wrench, color: 'text-amber-400' },
+    { id: 'ammo', label: t('cat_ammo'), icon: Disc, color: 'text-yellow-400' },
+    { id: 'sustenance', label: t('cat_sustenance'), icon: Coffee, color: 'text-lime-400' },
     { id: 'locations', label: t('cat_locations'), icon: MapPin, color: 'text-violet-400' },
     { id: 'commodities', label: t('cat_commodities'), icon: TrendingUp, color: 'text-rose-400' },
   ];
 
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedSubCategory, setSelectedSubCategory] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'flight-ready' | 'in-concept' | 'lore'>('all');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -50,11 +112,20 @@ export function UniverseNexusView() {
     document.title = t('doc_title');
   }, [language, t]);
 
+  // Live Taxonomy Query
+  const { data: taxonomy } = useQuery({
+    queryKey: ['universe-taxonomy', env],
+    queryFn: () => fetchUniverseTaxonomy(env),
+    staleTime: 60_000,
+  });
+
+  // Main Exploration Query
   const { data, isLoading } = useQuery({
-    queryKey: ['universe-explore', selectedCategory, statusFilter, search, page, env, language],
+    queryKey: ['universe-explore', selectedCategory, selectedSubCategory, statusFilter, search, page, env, language],
     queryFn: () =>
       fetchUniverseExplore({
         category: selectedCategory,
+        subCategory: selectedSubCategory !== 'all' ? selectedSubCategory : undefined,
         search: search || undefined,
         status: statusFilter !== 'all' ? statusFilter : undefined,
         page,
@@ -69,8 +140,12 @@ export function UniverseNexusView() {
   const total = data?.total || 0;
   const pages = data?.pages || 1;
 
+  const activeTaxonomyCategory = taxonomy?.find((c: TaxonomyCategory) => c.id === selectedCategory);
+  const subCategories = activeTaxonomyCategory?.subCategories || [];
+
   const handleCategoryChange = (catId: string) => {
     setSelectedCategory(catId);
+    setSelectedSubCategory('all');
     setStatusFilter('all');
     setPage(1);
   };
@@ -101,6 +176,7 @@ export function UniverseNexusView() {
           {categories.map((cat) => {
             const Icon = cat.icon;
             const isActive = selectedCategory === cat.id;
+            const catTax = taxonomy?.find((c: TaxonomyCategory) => c.id === cat.id);
             return (
               <button
                 key={cat.id}
@@ -113,10 +189,56 @@ export function UniverseNexusView() {
               >
                 <Icon size={14} className={isActive ? 'text-cyan-400' : 'text-slate-500'} />
                 <span>{cat.label}</span>
+                {catTax?.total ? (
+                  <span className="text-[10px] opacity-60 font-mono">({catTax.total})</span>
+                ) : null}
               </button>
             );
           })}
         </div>
+
+        {/* Dynamic Sub-Category Pills Bar (when category is selected and has subcategories) */}
+        {subCategories.length > 0 && selectedCategory !== 'all' && (
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-1.5 border-t border-slate-800/60 scrollbar-none">
+            <span className="text-[10px] font-mono-sc text-slate-500 uppercase shrink-0 mr-1 hidden sm:inline">
+              {language === 'fr' ? 'Sous-catégorie :' : 'Subcategory:'}
+            </span>
+            <button
+              onClick={() => {
+                setSelectedSubCategory('all');
+                setPage(1);
+              }}
+              className={`px-2.5 py-1 rounded-md text-xs font-mono-sc transition-all shrink-0 border ${
+                selectedSubCategory === 'all'
+                  ? 'bg-slate-800 text-cyan-300 border-cyan-500/50 font-bold shadow-sm'
+                  : 'bg-slate-950/40 text-slate-400 hover:text-slate-200 border-slate-800/60'
+              }`}
+            >
+              {t('sub_all')} ({activeTaxonomyCategory?.total || total})
+            </button>
+            {subCategories.map((sub) => {
+              const isSubActive = selectedSubCategory === sub.id;
+              const label = language === 'fr' ? sub.label_fr : sub.label_en;
+              return (
+                <button
+                  key={sub.id}
+                  onClick={() => {
+                    setSelectedSubCategory(sub.id);
+                    setPage(1);
+                  }}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-mono-sc transition-all shrink-0 border ${
+                    isSubActive
+                      ? 'bg-cyan-950/90 text-cyan-300 border-cyan-500/60 font-bold shadow-sm'
+                      : 'bg-slate-950/40 text-slate-400 hover:text-slate-200 border-slate-800/60'
+                  }`}
+                >
+                  <span>{label}</span>
+                  <span className="text-[10px] opacity-75 font-mono">({sub.count})</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Action Controls Deck */}
         <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 pt-2 border-t border-slate-800/60">
@@ -151,8 +273,8 @@ export function UniverseNexusView() {
             )}
           </div>
 
-          {/* Status Filters (Ships & All) */}
-          {(selectedCategory === 'ships' || selectedCategory === 'all') && (
+          {/* Status Filters (for all and ships when not selected through subcategories) */}
+          {selectedCategory === 'all' && (
             <div className="flex items-center gap-1.5 overflow-x-auto text-[11px] font-mono-sc">
               <span className="text-slate-500 uppercase mr-1 hidden lg:inline">Statut:</span>
               {[
@@ -237,17 +359,7 @@ export function UniverseNexusView() {
                       />
                     ) : (
                       <div className="text-slate-700 group-hover:text-cyan-500/50 transition-colors">
-                        {item.category === 'ships' ? (
-                          <Rocket size={40} />
-                        ) : item.category === 'components' ? (
-                          <Zap size={40} />
-                        ) : item.category === 'locations' ? (
-                          <MapPin size={40} />
-                        ) : item.category === 'commodities' ? (
-                          <TrendingUp size={40} />
-                        ) : (
-                          <Shield size={40} />
-                        )}
+                        {renderCategoryIcon(item.category, 40)}
                       </div>
                     )}
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-80" />
@@ -256,57 +368,46 @@ export function UniverseNexusView() {
                     {item.badge && (
                       <div className="absolute top-2.5 right-2.5">
                         <span
-                          className={`px-2 py-0.5 rounded text-[10px] uppercase font-mono-sc font-medium border ${
-                            item.badge.color === 'purple'
-                              ? 'bg-purple-950/90 text-purple-300 border-purple-600'
-                              : item.badge.color === 'amber'
-                              ? 'bg-amber-950/90 text-amber-300 border-amber-600'
-                              : item.badge.color === 'cyan'
-                              ? 'bg-cyan-950/90 text-cyan-300 border-cyan-600'
-                              : 'bg-slate-900/90 text-slate-300 border-slate-700'
-                          }`}
+                          className={`px-2 py-0.5 rounded text-[10px] uppercase font-mono-sc font-medium border ${getBadgeClass(
+                            item.badge.color,
+                          )}`}
                         >
                           {localizeCatalogLabel(language, item.badge.label)}
                         </span>
                       </div>
                     )}
+
+                    {/* Manufacturer or Category Tag */}
+                    <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5">
+                      <span className="px-1.5 py-0.5 rounded bg-slate-950/80 border border-slate-800 text-[10px] font-mono-sc text-slate-400">
+                        {item.manufacturer || localizeCatalogLabel(language, item.category)}
+                      </span>
+                    </div>
                   </div>
 
-                  {/* Body Info */}
-                  <div className="p-4 space-y-1.5">
-                    <span className="text-[11px] font-mono-sc text-cyan-400 block truncate">
-                      {item.manufacturer ||
-                        (item.system
-                          ? `${language === 'fr' ? 'Système' : 'System'} ${item.system}`
-                          : localizeCatalogLabel(language, item.category))}
-                    </span>
-                    <h3 className="font-bold text-base font-rajdhani text-white group-hover:text-cyan-300 transition-colors line-clamp-1">
+                  {/* Body Content */}
+                  <div className="p-4 space-y-2">
+                    <h3 className="font-bold text-white group-hover:text-cyan-300 font-rajdhani text-lg leading-tight transition-colors line-clamp-1">
                       {item.name}
                     </h3>
-                    <p className="text-xs font-mono-sc text-slate-400 truncate">
-                      {(() => {
-                        const typeLabel = localizeCatalogLabel(language, item.type);
-                        const subLabel =
-                          item.subType && item.subType !== 'UNDEFINED' ? localizeCatalogLabel(language, item.subType) : '';
-                        return subLabel && subLabel !== typeLabel ? `${typeLabel} • ${subLabel}` : typeLabel;
-                      })()}
+                    <p className="text-xs text-slate-400 font-mono-sc line-clamp-1">
+                      {localizeCatalogLabel(language, item.type)}
+                      {item.subType ? ` • ${localizeCatalogLabel(language, item.subType)}` : ''}
                     </p>
                   </div>
                 </div>
 
-                {/* Footer Action */}
-                <div className="px-4 py-3 border-t border-slate-900 bg-slate-950/40 flex items-center justify-between">
-                  {item.priceAuec ? (
-                    <span className="text-xs font-bold font-mono-sc text-emerald-400">
-                      {fNumber(Math.round(item.priceAuec))} aUEC
-                    </span>
-                  ) : item.storePriceUsd ? (
-                    <span className="text-xs font-bold font-mono-sc text-slate-300">
-                      ${item.storePriceUsd} USD
-                    </span>
-                  ) : (
-                    <span className="text-[10px] font-mono-sc text-slate-500 uppercase">{t('in_game')}</span>
-                  )}
+                {/* Footer Meta / Pivot CTA */}
+                <div className="p-4 pt-0 flex items-center justify-between border-t border-slate-900 mt-2">
+                  <div className="text-xs font-mono-sc">
+                    {item.priceAuec ? (
+                      <span className="text-emerald-400 font-bold">{fNumber(item.priceAuec)} aUEC</span>
+                    ) : item.storePriceUsd ? (
+                      <span className="text-cyan-400 font-bold">${item.storePriceUsd} USD</span>
+                    ) : (
+                      <span className="text-slate-600 uppercase text-[10px]">{t('in_game')}</span>
+                    )}
+                  </div>
 
                   <button
                     onClick={() => openNexus(item.category, item.id)}
@@ -365,6 +466,7 @@ export function UniverseNexusView() {
             onClick={() => {
               setSearch('');
               setStatusFilter('all');
+              setSelectedSubCategory('all');
               setSelectedCategory('all');
             }}
             className="px-4 py-2 rounded-lg bg-cyan-950 border border-cyan-800 text-cyan-300 text-xs font-mono-sc hover:bg-cyan-900 transition-colors"
@@ -380,17 +482,17 @@ export function UniverseNexusView() {
           <button
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page === 1}
-            className="p-2 rounded-lg border border-slate-800 bg-slate-900/60 disabled:opacity-40 text-slate-300 hover:text-white"
+            className="p-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-800 transition-colors"
           >
             <ChevronLeft size={16} />
           </button>
-          <span className="text-xs font-mono-sc text-slate-400 px-3">
+          <span className="px-4 py-1.5 text-xs font-mono-sc text-slate-400 bg-slate-950 border border-slate-800 rounded-lg">
             {t('page_of', { page, pages })}
           </span>
           <button
             onClick={() => setPage((p) => Math.min(pages, p + 1))}
             disabled={page === pages}
-            className="p-2 rounded-lg border border-slate-800 bg-slate-900/60 disabled:opacity-40 text-slate-300 hover:text-white"
+            className="p-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-800 transition-colors"
           >
             <ChevronRight size={16} />
           </button>

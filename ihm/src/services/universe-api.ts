@@ -1,10 +1,18 @@
-import type { UniverseEntityNexus, UniverseOmniResult } from '@/types/universe';
+import type { TaxonomyCategory, UniverseEntityNexus, UniverseOmniResult } from '@/types/universe';
 
 type NexusLang = 'fr' | 'en';
 
 function getBaseUrl(): string {
   if (typeof window !== 'undefined') return '';
   return (process.env.API_URL ?? 'http://127.0.0.1:3000').replace(/\/$/, '');
+}
+
+export async function fetchUniverseTaxonomy(env = 'live'): Promise<TaxonomyCategory[]> {
+  const base = getBaseUrl();
+  const res = await fetch(`${base}/api/v2/universe/taxonomy?env=${encodeURIComponent(env)}`);
+  if (!res.ok) return [];
+  const json = await res.json();
+  return json.data || [];
 }
 
 export async function fetchOmniSearch(query: string, env = 'live', limit = 20, lang: NexusLang = 'fr'): Promise<UniverseOmniResult[]> {
@@ -20,6 +28,8 @@ export async function fetchOmniSearch(query: string, env = 'live', limit = 20, l
 
 export async function fetchUniverseExplore(params: {
   category?: string;
+  sub_category?: string;
+  subCategory?: string;
   search?: string;
   manufacturer?: string;
   type?: string;
@@ -31,6 +41,8 @@ export async function fetchUniverseExplore(params: {
 }) {
   const query = new URLSearchParams();
   if (params.category) query.set('category', params.category);
+  const subCategory = params.sub_category || params.subCategory;
+  if (subCategory && subCategory !== 'all') query.set('sub_category', subCategory);
   if (params.search) query.set('search', params.search);
   if (params.manufacturer) query.set('manufacturer', params.manufacturer);
   if (params.type) query.set('type', params.type);

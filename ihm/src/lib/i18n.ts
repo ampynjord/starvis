@@ -25,11 +25,19 @@ export const TRANSLATIONS = {
 
     // Categories
     cat_all: "Tout l'Univers",
-    cat_ships: 'Flotte & Véhicules',
-    cat_components: 'Composants & Armes',
+    cat_ships: 'Flotte & Vaisseaux',
+    cat_vehicles: 'Composants Véhicules',
+    cat_components: 'Composants',
+    cat_armor: 'Armures',
+    cat_clothing: 'Vêtements',
+    cat_weapons: 'Armes FPS',
+    cat_utility: 'Utilitaires',
+    cat_ammo: 'Munitions',
+    cat_sustenance: 'Sustenance',
     cat_items: 'Équipement FPS',
-    cat_locations: 'Lieux & Stations',
-    cat_commodities: 'Marché & Commerce',
+    cat_locations: 'Lieux & Starmap',
+    cat_commodities: 'Marché & Fret',
+    sub_all: 'Tous',
 
     // Explorer Bar & States
     filter_placeholder: 'Filtrer par nom humain (ex: Gladius, Panther, MicroTech)...',
@@ -155,11 +163,19 @@ export const TRANSLATIONS = {
 
     // Categories
     cat_all: 'Entire Universe',
-    cat_ships: 'Fleet & Vehicles',
-    cat_components: 'Components & Weapons',
+    cat_ships: 'Fleet & Ships',
+    cat_vehicles: 'Vehicle Components',
+    cat_components: 'Components',
+    cat_armor: 'Armor',
+    cat_clothing: 'Clothing',
+    cat_weapons: 'FPS Weapons',
+    cat_utility: 'Utility',
+    cat_ammo: 'Ammo',
+    cat_sustenance: 'Sustenance',
     cat_items: 'FPS Equipment',
-    cat_locations: 'Locations & Stations',
-    cat_commodities: 'Market & Commodities',
+    cat_locations: 'Locations & Starmap',
+    cat_commodities: 'Market & Cargo',
+    sub_all: 'All',
 
     // Explorer Bar & States
     filter_placeholder: 'Filter by human in-game name (e.g. Gladius, Panther, MicroTech)...',

@@ -1,9 +1,25 @@
+export type UniverseCategory =
+  | 'ships'
+  | 'fleet'
+  | 'vehicles'
+  | 'components'
+  | 'armor'
+  | 'clothing'
+  | 'weapons'
+  | 'utility'
+  | 'ammo'
+  | 'sustenance'
+  | 'locations'
+  | 'commodities'
+  | 'items';
+
 export interface UniverseOmniResult {
   id: string;
   uuid?: string;
   className?: string;
   name: string;
-  category: 'ships' | 'components' | 'items' | 'locations' | 'commodities';
+  category: UniverseCategory;
+  subCategory?: string | null;
   type: string;
   subType?: string | null;
   manufacturer?: string | null;
@@ -16,13 +32,13 @@ export interface UniverseOmniResult {
   system?: string | null;
   badge?: {
     label: string;
-    color: 'blue' | 'purple' | 'amber' | 'emerald' | 'cyan' | 'slate';
+    color: 'blue' | 'purple' | 'amber' | 'emerald' | 'cyan' | 'slate' | 'rose' | 'indigo' | 'lime';
   };
 }
 
 export interface UniverseEntityNexus {
   entity: Record<string, any>;
-  category: 'ships' | 'components' | 'items' | 'locations' | 'commodities';
+  category: UniverseCategory | string;
   connections: {
     equippedOn?: Record<string, any>[];
     loadout?: Record<string, any>[];
@@ -32,4 +48,20 @@ export interface UniverseEntityNexus {
     marketOffers?: Record<string, any>[];
     manufacturer?: Record<string, any> | null;
   };
+}
+
+export interface TaxonomySubCategory {
+  id: string;
+  label_fr: string;
+  label_en: string;
+  count: number;
+}
+
+export interface TaxonomyCategory {
+  id: string;
+  label_fr: string;
+  label_en: string;
+  icon: string;
+  total: number;
+  subCategories: TaxonomySubCategory[];
 }

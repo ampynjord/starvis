@@ -26,7 +26,7 @@ import { buildLoadoutTree, type LoadoutNode } from '@/lib/loadout-formatter';
 import { ShipHoloViewer } from '@/components/ship/ShipHoloViewer';
 
 interface EntityNexusSheetProps {
-  category: 'ships' | 'components' | 'items' | 'locations' | 'commodities' | null;
+  category: string | null;
   id: string | null;
   open: boolean;
   onClose: () => void;
@@ -34,7 +34,7 @@ interface EntityNexusSheetProps {
 }
 
 interface HistoryItem {
-  category: 'ships' | 'components' | 'items' | 'locations' | 'commodities';
+  category: string;
   id: string;
   name: string;
 }
@@ -163,7 +163,7 @@ export function EntityNexusSheet({ category, id, open, onClose, onOpenModel3D }:
     };
   }, [currentTarget?.category, currentTarget?.id, env, language]);
 
-  const handlePivot = (newCategory: 'ships' | 'components' | 'items' | 'locations' | 'commodities', newId: string, newName = '') => {
+  const handlePivot = (newCategory: string, newId: string, newName = '') => {
     setShow3D(false);
     setHistory((prev) => [...prev, { category: newCategory, id: newId, name: newName }]);
   };

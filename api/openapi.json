@@ -13903,6 +13903,48 @@
         }
       }
     },
+    "/api/v2/universe/taxonomy": {
+      "get": {
+        "tags": ["Universe Nexus"],
+        "summary": "Live universe taxonomy tree with real entity counts",
+        "operationId": "universeGetTaxonomy",
+        "description": "Returns all official categories and subcategories with dynamic in-game item counts.",
+        "parameters": [
+          {
+            "name": "env",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "live"
+            },
+            "description": "Game environment"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Taxonomy tree with categories, subcategories and counts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v2/universe/explore": {
       "get": {
         "tags": ["Universe Nexus"],
@@ -13915,10 +13957,33 @@
             "in": "query",
             "schema": {
               "type": "string",
-              "enum": ["all", "ships", "components", "items", "locations", "commodities"],
+              "enum": [
+                "all",
+                "ships",
+                "fleet",
+                "vehicles",
+                "components",
+                "armor",
+                "clothing",
+                "weapons",
+                "utility",
+                "ammo",
+                "sustenance",
+                "locations",
+                "commodities",
+                "items"
+              ],
               "default": "all"
             },
             "description": "Category to explore"
+          },
+          {
+            "name": "sub_category",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Specific subcategory filter (e.g. helmets, quantum_drives, primary...)"
           },
           {
             "name": "search",
@@ -14053,7 +14118,21 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": ["ships", "components", "items", "locations", "commodities"]
+              "enum": [
+                "ships",
+                "fleet",
+                "vehicles",
+                "components",
+                "armor",
+                "clothing",
+                "weapons",
+                "utility",
+                "ammo",
+                "sustenance",
+                "locations",
+                "commodities",
+                "items"
+              ]
             },
             "description": "Entity category"
           },

@@ -2,7 +2,9 @@
 
 import React, { createContext, useContext, useState, useCallback } from 'react';
 
-type EntityCategory = 'ships' | 'components' | 'items' | 'locations' | 'commodities';
+import type { UniverseCategory } from '@/types/universe';
+
+type EntityCategory = UniverseCategory | string;
 
 interface NexusContextValue {
   openNexus: (category: EntityCategory, id: string) => void;

@@ -29,6 +29,22 @@ export function mountUniverseNexusRoutes(router: Router, deps: RouteDependencies
   );
 
   /**
+   * GET /api/v2/universe/taxonomy
+   * Dynamic in-game taxonomy tree with live entity counts for categories and subcategories.
+   */
+  router.get(
+    '/api/v2/universe/taxonomy',
+    asyncHandler(async (req, res) => {
+      const env = getQueryString(req, 'env') ?? 'live';
+      const taxonomy = await nexusService.getTaxonomy(env);
+      sendWithETag(req, res, {
+        success: true,
+        data: taxonomy,
+      });
+    }),
+  );
+
+  /**
    * GET /api/v2/universe/explore
    * Unified pagination & intelligent facets across the universe categories.
    */
@@ -36,6 +52,7 @@ export function mountUniverseNexusRoutes(router: Router, deps: RouteDependencies
     '/api/v2/universe/explore',
     asyncHandler(async (req, res) => {
       const category = (getQueryString(req, 'category') as any) ?? 'all';
+      const subCategory = getQueryString(req, 'sub_category') ?? getQueryString(req, 'subCategory');
       const search = getQueryString(req, 'search');
       const manufacturer = getQueryString(req, 'manufacturer');
       const type = getQueryString(req, 'type');
@@ -48,6 +65,7 @@ export function mountUniverseNexusRoutes(router: Router, deps: RouteDependencies
 
       const result = await nexusService.explore({
         category,
+        subCategory,
         search,
         manufacturer,
         type,
@@ -78,7 +96,23 @@ export function mountUniverseNexusRoutes(router: Router, deps: RouteDependencies
       const env = getQueryString(req, 'env') ?? 'live';
       const lang = getQueryString(req, 'lang') ?? 'fr';
 
-      if (!['ships', 'components', 'items', 'locations', 'commodities'].includes(category)) {
+      const validCategories = [
+        'ships',
+        'fleet',
+        'components',
+        'vehicles',
+        'items',
+        'armor',
+        'clothing',
+        'weapons',
+        'utility',
+        'ammo',
+        'sustenance',
+        'locations',
+        'commodities',
+      ];
+
+      if (!validCategories.includes(String(category).toLowerCase())) {
         res.status(400).json({ success: false, error: 'Invalid category' });
         return;
       }
