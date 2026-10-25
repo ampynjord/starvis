@@ -1778,6 +1778,7 @@ export class UniverseNexusService {
       const shipRows = await this.prisma.$queryRawUnsafe<Row[]>(
         `SELECT 
           s.*,
+          REGEXP_REPLACE(COALESCE(sm.name, s.name), '\\s+GS$', '') AS name,
           tr.raw_json AS translation_json,
           tr.name AS translation_name,
           COALESCE(m.name, s.manufacturer_code) AS manufacturer_name,
@@ -1817,14 +1818,41 @@ export class UniverseNexusService {
           c.sub_type AS component_sub_type,
           COALESCE(c.size, sl.port_max_size, sl.port_min_size) AS component_size,
           c.grade AS component_grade,
-          c.manufacturer_code AS component_manufacturer
+          c.component_class,
+          c.manufacturer_code AS component_manufacturer,
+          c.weapon_dps,
+          c.weapon_damage,
+          c.weapon_fire_rate,
+          c.weapon_range,
+          c.weapon_ammo_count,
+          c.weapon_damage_type,
+          c.weapon_speed,
+          c.weapon_burst_dps,
+          c.weapon_sustained_dps,
+          c.weapon_alpha_damage,
+          c.shield_hp,
+          c.shield_regen,
+          c.shield_hardening,
+          c.shield_faces,
+          c.quantum_speed,
+          c.quantum_spool_time,
+          c.quantum_range,
+          c.qd_fuel_rate,
+          c.qd_cooldown,
+          c.cooler_cooling_rate,
+          c.power_output,
+          c.em_signature,
+          c.ir_signature,
+          c.thruster_max_thrust,
+          c.thruster_type,
+          c.cm_ammo_count
         FROM game.ship_loadouts sl
         LEFT JOIN game.components c ON (c.uuid = sl.component_uuid OR c.class_name = sl.component_class_name) AND c.env = $1
         ${translationJoin('c')}
         WHERE sl.ship_uuid = $2 AND sl.env = $1
           AND sl.component_class_name !~* '(door|interior|airlock|seat|light|hatch|bed|toilet|ladder|cockpit|flair|dashboard|radar_helper|screen_mfd|controller_|screen_annunciator|display_hud)'
           AND sl.port_name !~* '(door|interior|airlock|seat|light|hatch|bed|toilet|ladder|cockpit|flair|screen_|display_|controller_|^\\$.*|^bar\\d|^mec|^pow|^ven|landingpad)'
-          AND (c.name IS NOT NULL OR sl.port_type IN ('Turret', 'WeaponGun', 'MissileRack', 'Gimbal', 'QuantumDrive'))
+          AND (c.name IS NOT NULL OR sl.port_type IN ('Turret', 'WeaponGun', 'MissileRack', 'Gimbal', 'QuantumDrive', 'Countermeasure'))
           AND (c.name IS NULL OR (c.name NOT ILIKE '%placeholder%' AND c.name !~ '^[A-Z]{2,5}_'))
         ORDER BY sl.id ASC`,
         toPostgres(env),

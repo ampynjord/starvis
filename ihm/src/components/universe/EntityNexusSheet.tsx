@@ -12,7 +12,17 @@ import {
   ShoppingCart,
   Loader2,
   Crosshair,
+  Target,
+  ShieldAlert,
+  Sparkles,
   Shield,
+  Snowflake,
+  Radio,
+  HeartPulse,
+  Gauge,
+  Anchor,
+  Cpu,
+  Fuel,
   Wrench,
   Compass,
 } from 'lucide-react';
@@ -20,7 +30,7 @@ import { useEnv } from '@/contexts/EnvContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { fetchEntityNexus } from '@/services/universe-api';
 import type { UniverseEntityNexus } from '@/types/universe';
-import { fNumber } from '@/utils/formatters';
+import { fNumber, fSize } from '@/utils/formatters';
 import { localizeCatalogLabel } from '@/lib/catalog-labels';
 import { buildLoadoutTree, type LoadoutNode } from '@/lib/loadout-formatter';
 import { ShipHoloViewer } from '@/components/ship/ShipHoloViewer';
@@ -39,6 +49,15 @@ interface HistoryItem {
   name: string;
 }
 
+const COMPONENT_CLASS_STYLES: Record<string, { labelFr: string; labelEn: string; color: string }> = {
+  military: { labelFr: 'Militaire', labelEn: 'Military', color: 'text-emerald-300 bg-emerald-950/70 border-emerald-500/40' },
+  civilian: { labelFr: 'Civil', labelEn: 'Civilian', color: 'text-slate-300 bg-slate-900/80 border-slate-700/60' },
+  industrial: { labelFr: 'Industriel', labelEn: 'Industrial', color: 'text-amber-300 bg-amber-950/70 border-amber-500/40' },
+  stealth: { labelFr: 'Furtif', labelEn: 'Stealth', color: 'text-purple-300 bg-purple-950/70 border-purple-500/40' },
+  competition: { labelFr: 'Course', labelEn: 'Racing', color: 'text-rose-300 bg-rose-950/70 border-rose-500/40' },
+  racing: { labelFr: 'Course', labelEn: 'Racing', color: 'text-rose-300 bg-rose-950/70 border-rose-500/40' },
+};
+
 function LoadoutNodeCard({
   node,
   depth = 0,
@@ -50,58 +69,124 @@ function LoadoutNodeCard({
   language: string;
   onPivot: (cat: 'ships' | 'components' | 'items' | 'locations' | 'commodities', id: string, name: string) => void;
 }) {
+  const isFr = language === 'fr';
   const hasChildren = node.children && node.children.length > 0;
   const isJumpModule =
     (node.component_type || '').toLowerCase().includes('jump') ||
     node.port_name.toLowerCase().includes('jump');
 
+  const classKey = (node.component_class || '').trim().toLowerCase();
+  const classInfo = COMPONENT_CLASS_STYLES[classKey];
+
   return (
     <div className={`space-y-1.5 ${depth > 0 ? 'ml-3 sm:ml-4 pl-2 sm:pl-3 border-l-2 border-cyan-500/30' : ''}`}>
       <div
-        onClick={() =>
-          node.component_uuid &&
-          onPivot('components', node.component_uuid, node.component_name || '')
-        }
-        className={`p-2.5 rounded-lg border transition-all flex items-center justify-between ${
-          node.component_uuid
+        onClick={() => {
+          if (node.docked_ship_uuid) {
+            onPivot('ships', node.docked_ship_uuid, node.component_name || '');
+          } else if (node.component_uuid) {
+            onPivot('components', node.component_uuid, node.component_name || '');
+          }
+        }}
+        className={`p-2.5 rounded-lg border transition-all flex flex-col gap-1.5 ${
+          node.component_uuid || node.docked_ship_uuid
             ? depth === 0
               ? 'bg-slate-900/80 hover:bg-cyan-950/40 border-slate-800 hover:border-cyan-500/50 cursor-pointer group'
               : 'bg-slate-950/70 hover:bg-cyan-950/30 border-slate-800/80 hover:border-cyan-500/40 cursor-pointer group'
             : 'bg-slate-950/40 border-slate-800/40 opacity-75'
         }`}
       >
-        <div className="min-w-0 pr-2">
-          <div className="flex items-center gap-1.5">
-            {depth > 0 && <span className="text-[10px] font-mono-sc text-cyan-400 font-bold">↳</span>}
-            <span className="text-[10px] font-mono-sc text-slate-400 block truncate group-hover:text-slate-300">
-              {node.humanPortName}
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0 pr-2">
+            <div className="flex items-center gap-1.5">
+              {depth > 0 && <span className="text-[10px] font-mono-sc text-cyan-400 font-bold">↳</span>}
+              <span className="text-[10px] font-mono-sc text-slate-400 block truncate group-hover:text-slate-300">
+                {node.humanPortName}
+              </span>
+            </div>
+            <span className="text-xs font-semibold text-white font-rajdhani truncate block group-hover:text-cyan-300">
+              {node.count && node.count > 1 ? `${node.count}x ` : ''}
+              {node.component_name ||
+                localizeCatalogLabel(language as any, node.component_type) ||
+                node.port_type}
             </span>
           </div>
-          <span className="text-xs font-semibold text-white font-rajdhani truncate block group-hover:text-cyan-300">
-            {node.count && node.count > 1 ? `${node.count}x ` : ''}
-            {node.component_name ||
-              localizeCatalogLabel(language as any, node.component_type) ||
-              node.port_type}
-          </span>
+
+          <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+            {node.docked_ship_uuid && (
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-mono-sc bg-indigo-950/80 text-indigo-300 border border-indigo-700/60 font-semibold uppercase">
+                {isFr ? 'Parasite Arrimé ↗' : 'Docked Craft ↗'}
+              </span>
+            )}
+            {isJumpModule && (
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-mono-sc bg-purple-950/80 text-purple-300 border border-purple-800/60 font-semibold uppercase">
+                {isFr ? 'Saut' : 'Jump'}
+              </span>
+            )}
+            {classInfo && (
+              <span className={`px-1.5 py-0.5 rounded text-[9px] font-mono-sc font-bold border leading-none shrink-0 ${classInfo.color}`}>
+                {isFr ? classInfo.labelFr : classInfo.labelEn}
+              </span>
+            )}
+            {node.component_grade && (
+              <span className="px-1 py-0.5 rounded text-[9px] font-mono-sc bg-cyan-950/60 text-cyan-300 border border-cyan-500/40 font-bold leading-none shrink-0">
+                Grade {node.component_grade.toUpperCase()}
+              </span>
+            )}
+            {node.component_size != null && (
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono-sc bg-cyan-950/70 text-cyan-300 border border-cyan-800/60 font-bold leading-none shrink-0">
+                {fSize(node.component_size, language)}
+              </span>
+            )}
+          </div>
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0">
-          {isJumpModule && (
-            <span className="px-1.5 py-0.5 rounded text-[9px] font-mono-sc bg-purple-950/80 text-purple-300 border border-purple-800/60 font-semibold uppercase">
-              {language === 'fr' ? 'Saut' : 'Jump'}
-            </span>
-          )}
-          {node.component_grade && (
-            <span className="px-1 py-0.2 rounded text-[9px] font-mono-sc bg-slate-800 text-slate-400 border border-slate-700">
-              {node.component_grade}
-            </span>
-          )}
-          {node.component_size && (
-            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono-sc bg-cyan-950/70 text-cyan-300 border border-cyan-800/60 font-bold">
-              T{node.component_size}
-            </span>
-          )}
-        </div>
+        {/* Telemetry chips in Nexus sheet */}
+        {(node.weapon_dps ||
+          node.weapon_speed ||
+          node.cm_ammo_count ||
+          node.shield_hp ||
+          node.shield_regen ||
+          node.quantum_speed ||
+          node.power_output) && (
+          <div className="flex flex-wrap items-center gap-1 pt-1 border-t border-slate-800/50 text-[9px] font-mono-sc">
+            {node.weapon_dps != null && (
+              <span className="text-amber-400 bg-amber-950/40 border border-amber-900/40 rounded px-1 py-0.2">
+                {Math.round(node.weapon_dps)} DPS
+              </span>
+            )}
+            {node.weapon_speed != null && (
+              <span className="text-emerald-400 bg-emerald-950/40 border border-emerald-900/40 rounded px-1 py-0.2">
+                {Math.round(node.weapon_speed)} m/s
+              </span>
+            )}
+            {node.cm_ammo_count != null && (
+              <span className="text-purple-400 bg-purple-950/40 border border-purple-900/40 rounded px-1 py-0.2">
+                {node.cm_ammo_count} {isFr ? 'charges' : 'ammo'}
+              </span>
+            )}
+            {node.shield_hp != null && (
+              <span className="text-cyan-400 bg-cyan-950/40 border border-cyan-900/40 rounded px-1 py-0.2">
+                {Math.round(node.shield_hp)} HP
+              </span>
+            )}
+            {node.shield_regen != null && (
+              <span className="text-cyan-300 bg-cyan-950/40 border border-cyan-900/40 rounded px-1 py-0.2">
+                {Math.round(node.shield_regen)}/s
+              </span>
+            )}
+            {node.quantum_speed != null && (
+              <span className="text-purple-400 bg-purple-950/40 border border-purple-900/40 rounded px-1 py-0.2">
+                {Math.round(node.quantum_speed / 1000)} km/s
+              </span>
+            )}
+            {node.power_output != null && (
+              <span className="text-yellow-400 bg-yellow-950/40 border border-yellow-900/40 rounded px-1 py-0.2">
+                {Math.round(node.power_output)} kW
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {hasChildren && (
@@ -448,15 +533,35 @@ export function EntityNexusSheet({ category, id, open, onClose, onOpenModel3D }:
                           const IconComp =
                             section.iconName === 'crosshair'
                               ? Crosshair
-                              : section.iconName === 'shield'
-                                ? Shield
-                                : section.iconName === 'zap'
-                                  ? Zap
-                                  : section.iconName === 'compass'
-                                    ? Compass
-                                    : section.iconName === 'rocket'
-                                      ? Rocket
-                                      : Wrench;
+                              : section.iconName === 'target'
+                                ? Target
+                                : section.iconName === 'shield-alert'
+                                  ? ShieldAlert
+                                  : section.iconName === 'rocket'
+                                    ? Rocket
+                                    : section.iconName === 'sparkles'
+                                      ? Sparkles
+                                      : section.iconName === 'compass'
+                                        ? Compass
+                                        : section.iconName === 'shield'
+                                          ? Shield
+                                          : section.iconName === 'zap'
+                                            ? Zap
+                                            : section.iconName === 'snowflake'
+                                              ? Snowflake
+                                              : section.iconName === 'radio'
+                                                ? Radio
+                                                : section.iconName === 'heart-pulse'
+                                                  ? HeartPulse
+                                                  : section.iconName === 'gauge'
+                                                    ? Gauge
+                                                    : section.iconName === 'anchor'
+                                                      ? Anchor
+                                                      : section.iconName === 'cpu'
+                                                        ? Cpu
+                                                        : section.iconName === 'fuel'
+                                                          ? Fuel
+                                                          : Wrench;
 
                           return (
                             <div key={section.key} className="space-y-2">
