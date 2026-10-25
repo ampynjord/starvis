@@ -19,22 +19,24 @@ import {
 } from 'lucide-react';
 import { useEnv } from '@/contexts/EnvContext';
 import { useEntityNexus } from '@/contexts/NexusContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { fetchUniverseExplore } from '@/services/universe-api';
 import type { UniverseOmniResult } from '@/types/universe';
 import { fNumber } from '@/utils/formatters';
 
-const CATEGORIES = [
-  { id: 'all', label: "Tout l'Univers", icon: Sparkles, color: 'text-cyan-400' },
-  { id: 'ships', label: 'Flotte & Véhicules', icon: Rocket, color: 'text-cyan-400' },
-  { id: 'components', label: 'Composants & Armes', icon: Zap, color: 'text-amber-400' },
-  { id: 'items', label: 'Équipement FPS', icon: Shield, color: 'text-emerald-400' },
-  { id: 'locations', label: 'Lieux & Stations', icon: MapPin, color: 'text-violet-400' },
-  { id: 'commodities', label: 'Marché & Commerce', icon: TrendingUp, color: 'text-rose-400' },
-];
-
 export function UniverseNexusView() {
   const { env } = useEnv();
   const { openNexus } = useEntityNexus();
+  const { language, t } = useLanguage();
+
+  const categories = [
+    { id: 'all', label: t('cat_all'), icon: Sparkles, color: 'text-cyan-400' },
+    { id: 'ships', label: t('cat_ships'), icon: Rocket, color: 'text-cyan-400' },
+    { id: 'components', label: t('cat_components'), icon: Zap, color: 'text-amber-400' },
+    { id: 'items', label: t('cat_items'), icon: Shield, color: 'text-emerald-400' },
+    { id: 'locations', label: t('cat_locations'), icon: MapPin, color: 'text-violet-400' },
+    { id: 'commodities', label: t('cat_commodities'), icon: TrendingUp, color: 'text-rose-400' },
+  ];
 
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [search, setSearch] = useState('');
@@ -71,21 +73,20 @@ export function UniverseNexusView() {
         <div className="relative z-10 max-w-3xl space-y-3">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-950/60 border border-cyan-500/30 text-cyan-400 text-xs font-mono-sc">
             <Sparkles size={13} className="animate-pulse" />
-            <span>UNIVERS CONNECTÉ STAR CITIZEN 4.10.2</span>
+            <span>{t('hero_badge')}</span>
           </div>
           <h1 className="text-3xl sm:text-5xl font-black font-rajdhani text-white tracking-wide">
-            STARVIS — NEXUS UNIVERSEL
+            {t('hero_title')}
           </h1>
           <p className="text-sm sm:text-base text-slate-300 font-rajdhani leading-relaxed">
-            Fin des silos cloisonnés : naviguez d'un vaisseau vers ses armes, les stations qui le vendent,
-            les prix aUEC et la Starmap en temps réel, sans aucune coupure de contexte.
+            {t('hero_desc')}
           </p>
         </div>
       </div>
 
       {/* Fluid Category Filter Pills */}
       <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-        {CATEGORIES.map((cat) => {
+        {categories.map((cat) => {
           const Icon = cat.icon;
           const isActive = selectedCategory === cat.id;
           return (
@@ -117,7 +118,7 @@ export function UniverseNexusView() {
               setSearch(e.target.value);
               setPage(1);
             }}
-            placeholder="Filtrer par nom humain (ex: Gladius, Panther, MicroTech)..."
+            placeholder={t('filter_placeholder')}
             className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-slate-950/70 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 font-rajdhani"
           />
         </div>
@@ -125,20 +126,20 @@ export function UniverseNexusView() {
         {/* Counter & View Switcher */}
         <div className="flex items-center justify-between sm:justify-end gap-3 text-xs font-mono-sc text-slate-400">
           <span>
-            {isLoading ? 'Chargement...' : `${fNumber(total)} entité(s) répertoriée(s)`}
+            {isLoading ? t('loading_explorer') : t('entities_indexed', { count: fNumber(total) })}
           </span>
           <div className="flex items-center gap-1 border-l border-slate-800 pl-3">
             <button
               onClick={() => setViewMode('grid')}
               className={`p-1.5 rounded ${viewMode === 'grid' ? 'bg-cyan-950 text-cyan-300 border border-cyan-800' : 'text-slate-500 hover:text-slate-300'}`}
-              title="Vue Grille"
+              title={t('grid_view')}
             >
               <LayoutGrid size={15} />
             </button>
             <button
               onClick={() => setViewMode('table')}
               className={`p-1.5 rounded ${viewMode === 'table' ? 'bg-cyan-950 text-cyan-300 border border-cyan-800' : 'text-slate-500 hover:text-slate-300'}`}
-              title="Vue Télémétrique"
+              title={t('table_view')}
             >
               <List size={15} />
             </button>
@@ -214,7 +215,7 @@ export function UniverseNexusView() {
                   {/* Body Info */}
                   <div className="p-4 space-y-1.5">
                     <span className="text-[11px] font-mono-sc text-cyan-400 block truncate">
-                      {item.manufacturer || (item.system ? `Système ${item.system}` : item.category)}
+                      {item.manufacturer || (item.system ? `${language === 'fr' ? 'Système' : 'System'} ${item.system}` : item.category)}
                     </span>
                     <h3 className="font-bold text-base font-rajdhani text-white group-hover:text-cyan-300 transition-colors line-clamp-1">
                       {item.name}
@@ -236,14 +237,14 @@ export function UniverseNexusView() {
                       ${item.storePriceUsd} USD
                     </span>
                   ) : (
-                    <span className="text-[10px] font-mono-sc text-slate-500 uppercase">En jeu</span>
+                    <span className="text-[10px] font-mono-sc text-slate-500 uppercase">{t('in_game')}</span>
                   )}
 
                   <button
                     onClick={() => openNexus(item.category, item.id)}
                     className="flex items-center gap-1 text-xs font-mono-sc text-cyan-400 hover:text-cyan-300 transition-colors"
                   >
-                    <span>Inspecter</span>
+                    <span>{t('inspect')}</span>
                     <ArrowRight size={13} className="group-hover:translate-x-1 transition-transform" />
                   </button>
                 </div>
@@ -256,10 +257,10 @@ export function UniverseNexusView() {
             <table className="w-full text-left text-xs font-mono-sc text-slate-300">
               <thead className="bg-slate-900/60 text-slate-400 uppercase text-[10px] border-b border-slate-800">
                 <tr>
-                  <th className="px-4 py-3">Nom</th>
-                  <th className="px-4 py-3">Famille</th>
+                  <th className="px-4 py-3">{language === 'fr' ? 'Nom' : 'Name'}</th>
+                  <th className="px-4 py-3">{language === 'fr' ? 'Catégorie' : 'Category'}</th>
                   <th className="px-4 py-3">Type</th>
-                  <th className="px-4 py-3">Constructeur / Lieu</th>
+                  <th className="px-4 py-3">{language === 'fr' ? 'Constructeur / Lieu' : 'Manufacturer / Location'}</th>
                   <th className="px-4 py-3 text-right">Action</th>
                 </tr>
               </thead>
@@ -281,7 +282,7 @@ export function UniverseNexusView() {
                     <td className="px-4 py-3 text-slate-400">{item.type}</td>
                     <td className="px-4 py-3 text-slate-400">{item.manufacturer || item.system || '-'}</td>
                     <td className="px-4 py-3 text-right">
-                      <button className="text-cyan-400 hover:text-cyan-300">Inspecter →</button>
+                      <button className="text-cyan-400 hover:text-cyan-300">{t('inspect')}</button>
                     </td>
                   </tr>
                 ))}
@@ -291,7 +292,7 @@ export function UniverseNexusView() {
         )
       ) : (
         <div className="py-24 text-center space-y-3">
-          <p className="text-slate-400 font-rajdhani text-lg">Aucune entité trouvée pour cette sélection.</p>
+          <p className="text-slate-400 font-rajdhani text-lg">{t('no_results')}</p>
           <button
             onClick={() => {
               setSearch('');
@@ -299,7 +300,7 @@ export function UniverseNexusView() {
             }}
             className="px-4 py-2 rounded-lg bg-cyan-950 border border-cyan-800 text-cyan-300 text-xs font-mono-sc"
           >
-            Réinitialiser les filtres
+            {language === 'fr' ? 'Réinitialiser les filtres' : 'Reset filters'}
           </button>
         </div>
       )}
@@ -315,7 +316,7 @@ export function UniverseNexusView() {
             <ChevronLeft size={16} />
           </button>
           <span className="text-xs font-mono-sc text-slate-400 px-3">
-            Page {page} sur {pages}
+            {t('page_of', { page, pages })}
           </span>
           <button
             onClick={() => setPage((p) => Math.min(pages, p + 1))}

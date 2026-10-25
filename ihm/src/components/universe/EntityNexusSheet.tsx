@@ -13,6 +13,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useEnv } from '@/contexts/EnvContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { fetchEntityNexus } from '@/services/universe-api';
 import type { UniverseEntityNexus } from '@/types/universe';
 import { fNumber } from '@/utils/formatters';
@@ -34,6 +35,7 @@ interface HistoryItem {
 
 export function EntityNexusSheet({ category, id, open, onClose, onOpenModel3D }: EntityNexusSheetProps) {
   const { env } = useEnv();
+  const { language, t } = useLanguage();
   const [data, setData] = useState<UniverseEntityNexus | null>(null);
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState<HistoryItem[]>([]);
@@ -53,15 +55,14 @@ export function EntityNexusSheet({ category, id, open, onClose, onOpenModel3D }:
   }, [open, category, id]);
 
   useEffect(() => {
-    if (!currentTarget) return;
-
+    if (!currentTarget?.category || !currentTarget?.id) return;
     let active = true;
     setLoading(true);
 
     fetchEntityNexus(currentTarget.category, currentTarget.id, env)
-      .then((nexus) => {
-        if (active && nexus) {
-          setData(nexus);
+      .then((res) => {
+        if (active) {
+          setData(res);
         }
       })
       .catch((err) => console.error('Failed to load nexus sheet', err))
@@ -119,11 +120,11 @@ export function EntityNexusSheet({ category, id, open, onClose, onOpenModel3D }:
                     className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-800 hover:bg-cyan-950 border border-slate-700 text-xs font-mono-sc text-cyan-300 transition-colors"
                   >
                     <ArrowLeft size={13} />
-                    <span>Retour</span>
+                    <span>{t('back')}</span>
                   </button>
                 )}
                 <span className="text-xs uppercase font-mono-sc tracking-widest text-cyan-400">
-                  Nexus 360° • {currentTarget.category}
+                  {t('nexus_360_title', { category: currentTarget.category })}
                 </span>
               </div>
               <button
@@ -139,7 +140,7 @@ export function EntityNexusSheet({ category, id, open, onClose, onOpenModel3D }:
               {loading ? (
                 <div className="flex flex-col items-center justify-center py-24 space-y-3">
                   <Loader2 size={32} className="text-cyan-400 animate-spin" />
-                  <p className="text-xs font-mono-sc text-slate-500">Chargement de la fiche Nexus...</p>
+                  <p className="text-xs font-mono-sc text-slate-500">{t('loading_sheet')}</p>
                 </div>
               ) : entity ? (
                 <>
@@ -165,7 +166,11 @@ export function EntityNexusSheet({ category, id, open, onClose, onOpenModel3D }:
                                   : 'bg-amber-950/90 text-amber-300 border-amber-600'
                               }`}
                             >
-                              {entity.production_status}
+                              {entity.production_status === 'flight-ready'
+                                ? t('flight_ready')
+                                : entity.production_status === 'lore'
+                                ? t('lore_vessel')
+                                : t('in_concept')}
                             </span>
                           </div>
                         )}
@@ -180,7 +185,7 @@ export function EntityNexusSheet({ category, id, open, onClose, onOpenModel3D }:
                         )}
                         {entity.role && <span>• {entity.role}</span>}
                         {entity.type && <span>• {entity.type}</span>}
-                        {entity.system_code && <span>• Système {entity.system_code}</span>}
+                        {entity.system_code && <span>• {language === 'fr' ? 'Système' : 'System'} {entity.system_code}</span>}
                       </div>
                       <h2 className="text-2xl sm:text-3xl font-bold font-rajdhani text-white mt-1">
                         {entity.name}
@@ -202,7 +207,7 @@ export function EntityNexusSheet({ category, id, open, onClose, onOpenModel3D }:
                           }`}
                         >
                           <Box size={14} />
-                          <span>{show3D ? 'Fermer Holoviewer 3D' : 'Visionneuse 3D Holoviewer'}</span>
+                          <span>{show3D ? t('btn_close_3d') : t('btn_3d_viewer')}</span>
                         </button>
                         {entity.store_url && (
                           <a
@@ -211,7 +216,7 @@ export function EntityNexusSheet({ category, id, open, onClose, onOpenModel3D }:
                             rel="noopener noreferrer"
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 text-xs font-mono-sc transition-colors"
                           >
-                            <span>Fiche RSI Officielle</span>
+                            <span>{t('btn_official_rsi')}</span>
                             <ExternalLink size={12} />
                           </a>
                         )}
@@ -238,47 +243,47 @@ export function EntityNexusSheet({ category, id, open, onClose, onOpenModel3D }:
                     <div className="space-y-3">
                       <h3 className="text-xs font-mono-sc uppercase text-slate-400 tracking-wider flex items-center gap-2">
                         <Rocket size={14} className="text-cyan-400" />
-                        <span>Télémétrie & Spécifications Physiques</span>
+                        <span>{t('telemetry_title')}</span>
                       </h3>
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                         <div className="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
-                          <span className="text-[10px] font-mono-sc text-slate-500 uppercase block">Dimensions</span>
+                          <span className="text-[10px] font-mono-sc text-slate-500 uppercase block">{t('dimensions')}</span>
                           <span className="text-sm font-semibold font-mono-sc text-white">
                             {entity.size_y || '-'}m × {entity.size_x || '-'}m
                           </span>
                         </div>
                         <div className="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
-                          <span className="text-[10px] font-mono-sc text-slate-500 uppercase block">Masse</span>
+                          <span className="text-[10px] font-mono-sc text-slate-500 uppercase block">{t('mass')}</span>
                           <span className="text-sm font-semibold font-mono-sc text-white">
                             {entity.mass ? `${fNumber(Math.round(entity.mass))} kg` : '-'}
                           </span>
                         </div>
                         <div className="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
-                          <span className="text-[10px] font-mono-sc text-slate-500 uppercase block">Vitesse SCM / Max</span>
+                          <span className="text-[10px] font-mono-sc text-slate-500 uppercase block">{t('speed')}</span>
                           <span className="text-sm font-semibold font-mono-sc text-white">
                             {entity.scm_speed || '-'} / {entity.max_speed || '-'} m/s
                           </span>
                         </div>
                         <div className="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
-                          <span className="text-[10px] font-mono-sc text-slate-500 uppercase block">Capacité Cargo</span>
+                          <span className="text-[10px] font-mono-sc text-slate-500 uppercase block">{t('cargo')}</span>
                           <span className="text-sm font-semibold font-mono-sc text-white">
                             {entity.cargo_capacity ?? 0} SCU
                           </span>
                         </div>
                         <div className="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
-                          <span className="text-[10px] font-mono-sc text-slate-500 uppercase block">Points de Coque</span>
+                          <span className="text-[10px] font-mono-sc text-slate-500 uppercase block">{t('hull_hp')}</span>
                           <span className="text-sm font-semibold font-mono-sc text-cyan-300">
                             {entity.total_hp ? fNumber(entity.total_hp) : '-'} HP
                           </span>
                         </div>
                         <div className="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
-                          <span className="text-[10px] font-mono-sc text-slate-500 uppercase block">Équipage Min/Max</span>
+                          <span className="text-[10px] font-mono-sc text-slate-500 uppercase block">{t('crew')}</span>
                           <span className="text-sm font-semibold font-mono-sc text-white">
                             {entity.crew_size || 1}
                           </span>
                         </div>
                         <div className="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
-                          <span className="text-[10px] font-mono-sc text-slate-500 uppercase block">Carburant Quantique</span>
+                          <span className="text-[10px] font-mono-sc text-slate-500 uppercase block">{t('quantum_fuel')}</span>
                           <span className="text-sm font-semibold font-mono-sc text-white">
                             {entity.quantum_fuel_capacity ? `${entity.quantum_fuel_capacity} M` : '-'}
                           </span>
@@ -298,7 +303,7 @@ export function EntityNexusSheet({ category, id, open, onClose, onOpenModel3D }:
                     <div className="space-y-3">
                       <h3 className="text-xs font-mono-sc uppercase text-slate-400 tracking-wider flex items-center gap-2">
                         <ShoppingCart size={14} className="text-emerald-400" />
-                        <span>Où l'acheter en jeu (Prix aUEC)</span>
+                        <span>{t('shops_title')}</span>
                       </h3>
                       <div className="divide-y divide-slate-800/60 rounded-xl border border-slate-800 bg-slate-900/40 overflow-hidden">
                         {connections.purchasableAt.map((shop, i) => (
@@ -311,7 +316,7 @@ export function EntityNexusSheet({ category, id, open, onClose, onOpenModel3D }:
                                 {shop.shop_name}
                               </span>
                               <span className="text-xs font-mono-sc text-slate-400">
-                                {shop.city || shop.planet_moon || shop.location} • Système {shop.system || 'Stanton'}
+                                {shop.city || shop.planet_moon || shop.location} • {language === 'fr' ? 'Système' : 'System'} {shop.system || 'Stanton'}
                               </span>
                             </div>
                             <div className="text-right">
@@ -322,7 +327,7 @@ export function EntityNexusSheet({ category, id, open, onClose, onOpenModel3D }:
                               )}
                               {shop.rental_price_1d && (
                                 <span className="text-[11px] font-mono-sc text-slate-400">
-                                  Location: {fNumber(Math.round(shop.rental_price_1d))} aUEC/j
+                                  {language === 'fr' ? 'Location :' : 'Rental:'} {fNumber(Math.round(shop.rental_price_1d))} aUEC/j
                                 </span>
                               )}
                             </div>
@@ -337,7 +342,7 @@ export function EntityNexusSheet({ category, id, open, onClose, onOpenModel3D }:
                     <div className="space-y-3">
                       <h3 className="text-xs font-mono-sc uppercase text-slate-400 tracking-wider flex items-center gap-2">
                         <Zap size={14} className="text-amber-400" />
-                        <span>Équipement Installé par Défaut (Cliquez pour inspecter)</span>
+                        <span>{t('loadout_title')}</span>
                       </h3>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {connections.loadout.map((slot, i) => (
@@ -377,7 +382,7 @@ export function EntityNexusSheet({ category, id, open, onClose, onOpenModel3D }:
                     <div className="space-y-3">
                       <h3 className="text-xs font-mono-sc uppercase text-slate-400 tracking-wider flex items-center gap-2">
                         <Rocket size={14} className="text-cyan-400" />
-                        <span>Installé d'origine sur ces vaisseaux (Cliquez pour pivoter)</span>
+                        <span>{t('compatible_ships_title')}</span>
                       </h3>
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                         {connections.equippedOn.map((ship, i) => (
@@ -404,7 +409,7 @@ export function EntityNexusSheet({ category, id, open, onClose, onOpenModel3D }:
                 </>
               ) : (
                 <div className="text-center py-16 text-slate-500 font-mono-sc text-sm">
-                  Entité introuvable dans le Nexus.
+                  {language === 'fr' ? 'Entité introuvable dans le Nexus.' : 'Entity not found in the Nexus.'}
                 </div>
               )}
             </div>

@@ -319,14 +319,14 @@ test.describe('@mobile responsive shell', () => {
   test('mobile navigation exposes the full app without horizontal overflow', async ({ page }) => {
     await gotoApp(page, '/');
     await page.waitForLoadState('load');
-    await expect(page.getByLabel('Open menu')).toBeVisible();
-    await page.getByLabel('Open menu').click();
+    await expect(page.getByLabel(/(Open menu|Ouvrir menu)/i)).toBeVisible();
+    await page.getByLabel(/(Open menu|Ouvrir menu)/i).click();
     await expectDrawerInViewport(page);
     const navigation = page.getByRole('navigation');
-    await expect(navigation.getByRole('link', { name: /Ships & Vehicles/i })).toBeVisible();
+    await expect(navigation.getByRole('link', { name: /(Ships & Vehicles|Flotte & Véhicules)/i })).toBeVisible();
     await expect(navigation.getByRole('link', { name: /Missions/i })).toBeVisible();
-    await page.getByLabel('Close menu').click();
-    await expect(page.getByLabel('Open menu')).toBeVisible();
+    await page.getByLabel(/(Close menu|Fermer menu)/i).click();
+    await expect(page.getByLabel(/(Open menu|Ouvrir menu)/i)).toBeVisible();
     await expectNoShellHorizontalOverflow(page);
   });
 
@@ -350,7 +350,7 @@ test.describe('@mobile responsive shell', () => {
         await expect(page.getByText(target.text).first()).toBeVisible({ timeout: 15_000 });
       }
       await expect(page.getByRole('button', { name: /search/i })).toBeVisible();
-      await expect(page.getByLabel('Open menu')).toBeVisible();
+      await expect(page.getByLabel(/(Open menu|Ouvrir menu)/i)).toBeVisible();
       await expectNoShellHorizontalOverflow(page);
     });
   }

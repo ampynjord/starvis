@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useEnv } from '@/contexts/EnvContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { fetchOmniSearch } from '@/services/universe-api';
 import type { UniverseOmniResult } from '@/types/universe';
 
@@ -32,6 +33,7 @@ export function OmniSearchModal({ open, onClose, onSelectEntity }: OmniSearchMod
 
   const debouncedQuery = useDebounce(query, 200);
   const { env } = useEnv();
+  const { language, t } = useLanguage();
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -79,14 +81,17 @@ export function OmniSearchModal({ open, onClose, onSelectEntity }: OmniSearchMod
     let active = true;
     setLoading(true);
 
-    fetchOmniSearch(debouncedQuery, env, 25)
-      .then((data) => {
+    fetchOmniSearch(debouncedQuery, env, 20)
+      .then((items) => {
         if (active) {
-          setResults(data);
+          setResults(items);
           setSelectedIndex(0);
         }
       })
-      .catch((err) => console.error('OmniSearch failed', err))
+      .catch((err) => {
+        console.error('OmniSearch failed', err);
+        if (active) setResults([]);
+      })
       .finally(() => {
         if (active) setLoading(false);
       });
@@ -97,12 +102,10 @@ export function OmniSearchModal({ open, onClose, onSelectEntity }: OmniSearchMod
   }, [debouncedQuery, env]);
 
   const handleSelect = (item: UniverseOmniResult) => {
-    onClose();
     if (onSelectEntity) {
       onSelectEntity(item.category, item.id);
-    } else {
-      window.location.href = `/${item.category}/${item.id}`;
     }
+    onClose();
   };
 
   const getCategoryIcon = (category: string) => {
@@ -152,7 +155,7 @@ export function OmniSearchModal({ open, onClose, onSelectEntity }: OmniSearchMod
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Rechercher dans tout l'univers (Gladius, Panther, Pyro, Laranite, Bengal...)"
+              placeholder={t('omni_placeholder')}
               className="flex-1 bg-transparent text-sm sm:text-base text-slate-100 placeholder-slate-500 focus:outline-none font-rajdhani tracking-wide"
             />
             {loading && <Loader2 size={16} className="text-cyan-400 animate-spin shrink-0" />}
@@ -165,7 +168,7 @@ export function OmniSearchModal({ open, onClose, onSelectEntity }: OmniSearchMod
               </button>
             )}
             <div className="hidden sm:flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-[10px] font-mono-sc text-slate-400 shrink-0">
-              ESC pour fermer
+              ESC {t('key_close')}
             </div>
           </div>
 
@@ -220,7 +223,7 @@ export function OmniSearchModal({ open, onClose, onSelectEntity }: OmniSearchMod
                         {item.manufacturer && <span>{item.manufacturer}</span>}
                         {item.type && <span>• {item.type}</span>}
                         {item.subType && <span>• {item.subType}</span>}
-                        {item.system && <span>• Système {item.system}</span>}
+                        {item.system && <span>• {language === 'fr' ? 'Système' : 'System'} {item.system}</span>}
                       </div>
                     </div>
 
@@ -236,11 +239,11 @@ export function OmniSearchModal({ open, onClose, onSelectEntity }: OmniSearchMod
               })
             ) : query.trim().length >= 2 && !loading ? (
               <div className="py-12 text-center text-slate-500 font-mono-sc text-sm">
-                Aucune entité trouvée pour « <span className="text-slate-300">{query}</span> »
+                {t('omni_no_results', { query })}
               </div>
             ) : (
               <div className="py-8 px-4 text-center">
-                <p className="text-xs font-mono-sc text-slate-500 mb-3">Recherche instantanée dans tout l'univers :</p>
+                <p className="text-xs font-mono-sc text-slate-500 mb-3">{t('omni_quick_tags')}</p>
                 <div className="flex flex-wrap items-center justify-center gap-2 text-xs">
                   {['Gladius', 'Panther Repeater', 'FR-66', 'Area18', 'Laranite', 'Bengal', 'Stingray'].map(
                     (tag) => (
@@ -260,7 +263,7 @@ export function OmniSearchModal({ open, onClose, onSelectEntity }: OmniSearchMod
 
           {/* Footer Info */}
           <div className="px-4 py-2 border-t border-slate-900 bg-slate-950/80 flex items-center justify-between text-[11px] font-mono-sc text-slate-500">
-            <span>↑↓ Naviguer • Entrée pour inspecter</span>
+            <span>↑↓ {t('key_navigate')} • Enter {t('key_open')}</span>
             <span>STARVIS V2 Nexus</span>
           </div>
         </motion.div>

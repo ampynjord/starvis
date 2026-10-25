@@ -6,6 +6,7 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { StaleBuildRecovery } from '@/components/ui/StaleBuildRecovery';
 import { EnvProvider } from '@/contexts/EnvContext';
+import { LanguageProvider } from '@/contexts/LanguageContext';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -24,11 +25,13 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <ErrorBoundary>
       <StaleBuildRecovery />
-      <EnvProvider>
-        <QueryClientProvider client={queryClient}>
-          <AuthProvider>{children}</AuthProvider>
-        </QueryClientProvider>
-      </EnvProvider>
+      <LanguageProvider>
+        <EnvProvider>
+          <QueryClientProvider client={queryClient}>
+            <AuthProvider>{children}</AuthProvider>
+          </QueryClientProvider>
+        </EnvProvider>
+      </LanguageProvider>
     </ErrorBoundary>
   );
 }
