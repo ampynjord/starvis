@@ -288,13 +288,13 @@ test.describe('@mobile responsive shell', () => {
 
   for (const target of [
     { path: '/', heading: /^STARVIS$/i },
+    { path: '/developer', heading: /^(Public API & Datasets|API & Datasets)$/i },
     { path: '/ships', heading: /^Ships$/i },
     { path: '/components', heading: /^Components$/i },
     { path: '/items', heading: /^(Equipment|Weapons|Armor|Clothing|Utility|Ammo|Sustenance)$/i },
     { path: '/commodities', heading: /^(Commodities|Trade Goods)$/i },
-    { path: '/industrial', heading: /^(Industrial|Commodities|Trade Goods)$/i },
-    { path: '/trade', heading: /^Trade (Routes|Calculator)$/i },
-    { path: '/trade-calculator', heading: /^Trade Calculator$/i },
+    { path: '/loot', heading: /^Loot Tables$/i },
+    { path: '/changelog', heading: /^Changelog$/i },
     { path: '/missions', heading: /^(Missions|Mission Database)$/i },
     { path: '/starmap', text: /Galactic Map|Loading RSI starmap objects|No RSI starmap objects/i },
   ]) {

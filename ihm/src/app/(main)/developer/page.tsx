@@ -52,19 +52,19 @@ type ApiTokenSummary = {
 
 function Section({ title, icon: Icon, children }: { title: string; icon: React.ElementType; children: React.ReactNode }) {
   return (
-    <section className="sci-panel p-5 space-y-4">
+    <section className="sci-panel min-w-0 max-w-full overflow-hidden p-5 space-y-4">
       <div className="flex items-center gap-2 border-b border-slate-800/60 pb-3">
         <Icon size={14} className="text-cyan-400 shrink-0" />
         <h2 className="font-orbitron text-[10px] font-bold tracking-widest uppercase text-slate-400">{title}</h2>
       </div>
-      {children}
+      <div className="min-w-0 max-w-full">{children}</div>
     </section>
   );
 }
 
 function CodeBlock({ children }: { children: string }) {
   return (
-    <pre className="overflow-x-auto rounded-sm border border-slate-800 bg-slate-950 px-4 py-3 text-[11px] font-mono text-slate-300 whitespace-pre">
+    <pre className="max-w-full overflow-x-auto rounded-sm border border-slate-800 bg-slate-950 px-4 py-3 text-[11px] font-mono text-slate-300 whitespace-pre">
       {children}
     </pre>
   );
@@ -261,14 +261,14 @@ export default function DeveloperPage() {
 
   if (loading) {
     return (
-      <PageShell size="xl" className="p-4 md:p-6">
+      <PageShell size="xl" className="p-4 md:p-6 min-w-0 max-w-full overflow-x-hidden">
         <div className="p-8 text-center font-mono-sc text-sm text-slate-600">LOADING SESSION...</div>
       </PageShell>
     );
   }
 
   return (
-    <PageShell size="xl" className="p-4 md:p-6">
+    <PageShell size="xl" className="p-4 md:p-6 min-w-0 max-w-full overflow-x-hidden">
       <PageHeader
         eyebrow="Open Data & Developer Hub"
         title="API & Datasets"
@@ -320,7 +320,7 @@ export default function DeveloperPage() {
         </div>
       </section>
 
-      <div className="grid gap-4 lg:grid-cols-2" id="datasets">
+      <div className="grid min-w-0 max-w-full gap-4 lg:grid-cols-2" id="datasets">
         <Section title="Quickstart — Public REST API (No Key Required)" icon={Terminal}>
           <div className="space-y-3">
             <p className="font-rajdhani text-sm text-slate-400">

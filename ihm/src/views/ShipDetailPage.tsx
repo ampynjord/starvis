@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { formatDecimal } from '@/lib/format';
 import { useQuery } from '@tanstack/react-query';
 import {
-  ArrowLeft, BarChart3, ChevronLeft, ChevronRight, Clock, Coins,
+  ArrowLeft, ChevronLeft, ChevronRight, Clock, Coins,
   Crosshair, ExternalLink, Layers, Package, Palette, Rocket, Ruler, Users, Zap,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -516,9 +516,6 @@ export default function ShipDetailPage({ initialShip }: { initialShip?: Ship | n
               </div>
             </div>
             <div className="flex items-center gap-3 shrink-0">
-              <Link href={`/compare?a=${uuid}`} className="sci-btn-amber text-sm">
-                <BarChart3 size={13} /> Compare
-              </Link>
               {rsiStoreUrl && (
                 <a href={rsiStoreUrl} target="_blank" rel="noreferrer"
                   className="inline-flex items-center gap-1.5 text-xs font-mono-sc text-slate-500 hover:text-cyan-400 transition-colors">

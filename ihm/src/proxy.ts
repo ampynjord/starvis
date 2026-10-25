@@ -53,6 +53,7 @@ const PUBLIC_PATHS = new Set([
   '/legal',
   '/discord',
   '/roadmap',
+  '/developer',
 ]);
 
 // Public path prefixes: detail pages, sub-routes, Next.js internals and static assets.

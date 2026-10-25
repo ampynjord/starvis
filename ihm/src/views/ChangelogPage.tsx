@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
@@ -412,7 +412,7 @@ export default function ChangelogPage() {
         <div className="sci-panel px-4 py-3 space-y-2.5">
           {/* By entity type */}
           <div className="flex flex-wrap gap-x-5 gap-y-1.5">
-            {Object.entries(summary.by_entity)
+            {Object.entries(summary.by_entity ?? {})
               .sort(([, a], [, b]) => (b as number) - (a as number))
               .map(([t, n]) => (
                 <button
@@ -435,7 +435,7 @@ export default function ChangelogPage() {
 
           {/* By change type */}
           <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5">
-            {Object.entries(summary.by_change).map(([t, n]) => {
+            {Object.entries(summary.by_change ?? {}).map(([t, n]) => {
               const cfg = CHANGE_CFG[t as ChangeType];
               return (
                 <button

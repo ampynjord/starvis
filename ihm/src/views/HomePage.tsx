@@ -6,11 +6,9 @@ import { motion } from 'framer-motion';
 import Image from 'next/image';
 import {
   ArrowRight,
-  BarChart3,
   BookOpen,
   Bug,
   ChevronRight,
-  ClipboardList,
   Code2,
   Clock,
   Crosshair,
@@ -19,16 +17,13 @@ import {
   Globe,
   Layers,
   Minus,
-  Pickaxe,
   Plus,
   RefreshCw,
   Rocket,
-  Scroll,
   Search,
   Shuffle,
   TrendingUp,
   TriangleAlert,
-  Trophy,
   Zap,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -100,25 +95,6 @@ const SECTIONS: SectionDef[] = NAV_GROUPS.filter((group) => group.id in HOME_SEC
   })),
 }));
 
-type ToolCategory = 'combat' | 'economy' | 'data';
-
-const TOOLS: {
-  to: string;
-  icon: React.ElementType;
-  label: string;
-  sub: string;
-  category: ToolCategory;
-  badge?: string;
-}[] = [
-  { to: '/compare',             icon: BarChart3,         label: 'Compare',             sub: 'Side-by-side ship & component stats',    category: 'data' },
-  { to: '/ranking',             icon: Trophy,            label: 'Ranking',             sub: 'Top ships by DPS, cargo, speed…',        category: 'data' },
-  { to: '/crafting-calculator', icon: Scroll,            label: 'Crafting Calculator', sub: 'Recipes, ingredients & batch calc',      category: 'economy' },
-  { to: '/missions',            icon: ClipboardList,     label: 'Missions',            sub: 'Contracts by faction & legality',        category: 'data' },
-  { to: '/fps-calculator',      icon: Crosshair,         label: 'FPS Calculator',      sub: 'TTK & damage breakdown for weapons',     category: 'combat',  badge: 'TTK' },
-  { to: '/trade-calculator',    icon: TrendingUp,        label: 'Trade Calculator',    sub: 'Profit & commodity prices',              category: 'economy', badge: 'aUEC' },
-  { to: '/mining-calculator',   icon: Pickaxe,           label: 'Mining Calculator',   sub: 'Ore yield & laser settings',             category: 'economy', badge: 'Yield' },
-];
-
 const PLATFORM_PILLARS = [
   {
     to: '/about',
@@ -156,12 +132,6 @@ const PLATFORM_PILLARS = [
     accent: 'text-amber-400',
   },
 ];
-
-const CATEGORY_LABEL: Record<ToolCategory, { label: string; color: string; border: string }> = {
-  combat:  { label: 'Combat',  color: 'text-red-400',    border: 'border-red-800/60 hover:border-red-500/70' },
-  economy: { label: 'Economy', color: 'text-green-400',  border: 'border-green-800/60 hover:border-green-500/70' },
-  data:    { label: 'Data',    color: 'text-blue-400',   border: 'border-blue-800/60 hover:border-blue-500/70' },
-};
 
 const CHANGE_ICON = {
   added:    { Icon: Plus,      cls: 'text-green-400', bg: 'bg-green-950/50 border-green-900' },
@@ -387,7 +357,7 @@ export default function HomePage() {
             <div>
               <p className="font-mono-sc text-[9px] uppercase tracking-widest text-cyan-700">Platform direction</p>
               <h2 className="mt-1 font-orbitron text-sm font-bold uppercase tracking-widest text-cyan-300">
-                Open Data Engine, Calculators & Public API
+                Open Data Engine, 3D Pipeline & Public API
               </h2>
             </div>
             <Link href="/about" className="sci-btn-ghost px-3 py-2 text-xs">
@@ -623,62 +593,6 @@ export default function HomePage() {
           </div>
         </motion.div>
       </div>
-
-      {/* ── Tools ────────────────────────────────────────────────────── */}
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
-        <div className="flex items-center gap-3 mb-3">
-          <span className="font-orbitron text-[10px] font-bold text-slate-600 tracking-widest uppercase">
-            Tools & Calculators
-          </span>
-          <div className="flex-1 h-px bg-slate-800" />
-          <div className="flex items-center gap-2">
-            {(['combat', 'economy', 'data'] as ToolCategory[]).map(cat => (
-              <span key={cat} className={`font-mono-sc text-[9px] uppercase tracking-widest ${CATEGORY_LABEL[cat].color}`}>
-                ■ {CATEGORY_LABEL[cat].label}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-          {TOOLS.map(({ to, icon: Icon, label, sub, category, badge }, i) => {
-            const cat = CATEGORY_LABEL[category];
-            return (
-              <motion.div
-                key={to}
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.52 + i * 0.04 }}
-              >
-                <Link href={to} className="block h-full">
-                  <div className={`sci-panel p-4 h-full border transition-colors duration-150 ${cat.border} group cursor-pointer`}>
-                    <div className="flex items-start justify-between mb-3">
-                      <Icon size={18} className="text-slate-500 group-hover:text-slate-200 transition-colors shrink-0" strokeWidth={1.5} />
-                      <div className="flex flex-col items-end gap-1">
-                        {badge && (
-                          <span className="font-orbitron text-[8px] tracking-widest text-slate-700 border border-slate-800 rounded-sm px-1 py-0.5 uppercase">
-                            {badge}
-                          </span>
-                        )}
-                        <span className={`font-mono-sc text-[8px] uppercase tracking-widest ${cat.color} opacity-60`}>
-                          {cat.label}
-                        </span>
-                      </div>
-                    </div>
-                    <p className="font-orbitron text-sm font-bold mb-1 leading-tight text-slate-300 group-hover:text-slate-100 transition-colors">
-                      {label}
-                    </p>
-                    <p className="font-rajdhani text-xs leading-snug text-slate-600 group-hover:text-slate-500 transition-colors">
-                      {sub}
-                    </p>
-                  </div>
-                </Link>
-              </motion.div>
-            );
-          })}
-        </div>
-      </motion.div>
-
 
     </PageShell>
   );

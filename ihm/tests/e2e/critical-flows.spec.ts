@@ -189,7 +189,7 @@ test.describe('@critical application flows', () => {
   test('data library pages render usable records', async ({ page }) => {
     const pageErrors = watchBrowserErrors(page);
     const pages = [
-      { path: '/ships', heading: 'Ships', text: 'Aurora MR' },
+      { path: '/ships', heading: 'Ships', text: '100i' },
       { path: '/components', heading: 'Components', text: 'CF-117 Bulldog' },
       { path: '/weapons', heading: /Weapons|Equipment/i, text: 'P4-AR Rifle' },
       { path: '/commodities', heading: 'Commodities', text: 'Agricium' },
@@ -197,7 +197,7 @@ test.describe('@critical application flows', () => {
 
     for (const target of pages) {
       await gotoApp(page, target.path);
-      await expect(page.getByRole('heading', { name: target.heading })).toBeVisible();
+      await expect(page.getByRole('heading', { name: target.heading }).first()).toBeVisible();
       await expect(page.getByText(target.text).first()).toBeVisible();
     }
     expect(pageErrors).toEqual([]);

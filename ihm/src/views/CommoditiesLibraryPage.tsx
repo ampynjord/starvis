@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 /**
  * CommoditiesLibraryPage - merged commodities & minerals library.
@@ -10,7 +10,6 @@ import { motion } from 'framer-motion';
 import {
   Crosshair,
   FlaskConical,
-  Link as LinkIcon,
   Package,
   Pickaxe,
   Search,
@@ -79,8 +78,7 @@ function TradeGoodsTab() {
       </ListFilterBar>
 
         <div className="sci-panel p-3 mb-4 flex items-center justify-between gap-3">
-          <p className="text-xs text-slate-400 font-mono-sc">Raw ores, refined materials, fuel/gas and trade goods. Use Mining Calculator for yield and profit tools.</p>
-          <Link href="/mining-calculator" className="text-xs text-cyan-400 hover:text-cyan-300 whitespace-nowrap">Open Mining Calculator</Link>
+          <p className="text-xs text-slate-400 font-mono-sc">Raw ores, refined materials, fuel/gas, minerals and trade goods cross-referenced with UEX Corp market pricing.</p>
         </div>
 
         <div className="mb-4 relative">
@@ -145,12 +143,6 @@ function MineralsTab() {
           <div className="sci-panel px-3 py-1.5 text-[10px] font-mono-sc text-slate-500 flex items-center gap-1.5">
             <Crosshair size={10} /> Click a row to inspect
           </div>
-          <Link
-            href="/mining-calculator"
-            className="sci-panel px-3 py-1.5 text-[10px] font-mono-sc text-cyan-500 hover:text-cyan-300 flex items-center gap-1.5 transition-colors border-cyan-900/40 hover:border-cyan-700"
-          >
-            <LinkIcon size={10} /> Open Mining Calculator
-          </Link>
         </div>
       )}
     />

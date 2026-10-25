@@ -1,5 +1,4 @@
 import {
-  BarChart3,
   Boxes,
   CalendarClock,
   ClipboardList,
@@ -14,10 +13,6 @@ import {
   Rocket,
   Scroll,
   Shield,
-  SlidersHorizontal,
-  TrendingUp,
-  Trophy,
-  Utensils,
   Wrench,
   Zap,
 } from 'lucide-react';
@@ -39,41 +34,33 @@ export type NavGroupDef = {
 };
 
 const PLATFORM_ITEMS: NavItemDef[] = [
-  { to: '/about', icon: Database, label: 'About Starvis' },
   { to: '/developer', icon: Code2, label: 'API & Datasets' },
+  { to: '/changelog', icon: Scroll, label: 'Patch Changelog' },
+  { to: '/about', icon: Database, label: 'About Starvis' },
   { to: '/roadmap', icon: CalendarClock, label: 'Roadmap' },
 ];
 
 const SHIPS_ITEMS: NavItemDef[] = [
   { to: '/ships', icon: Rocket, label: 'Ships & Vehicles' },
-  { to: '/compare', icon: BarChart3, label: 'Compare' },
-  { to: '/ranking', icon: Trophy, label: 'Ranking' },
-  { to: '/vehicles', icon: Zap, label: 'Vehicle Equipment' },
+  { to: '/components', icon: Zap, label: 'Vehicle Components' },
+  { to: '/manufacturers', icon: Wrench, label: 'Manufacturers' },
 ];
 
 const EQUIPMENT_ITEMS: NavItemDef[] = [
+  { to: '/items', icon: Package, label: 'All FPS Items' },
   { to: '/weapons', icon: Crosshair, label: 'Weapons' },
   { to: '/armor', icon: Shield, label: 'Armor' },
-  { to: '/clothing', icon: Package, label: 'Clothing' },
-  { to: '/utility', icon: Wrench, label: 'Utility' },
-  { to: '/ammo', icon: Zap, label: 'Ammo', exact: true },
-  { to: '/sustenance', icon: Utensils, label: 'Sustenance' },
-  { to: '/fps-calculator', icon: SlidersHorizontal, label: 'FPS Calculator', earlyAccess: true },
+  { to: '/loot', icon: Boxes, label: 'Loot Tables' },
 ];
 
 const ECONOMY_ITEMS: NavItemDef[] = [
   { to: '/commodities', icon: Factory, label: 'Commodities' },
-  { to: '/trade-calculator', icon: TrendingUp, label: 'Trade Calculator', earlyAccess: true },
-  { to: '/mining-calculator', icon: BarChart3, label: 'Mining Calculator', earlyAccess: true },
-  { to: '/crafting-calculator', icon: Scroll, label: 'Crafting Calculator', earlyAccess: true },
+  { to: '/missions', icon: ClipboardList, label: 'Missions' },
+  { to: '/factions', icon: Shield, label: 'Factions' },
 ];
 
 const UNIVERSE_ITEMS: NavItemDef[] = [
-  { to: '/starmap', icon: MapPin, label: 'Starmap', earlyAccess: true },
-  { to: '/missions', icon: ClipboardList, label: 'Missions' },
-  { to: '/loot', icon: Boxes, label: 'Loot Tables' },
-  { to: '/factions', icon: Shield, label: 'Factions' },
-  { to: '/manufacturers', icon: Wrench, label: 'Manufacturers' },
+  { to: '/starmap', icon: MapPin, label: 'Starmap' },
   { to: '/galactapedia', icon: Globe, label: 'Galactapedia' },
   { to: '/comm-links', icon: Newspaper, label: 'Comm-Links' },
 ];
