@@ -10837,13 +10837,28 @@
                           "type": "string",
                           "example": "ctm"
                         },
+                        "formats": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "example": ["ctm", "glb", "obj"]
+                        },
                         "url": {
                           "type": "string",
                           "description": "Original RSI CDN URL"
                         },
                         "proxy_url": {
                           "type": "string",
-                          "description": "Starvis proxy URL (cached)"
+                          "description": "Starvis proxy URL (.ctm cached)"
+                        },
+                        "glb_url": {
+                          "type": "string",
+                          "description": "Standard glTF 2.0 binary (.glb) URL"
+                        },
+                        "obj_url": {
+                          "type": "string",
+                          "description": "Standard Wavefront (.obj) URL"
                         }
                       }
                     }
@@ -10861,9 +10876,9 @@
     "/api/v1/ships/{uuid}/model/file": {
       "get": {
         "tags": ["Ships"],
-        "summary": "Download 3D model binary (.ctm)",
+        "summary": "Download 3D model binary (.ctm, .glb, or .obj)",
         "operationId": "getShipModelFile",
-        "description": "Serves the binary `.ctm` file. First request downloads from RSI and caches to disk; subsequent requests are served from cache. Supports `If-None-Match` / ETag for browser caching.",
+        "description": "Serves the 3D model in `.ctm` (default), `.glb` (`?format=glb`), or `.obj` (`?format=obj`). First request downloads from RSI and caches/converts to disk; subsequent requests are served from cache.",
         "parameters": [
           {
             "name": "uuid",
@@ -10875,6 +10890,17 @@
           },
           {
             "$ref": "#/components/parameters/env"
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["ctm", "glb", "obj"],
+              "default": "ctm"
+            },
+            "description": "3D mesh export format: ctm (OpenCTM), glb (glTF 2.0 binary), or obj (Wavefront OBJ)"
           }
         ],
         "responses": {

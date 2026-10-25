@@ -6,6 +6,7 @@ import type { Router } from 'express';
 import { SearchQuery, ShipQuery } from '../schemas.js';
 import { parseIncludes } from '../services/shared.js';
 import { CTM_CACHE_DIR } from '../utils/config.js';
+import { ctmToGlb, ctmToObj } from '../utils/ctm-converter.js';
 import { compactObject, success } from '../utils/response.js';
 import { asyncHandler, makeGameDataGuard, makeShipResolver, sendCsvOrJson, sendWithETag } from './helpers.js';
 import {
@@ -496,8 +497,11 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
           uuid,
           name: ship.name,
           format: 'ctm',
+          formats: ['ctm', 'glb', 'obj'],
           url: ctmUrl,
           proxy_url: `/api/v1/ships/${req.params.uuid}/model/file`,
+          glb_url: `/api/v1/ships/${req.params.uuid}/model/file?format=glb`,
+          obj_url: `/api/v1/ships/${req.params.uuid}/model/file?format=obj`,
         },
       });
     }),
@@ -505,7 +509,7 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
 
   /**
    * GET /api/v1/ships/:uuid/model/file
-   * Serves the binary .ctm file with disk cache (lazy).
+   * Serves the 3D model file in .ctm (default), .glb (?format=glb), or .obj (?format=obj) with disk cache (lazy).
    * - First request: downloads from RSI, saves to CTM_CACHE_DIR/{uuid}.ctm
    * - Subsequent requests: serves the local file directly
    * - If ctm_url changes in DB (new extraction): sidecar {uuid}.url detects
@@ -516,6 +520,9 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
     requireGameData,
     asyncHandler(async (req, res) => {
       const env = String(req.query.env ?? 'live');
+      const rawFormat = String(req.query.format ?? 'ctm').toLowerCase();
+      const format: 'ctm' | 'glb' | 'obj' = rawFormat === 'glb' ? 'glb' : rawFormat === 'obj' ? 'obj' : 'ctm';
+
       const uuid = await resolveShipUuid(req.params.uuid, env);
       if (!uuid) return void res.status(404).json({ success: false, error: 'Ship not found' });
 
@@ -528,78 +535,93 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
       // ── Disk cache ───────────────────────────────────────────────────────
       mkdirSync(CTM_CACHE_DIR, { recursive: true });
       const cacheFile = join(CTM_CACHE_DIR, `${uuid}.ctm`);
+      const glbCacheFile = join(CTM_CACHE_DIR, `${uuid}.glb`);
+      const objCacheFile = join(CTM_CACHE_DIR, `${uuid}.obj`);
       const sidecar = join(CTM_CACHE_DIR, `${uuid}.url`);
 
       // Invalidate cache if the URL changed since last download
       const cachedUrl = existsSync(sidecar) ? readFileSync(sidecar, 'utf-8').trim() : null;
       if (cachedUrl && cachedUrl !== ctmUrl && existsSync(cacheFile)) {
-        unlinkSync(cacheFile);
-        unlinkSync(sidecar);
-      }
-
-      const etag = `"${createHash('md5').update(ctmUrl).digest('hex').slice(0, 16)}"`;
-      const headers = {
-        'Content-Type': 'application/octet-stream',
-        'Content-Disposition': `attachment; filename="${ship.class_name}.ctm"`,
-        'Cache-Control': 'public, max-age=86400',
-        ETag: etag,
-      };
-
-      // ── Serve from cache ─────────────────────────────────────────────────
-      if (existsSync(cacheFile)) {
-        if (req.headers['if-none-match'] === etag) {
-          res.status(304).end();
-          return;
+        for (const f of [cacheFile, glbCacheFile, objCacheFile, sidecar]) {
+          if (existsSync(f)) unlinkSync(f);
         }
-        for (const [k, v] of Object.entries(headers)) res.setHeader(k, v);
-        res.setHeader('X-CTM-Cache', 'HIT');
-        res.sendFile(cacheFile);
-        return;
       }
 
-      // ── Download from RSI + save ─────────────────────────────────────────
+      const etag = `"${createHash('md5').update(`${ctmUrl}:${format}`).digest('hex').slice(0, 16)}"`;
       if (req.headers['if-none-match'] === etag) {
         res.status(304).end();
         return;
       }
 
-      const url = new URL(ctmUrl);
-      await new Promise<void>((resolve, reject) => {
-        const proxyReq = httpsRequest(
-          { hostname: url.hostname, path: url.pathname, method: 'GET', headers: { 'User-Agent': 'starvis/1.0' } },
-          (upstream) => {
-            if (upstream.statusCode !== 200) {
-              res.status(upstream.statusCode ?? 502).json({ success: false, error: 'Upstream error' });
-              upstream.resume();
-              resolve();
-              return;
-            }
-            for (const [k, v] of Object.entries(headers)) res.setHeader(k, v);
-            res.setHeader('X-CTM-Cache', 'MISS');
-            if (upstream.headers['content-length']) res.setHeader('Content-Length', upstream.headers['content-length']);
+      // Ensure .ctm exists on disk
+      if (!existsSync(cacheFile)) {
+        const url = new URL(ctmUrl);
+        const downloaded = await new Promise<boolean>((resolve, reject) => {
+          const proxyReq = httpsRequest(
+            { hostname: url.hostname, path: url.pathname, method: 'GET', headers: { 'User-Agent': 'starvis/1.0' } },
+            (upstream) => {
+              if (upstream.statusCode !== 200) {
+                res.status(upstream.statusCode ?? 502).json({ success: false, error: 'Upstream error' });
+                upstream.resume();
+                resolve(false);
+                return;
+              }
+              const writer = createWriteStream(cacheFile);
+              upstream.pipe(writer);
+              writer.on('finish', () => {
+                writeFileSync(sidecar, ctmUrl, 'utf-8');
+                resolve(true);
+              });
+              writer.on('error', (err) => {
+                try {
+                  unlinkSync(cacheFile);
+                } catch {}
+                reject(err);
+              });
+            },
+          );
+          proxyReq.on('error', reject);
+          proxyReq.end();
+        });
+        if (!downloaded) return;
+      }
 
-            // Pipe simultaneously to the client AND disk cache
-            const writer = createWriteStream(cacheFile);
-            upstream.pipe(res);
-            upstream.pipe(writer);
-            writer.on('finish', () => writeFileSync(sidecar, ctmUrl, 'utf-8'));
-            writer.on('error', () => {
-              try {
-                unlinkSync(cacheFile);
-              } catch {}
-            });
-            upstream.on('end', resolve);
-            upstream.on('error', (err) => {
-              try {
-                unlinkSync(cacheFile);
-              } catch {}
-              reject(err);
-            });
-          },
-        );
-        proxyReq.on('error', reject);
-        proxyReq.end();
-      });
+      const meshName = String(ship.class_name || ship.name || uuid);
+
+      if (format === 'glb') {
+        if (!existsSync(glbCacheFile)) {
+          const ctmBuf = readFileSync(cacheFile);
+          const glbBuf = ctmToGlb(ctmBuf, meshName);
+          writeFileSync(glbCacheFile, glbBuf);
+        }
+        res.setHeader('Content-Type', 'model/gltf-binary');
+        res.setHeader('Content-Disposition', `attachment; filename="${meshName}.glb"`);
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        res.setHeader('ETag', etag);
+        res.sendFile(glbCacheFile);
+        return;
+      }
+
+      if (format === 'obj') {
+        if (!existsSync(objCacheFile)) {
+          const ctmBuf = readFileSync(cacheFile);
+          const objText = ctmToObj(ctmBuf, meshName);
+          writeFileSync(objCacheFile, objText, 'utf-8');
+        }
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="${meshName}.obj"`);
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        res.setHeader('ETag', etag);
+        res.sendFile(objCacheFile);
+        return;
+      }
+
+      res.setHeader('Content-Type', 'application/octet-stream');
+      res.setHeader('Content-Disposition', `attachment; filename="${meshName}.ctm"`);
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      res.setHeader('ETag', etag);
+      res.setHeader('X-CTM-Cache', 'HIT');
+      res.sendFile(cacheFile);
     }),
   );
 

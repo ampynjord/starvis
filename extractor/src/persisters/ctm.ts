@@ -20,14 +20,31 @@ export async function saveShipCtmModels(
   const { force = false, concurrency = 1 } = ctmOpts;
   await conn.query('ALTER TABLE rsi.ship_matrix ADD COLUMN IF NOT EXISTS ctm_url VARCHAR(500)');
 
-  // Incremental mode: query ALL envs so PTU-only ships also get a CTM URL.
-  // The UPDATE below is already env-agnostic (WHERE class_name = ?) so a single
-  // scrape covers every env at once.
+  // Cross-propagate existing CTM URLs between game.ships and rsi.ship_matrix via ship_matrix_id
+  await conn.query(
+    `UPDATE rsi.ship_matrix sm
+     SET ctm_url = s.ctm_url
+     FROM game.ships s
+     WHERE s.ship_matrix_id = sm.id
+       AND sm.ctm_url IS NULL
+       AND s.ctm_url IS NOT NULL`,
+  );
+  await conn.query(
+    `UPDATE game.ships s
+     SET ctm_url = sm.ctm_url
+     FROM rsi.ship_matrix sm
+     WHERE s.ship_matrix_id = sm.id
+       AND s.ctm_url IS NULL
+       AND sm.ctm_url IS NOT NULL`,
+  );
+
+  // Incremental mode: query ALL envs and ALL vehicle categories (ship, ground, gravlev)
+  // so ground vehicles, gravlev bikes, and PTU-only ships also get a CTM URL.
   const { rows: gameRows } = await conn.query<any>(
     `SELECT DISTINCT ON (s.class_name) s.class_name, s.name, sm.url as rsi_url
      FROM game.ships s
      INNER JOIN rsi.ship_matrix sm ON s.ship_matrix_id = sm.id
-     WHERE s.vehicle_category = 'ship'
+     WHERE s.vehicle_category IN ('ship', 'ground', 'gravlev')
        AND sm.url IS NOT NULL
        ${force ? '' : 'AND s.ctm_url IS NULL'}
      ORDER BY s.class_name, s.env`,
@@ -79,7 +96,42 @@ export async function saveShipCtmModels(
     }
     // Update across all envs — CTM URLs come from RSI website (env-agnostic)
     await conn.query('UPDATE game.ships SET ctm_url = $1 WHERE class_name = $2', [ctmUrl, className]);
+    await conn.query(
+      `UPDATE rsi.ship_matrix sm
+       SET ctm_url = $1
+       FROM game.ships s
+       WHERE s.class_name = $2 AND s.ship_matrix_id = sm.id AND sm.ctm_url IS NULL`,
+      [ctmUrl, className],
+    );
     updatedGame++;
   }
+
+  // Propagate CTM URLs across variants sharing the same RSI chassis_id when a variant lacks its own CTM
+  await conn.query(
+    `UPDATE game.ships s1
+     SET ctm_url = sub.ctm_url
+     FROM (
+       SELECT sm1.id AS ship_matrix_id,
+              (SELECT s2.ctm_url
+               FROM game.ships s2
+               JOIN rsi.ship_matrix sm2 ON sm2.id = s2.ship_matrix_id
+               WHERE sm2.chassis_id = sm1.chassis_id AND s2.ctm_url IS NOT NULL
+               LIMIT 1) AS ctm_url
+       FROM rsi.ship_matrix sm1
+       WHERE sm1.chassis_id IS NOT NULL
+     ) sub
+     WHERE s1.ship_matrix_id = sub.ship_matrix_id
+       AND s1.ctm_url IS NULL
+       AND sub.ctm_url IS NOT NULL`,
+  );
+  await conn.query(
+    `UPDATE rsi.ship_matrix sm
+     SET ctm_url = s.ctm_url
+     FROM game.ships s
+     WHERE s.ship_matrix_id = sm.id
+       AND sm.ctm_url IS NULL
+       AND s.ctm_url IS NOT NULL`,
+  );
+
   onProgress?.(`CTM: ${updatedGame} game ships updated (all envs), ${updatedConcept} concept ships updated`);
 }

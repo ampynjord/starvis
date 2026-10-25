@@ -201,10 +201,37 @@ export function ShipHoloViewer({ shipUuid, shipName }: Props) {
         title="Clic gauche: rotation · Scroll: zoom"
       />
 
-      {/* Footer hint */}
+      {/* Footer hint & 3D export downloads */}
       {loadState === 'ready' && (
-        <div className="px-4 py-1.5 border-t border-slate-800/40 bg-slate-900/20 text-[10px] font-mono-sc text-slate-600 text-center">
-          Clic gauche: rotation · Scroll: zoom
+        <div className="px-4 py-2 border-t border-slate-800/40 bg-slate-900/20 flex flex-wrap items-center justify-between gap-2 text-[10px] font-mono-sc text-slate-500">
+          <span>Clic gauche: rotation · Scroll: zoom</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-slate-600 uppercase">Export 3D:</span>
+            <a
+              href={`${ctmUrl}?format=glb`}
+              download
+              className="px-1.5 py-0.5 rounded border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20 transition-colors"
+              title="Télécharger le modèle 3D au format standard glTF 2.0 Binaire (.glb)"
+            >
+              GLB
+            </a>
+            <a
+              href={`${ctmUrl}?format=obj`}
+              download
+              className="px-1.5 py-0.5 rounded border border-slate-700 bg-slate-800/60 text-slate-300 hover:border-cyan-500/30 hover:text-cyan-300 transition-colors"
+              title="Télécharger le modèle 3D au format Wavefront (.obj)"
+            >
+              OBJ
+            </a>
+            <a
+              href={ctmUrl}
+              download
+              className="px-1.5 py-0.5 rounded border border-slate-700 bg-slate-800/60 text-slate-400 hover:border-cyan-500/30 hover:text-cyan-300 transition-colors"
+              title="Télécharger le modèle 3D brut OpenCTM RSI (.ctm)"
+            >
+              CTM
+            </a>
+          </div>
         </div>
       )}
     </div>

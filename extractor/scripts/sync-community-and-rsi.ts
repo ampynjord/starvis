@@ -10,6 +10,9 @@ import 'dotenv/config';
 import pg from 'pg';
 import { SCRAPER_USER_AGENT } from '../src/config.js';
 import { batchUpsert } from '../src/persisters/batch.js';
+import { saveShipCtmModels } from '../src/persisters/ctm.js';
+import { saveOfficialShipGalleries } from '../src/persisters/ship-galleries.js';
+import { updateShipMarketSummaries } from '../src/persisters/ship-market-summaries.js';
 import { saveUexMarket } from '../src/persisters/uex.js';
 import { LocalizationService } from '../src/services/localization-service.js';
 import { RsiSyncService } from '../src/services/rsi-sync-service.js';
@@ -246,14 +249,36 @@ async function main() {
       const conn = await pool.connect();
       try {
         await saveUexMarket(conn, 'live', (m) => console.log(`  [uex] ${m}`));
+        const summary = await updateShipMarketSummaries({ conn, env: 'live' });
+        console.log(`  [uex] Market summaries updated: ${summary.purchasable} purchasable, ${summary.rentable} rentable`);
       } finally {
         conn.release();
       }
     }
     if (runAll || args.has('--rsi')) {
       const rsi = new RsiSyncService(pool);
+      await rsi.syncShipMatrix((m) => console.log(m));
+      await rsi.syncStarmap((m) => console.log(m));
+      await rsi.syncGalactapedia((m) => console.log(m));
+      await rsi.syncCommLinks((m) => console.log(m));
       await rsi.syncRoadmap((m) => console.log(m));
       await rsi.syncServerStatus((m) => console.log(m));
+    }
+    if (args.has('--galleries')) {
+      const conn = await pool.connect();
+      try {
+        await saveOfficialShipGalleries(conn, { concurrency: 2 }, (m) => console.log(`  [galleries] ${m}`));
+      } finally {
+        conn.release();
+      }
+    }
+    if (args.has('--ctm')) {
+      const conn = await pool.connect();
+      try {
+        await saveShipCtmModels(conn, 'live', { concurrency: 3 }, (m) => console.log(`  [ctm] ${m}`));
+      } finally {
+        conn.release();
+      }
     }
   } finally {
     await pool.end();

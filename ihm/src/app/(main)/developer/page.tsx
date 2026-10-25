@@ -331,12 +331,16 @@ curl "${apiBaseUrl}/ships?limit=20&page=1"
 
 # Query a specific patch & bilingual translations
 curl "${apiBaseUrl}/ships?version=4.10.1&limit=5"
-curl "${apiBaseUrl}/translations?search=aurora&limit=10"`}</CodeBlock>
+curl "${apiBaseUrl}/translations?search=aurora&limit=10"
+
+# Download 3D ship model as standard glTF 2.0 (.glb), Wavefront (.obj) or OpenCTM (.ctm)
+curl -L "${apiBaseUrl}/ships/ANVL_Carrack/model/file?format=glb" -o carrack.glb`}</CodeBlock>
           </div>
         </Section>
 
         <Section title="Base & Cross-Referenced Endpoints" icon={BookOpen}>
           <CodeBlock>{`${apiBaseUrl}/ships
+${apiBaseUrl}/ships/:uuid/model/file?format=glb|obj|ctm
 ${apiBaseUrl}/components
 ${apiBaseUrl}/items
 ${apiBaseUrl}/commodities
@@ -348,8 +352,7 @@ ${apiBaseUrl}/starmap/positions
 ${apiBaseUrl}/translations
 ${apiBaseUrl}/datasets
 ${apiBaseUrl}/rsi/roadmap
-${apiBaseUrl}/rsi/loaners
-${apiBaseUrl}/rsi/organizations/ CIG
+${apiBaseUrl}/rsi/organizations/:symbol
 ${apiBaseUrl}/rsi/status`}</CodeBlock>
         </Section>
       </div>
