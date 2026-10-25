@@ -16,6 +16,7 @@ import {
   Sparkles,
   LayoutGrid,
   List,
+  X,
 } from 'lucide-react';
 import { useEnv } from '@/contexts/EnvContext';
 import { useEntityNexus } from '@/contexts/NexusContext';
@@ -40,6 +41,7 @@ export function UniverseNexusView() {
   ];
 
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'flight-ready' | 'in-concept' | 'lore'>('all');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
@@ -62,12 +64,22 @@ export function UniverseNexusView() {
     staleTime: 30_000,
   });
 
-  const entities: UniverseOmniResult[] = data?.data || [];
+  const rawEntities: UniverseOmniResult[] = data?.data || [];
+  const entities =
+    statusFilter === 'all'
+      ? rawEntities
+      : rawEntities.filter((e) => {
+          if (statusFilter === 'in-concept') {
+            return e.productionStatus === 'in-concept' || e.productionStatus === 'in-development';
+          }
+          return e.productionStatus === statusFilter;
+        });
   const total = data?.total || 0;
   const pages = data?.pages || 1;
 
   const handleCategoryChange = (catId: string) => {
     setSelectedCategory(catId);
+    setStatusFilter('all');
     setPage(1);
   };
 
@@ -90,65 +102,112 @@ export function UniverseNexusView() {
         </div>
       </div>
 
-      {/* Fluid Category Filter Pills */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-        {categories.map((cat) => {
-          const Icon = cat.icon;
-          const isActive = selectedCategory === cat.id;
-          return (
-            <button
-              key={cat.id}
-              onClick={() => handleCategoryChange(cat.id)}
-              className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-mono-sc uppercase tracking-wider transition-all shrink-0 ${
-                isActive
-                  ? 'bg-cyan-950/90 text-cyan-300 border border-cyan-500/60 shadow-lg shadow-cyan-950/50'
-                  : 'bg-slate-900/60 text-slate-400 hover:text-white hover:bg-slate-800/80 border border-slate-800/80'
-              }`}
-            >
-              <Icon size={16} className={isActive ? 'text-cyan-400' : 'text-slate-500'} />
-              <span>{cat.label}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Control Bar: Search Input, View Mode, Counter */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 rounded-xl bg-slate-900/40 border border-slate-800/80">
-        {/* Search */}
-        <div className="relative flex-1 max-w-md">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-            placeholder={t('filter_placeholder')}
-            className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-slate-950/70 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 font-rajdhani"
-          />
+      {/* Cockpit Unified Command Console */}
+      <div className="rounded-xl bg-slate-900/60 border border-slate-800/80 p-3 sm:p-4 space-y-3 backdrop-blur-md shadow-xl">
+        {/* Category Pills Bar */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+          {categories.map((cat) => {
+            const Icon = cat.icon;
+            const isActive = selectedCategory === cat.id;
+            return (
+              <button
+                key={cat.id}
+                onClick={() => handleCategoryChange(cat.id)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono-sc uppercase tracking-wider transition-all shrink-0 ${
+                  isActive
+                    ? 'bg-cyan-950 text-cyan-300 border border-cyan-500/60 shadow-sm font-semibold'
+                    : 'bg-slate-950/60 text-slate-400 hover:text-white hover:bg-slate-800/60 border border-slate-800/60'
+                }`}
+              >
+                <Icon size={14} className={isActive ? 'text-cyan-400' : 'text-slate-500'} />
+                <span>{cat.label}</span>
+              </button>
+            );
+          })}
         </div>
 
-        {/* Counter & View Switcher */}
-        <div className="flex items-center justify-between sm:justify-end gap-3 text-xs font-mono-sc text-slate-400">
-          <span>
-            {isLoading ? t('loading_explorer') : t('entities_indexed', { count: fNumber(total) })}
-          </span>
-          <div className="flex items-center gap-1 border-l border-slate-800 pl-3">
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`p-1.5 rounded ${viewMode === 'grid' ? 'bg-cyan-950 text-cyan-300 border border-cyan-800' : 'text-slate-500 hover:text-slate-300'}`}
-              title={t('grid_view')}
-            >
-              <LayoutGrid size={15} />
-            </button>
-            <button
-              onClick={() => setViewMode('table')}
-              className={`p-1.5 rounded ${viewMode === 'table' ? 'bg-cyan-950 text-cyan-300 border border-cyan-800' : 'text-slate-500 hover:text-slate-300'}`}
-              title={t('table_view')}
-            >
-              <List size={15} />
-            </button>
+        {/* Action Controls Deck */}
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 pt-2 border-t border-slate-800/60">
+          {/* Search Box with Clear Button & Shortcut Badge */}
+          <div className="relative flex-1 max-w-lg">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              placeholder={t('filter_placeholder')}
+              className="w-full pl-8 pr-16 py-1.5 rounded-lg bg-slate-950/80 border border-slate-800/90 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 font-rajdhani transition-colors"
+            />
+            {search ? (
+              <button
+                onClick={() => {
+                  setSearch('');
+                  setPage(1);
+                }}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 p-0.5"
+                title="Effacer"
+              >
+                <X size={13} />
+              </button>
+            ) : (
+              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-mono-sc text-slate-600 border border-slate-800 px-1.5 py-0.5 rounded bg-slate-900 pointer-events-none">
+                Ctrl+K
+              </span>
+            )}
+          </div>
+
+          {/* Status Filters (Ships & All) */}
+          {(selectedCategory === 'ships' || selectedCategory === 'all') && (
+            <div className="flex items-center gap-1.5 overflow-x-auto text-[11px] font-mono-sc">
+              <span className="text-slate-500 uppercase mr-1 hidden lg:inline">Statut:</span>
+              {[
+                { id: 'all', label: language === 'fr' ? 'Tous' : 'All' },
+                { id: 'flight-ready', label: language === 'fr' ? 'En vol' : 'Flight-Ready' },
+                { id: 'in-concept', label: language === 'fr' ? 'Concept' : 'Concept' },
+                { id: 'lore', label: language === 'fr' ? 'Lore / SQ42' : 'Lore / SQ42' },
+              ].map((st) => (
+                <button
+                  key={st.id}
+                  onClick={() => setStatusFilter(st.id as any)}
+                  className={`px-2.5 py-1 rounded-md transition-all shrink-0 border ${
+                    statusFilter === st.id
+                      ? 'bg-slate-800 text-white border-cyan-500/50 font-bold'
+                      : 'bg-slate-950/40 text-slate-400 hover:text-slate-300 border-slate-800/60'
+                  }`}
+                >
+                  {st.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Counter & View Switcher */}
+          <div className="flex items-center justify-between md:justify-end gap-3 text-xs font-mono-sc text-slate-400 shrink-0">
+            <div className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+              <span>
+                {isLoading ? t('loading_explorer') : t('entities_indexed', { count: fNumber(total) })}
+              </span>
+            </div>
+            <div className="flex items-center gap-1 border-l border-slate-800 pl-3">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`p-1.5 rounded transition-colors ${viewMode === 'grid' ? 'bg-cyan-950 text-cyan-300 border border-cyan-800' : 'text-slate-500 hover:text-slate-300'}`}
+                title={t('grid_view')}
+              >
+                <LayoutGrid size={14} />
+              </button>
+              <button
+                onClick={() => setViewMode('table')}
+                className={`p-1.5 rounded transition-colors ${viewMode === 'table' ? 'bg-cyan-950 text-cyan-300 border border-cyan-800' : 'text-slate-500 hover:text-slate-300'}`}
+                title={t('table_view')}
+              >
+                <List size={14} />
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -310,9 +369,10 @@ export function UniverseNexusView() {
           <button
             onClick={() => {
               setSearch('');
+              setStatusFilter('all');
               setSelectedCategory('all');
             }}
-            className="px-4 py-2 rounded-lg bg-cyan-950 border border-cyan-800 text-cyan-300 text-xs font-mono-sc"
+            className="px-4 py-2 rounded-lg bg-cyan-950 border border-cyan-800 text-cyan-300 text-xs font-mono-sc hover:bg-cyan-900 transition-colors"
           >
             {language === 'fr' ? 'Réinitialiser les filtres' : 'Reset filters'}
           </button>

@@ -30,58 +30,24 @@
   --font-rajdhani: var(--font-rajdhani), Rajdhani, sans-serif;
   --font-mono: var(--font-mono), 'Share Tech Mono', 'JetBrains Mono', monospace;
 
-  --animate-scanline: scanline 4s linear infinite;
-  --animate-pulse_slow: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  --animate-glow: glow 2s ease-in-out infinite alternate;
-  --animate-flicker: flicker 0.15s infinite;
-  --animate-fade-in: fadeIn 0.4s ease-out;
-  --animate-slide-up: slideUp 0.4s ease-out;
+  --animate-fade-in: fadeIn 0.25s ease-out;
+  --animate-slide-up: slideUp 0.25s ease-out;
 
   --background-image-grid-void:
-    linear-gradient(rgba(0, 212, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 212, 255, 0.03) 1px, transparent 1px);
+    linear-gradient(rgba(14, 165, 233, 0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(14, 165, 233, 0.015) 1px, transparent 1px);
 
-  --background-size-grid-void: 40px 40px;
+  --background-size-grid-void: 32px 32px;
 
   --shadow-cyan-glow:
-    0 0 10px rgba(0, 212, 255, 0.3), 0 0 30px rgba(0, 212, 255, 0.1);
+    0 1px 3px rgba(0, 0, 0, 0.5), 0 0 12px rgba(6, 182, 212, 0.12);
   --shadow-amber-glow:
-    0 0 10px rgba(255, 184, 0, 0.3), 0 0 30px rgba(255, 184, 0, 0.1);
+    0 1px 3px rgba(0, 0, 0, 0.5), 0 0 12px rgba(245, 158, 11, 0.12);
   --shadow-panel:
-    0 4px 24px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(0, 212, 255, 0.1);
+    0 4px 20px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.04);
   --shadow-panel-hover:
-    0 8px 32px rgba(0, 0, 0, 0.8), 0 0 20px rgba(0, 212, 255, 0.15);
+    0 8px 24px rgba(0, 0, 0, 0.7), 0 0 16px rgba(6, 182, 212, 0.08);
 
-  @keyframes scanline {
-    0% {
-      transform: translateY(-100%);
-    }
-    100% {
-      transform: translateY(100vh);
-    }
-  }
-  @keyframes glow {
-    from {
-      text-shadow:
-        0 0 5px #00d4ff,
-        0 0 10px #00d4ff;
-    }
-    to {
-      text-shadow:
-        0 0 10px #00d4ff,
-        0 0 25px #00d4ff,
-        0 0 40px #00d4ff;
-    }
-  }
-  @keyframes flicker {
-    0%,
-    100% {
-      opacity: 1;
-    }
-    50% {
-      opacity: 0.92;
-    }
-  }
   @keyframes fadeIn {
     from {
       opacity: 0;
@@ -93,7 +59,7 @@
   @keyframes slideUp {
     from {
       opacity: 0;
-      transform: translateY(20px);
+      transform: translateY(12px);
     }
     to {
       opacity: 1;
@@ -122,54 +88,25 @@
 
 /* ─── Sci-fi panel ──────────────────────────────────────────────────────────── */
 @utility sci-panel {
-  @apply relative bg-panel border border-border rounded-sm;
+  @apply relative bg-panel border border-border rounded-lg;
   box-shadow:
-    0 4px 24px rgba(0, 0, 0, 0.6),
-    inset 0 1px 0 rgba(0, 212, 255, 0.08);
-  &::before {
-    content: '';
-    position: absolute;
-    width: 12px;
-    height: 12px;
-    border-color: var(--cyan);
-    border-style: solid;
-  }
-  &::after {
-    content: '';
-    position: absolute;
-    width: 12px;
-    height: 12px;
-    border-color: var(--cyan);
-    border-style: solid;
-  }
-  &::before {
-    top: -1px;
-    left: -1px;
-    border-width: 2px 0 0 2px;
-  }
-  &::after {
-    bottom: -1px;
-    right: -1px;
-    border-width: 0 2px 2px 0;
-  }
+    0 4px 20px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 @utility holo-card {
   /* Hover glow card */
-  @apply sci-panel transition-all duration-300 cursor-pointer;
+  @apply sci-panel transition-all duration-200 cursor-pointer;
   &:hover {
-    @apply border-cyan-400;
+    @apply border-cyan-500/60;
     box-shadow:
-      0 8px 32px rgba(0, 0, 0, 0.8),
-      0 0 20px rgba(0, 212, 255, 0.15);
-    transform: translateY(-2px);
+      0 6px 20px rgba(0, 0, 0, 0.6),
+      0 0 12px rgba(6, 182, 212, 0.1);
+    transform: translateY(-1px);
   }
 }
 @utility glow-text {
-  /* Glow text */
-  text-shadow:
-    0 0 8px rgba(0, 212, 255, 0.6),
-    0 0 20px rgba(0, 212, 255, 0.3);
-  color: var(--cyan);
+  /* Cockpit accented text */
+  @apply text-cyan-400 font-semibold;
 }
 @utility stat-bar-track {
   /* Stat bar */

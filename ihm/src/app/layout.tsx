@@ -67,10 +67,10 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: '/favicon.png', type: 'image/png' },
+      { url: '/favicon.svg', type: 'image/svg+xml' },
       { url: '/brand/starvis.png', type: 'image/png', sizes: '1254x1254' },
     ],
-    apple: [{ url: '/brand/starvis.png', type: 'image/png' }],
+    apple: [{ url: '/favicon.svg', type: 'image/svg+xml' }],
   },
   robots: { index: true, follow: true },
 };

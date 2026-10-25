@@ -11,6 +11,9 @@ import {
   Box,
   ShoppingCart,
   Loader2,
+  Crosshair,
+  Shield,
+  Wrench,
 } from 'lucide-react';
 import { useEnv } from '@/contexts/EnvContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -18,6 +21,7 @@ import { fetchEntityNexus } from '@/services/universe-api';
 import type { UniverseEntityNexus } from '@/types/universe';
 import { fNumber } from '@/utils/formatters';
 import { localizeCatalogLabel } from '@/lib/catalog-labels';
+import { groupLoadoutSlots } from '@/lib/loadout-formatter';
 import { ShipHoloViewer } from '@/components/ship/ShipHoloViewer';
 
 interface EntityNexusSheetProps {
@@ -343,42 +347,78 @@ export function EntityNexusSheet({ category, id, open, onClose, onOpenModel3D }:
                     </div>
                   )}
 
-                  {/* Connected Relationships: Default Loadout with Pivots */}
+                  {/* Connected Relationships: Structured Default Loadout with Pivots */}
                   {connections?.loadout && connections.loadout.length > 0 && (
-                    <div className="space-y-3">
-                      <h3 className="text-xs font-mono-sc uppercase text-slate-400 tracking-wider flex items-center gap-2">
-                        <Zap size={14} className="text-amber-400" />
-                        <span>{t('loadout_title')}</span>
-                      </h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {connections.loadout.map((slot, i) => (
-                          <div
-                            key={i}
-                            onClick={() =>
-                              slot.component_uuid &&
-                              handlePivot('components', slot.component_uuid, slot.component_name || '')
-                            }
-                            className={`p-2.5 rounded-lg border transition-all flex items-center justify-between ${
-                              slot.component_uuid
-                                ? 'bg-slate-900/60 hover:bg-cyan-950/50 border-slate-800 hover:border-cyan-500/40 cursor-pointer group'
-                                : 'bg-slate-900/20 border-slate-800/40 opacity-75'
-                            }`}
-                          >
-                            <div className="min-w-0 pr-2">
-                              <span className="text-[10px] font-mono-sc text-slate-500 block truncate">
-                                {slot.port_name} ({slot.port_type})
-                              </span>
-                              <span className="text-xs font-semibold text-white font-rajdhani truncate block group-hover:text-cyan-300">
-                                {slot.component_name || localizeCatalogLabel(language, slot.component_type) || t('cat_components')}
-                              </span>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                        <h3 className="text-xs font-mono-sc uppercase text-slate-300 tracking-wider flex items-center gap-2">
+                          <Zap size={14} className="text-amber-400" />
+                          <span>{t('loadout_title')}</span>
+                        </h3>
+                        <span className="text-[11px] font-mono-sc text-slate-500">
+                          {connections.loadout.length} {language === 'fr' ? 'emplacements' : 'slots'}
+                        </span>
+                      </div>
+
+                      <div className="space-y-3.5">
+                        {groupLoadoutSlots(connections.loadout as any, language).map((section) => {
+                          const IconComp =
+                            section.iconName === 'crosshair'
+                              ? Crosshair
+                              : section.iconName === 'shield'
+                                ? Shield
+                                : section.iconName === 'zap'
+                                  ? Zap
+                                  : Wrench;
+
+                          return (
+                            <div key={section.key} className="space-y-2">
+                              <div className="flex items-center gap-2 text-[11px] font-mono-sc uppercase text-cyan-400 tracking-wider">
+                                <IconComp size={12} className="text-cyan-400 shrink-0" />
+                                <span>{section.title}</span>
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {section.slots.map((slot, i) => (
+                                  <div
+                                    key={i}
+                                    onClick={() =>
+                                      slot.component_uuid &&
+                                      handlePivot('components', slot.component_uuid, slot.component_name || '')
+                                    }
+                                    className={`p-2.5 rounded-lg border transition-all flex items-center justify-between ${
+                                      slot.component_uuid
+                                        ? 'bg-slate-900/60 hover:bg-cyan-950/40 border-slate-800/80 hover:border-cyan-500/50 cursor-pointer group'
+                                        : 'bg-slate-900/20 border-slate-800/40 opacity-70'
+                                    }`}
+                                  >
+                                    <div className="min-w-0 pr-2">
+                                      <span className="text-[10px] font-mono-sc text-slate-400 block truncate group-hover:text-slate-300">
+                                        {slot.humanPortName}
+                                      </span>
+                                      <span className="text-xs font-semibold text-white font-rajdhani truncate block group-hover:text-cyan-300">
+                                        {slot.component_name ||
+                                          localizeCatalogLabel(language, slot.component_type) ||
+                                          t('cat_components')}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      {slot.component_grade && (
+                                        <span className="px-1 py-0.2 rounded text-[9px] font-mono-sc bg-slate-800 text-slate-400 border border-slate-700">
+                                          {slot.component_grade}
+                                        </span>
+                                      )}
+                                      {slot.component_size && (
+                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-mono-sc bg-cyan-950/70 text-cyan-300 border border-cyan-800/60 font-bold">
+                                          T{slot.component_size}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
-                            {slot.component_size && (
-                              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono-sc bg-slate-800 text-slate-300 border border-slate-700 shrink-0">
-                                T{slot.component_size}
-                              </span>
-                            )}
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   )}

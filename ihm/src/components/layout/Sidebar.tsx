@@ -7,7 +7,6 @@ import {
   Bug,
   CalendarClock,
   Code2,
-  Compass,
   Info,
   Orbit,
   Scale,
@@ -33,7 +32,6 @@ type DrawerLink = {
 
 const DRAWER_LINKS: DrawerLink[] = [
   { to: '/', icon: Orbit, labelKey: 'nav_nexus', exact: true },
-  { to: '/starmap', icon: Compass, labelKey: 'nav_starmap' },
   { to: '/developer', icon: Code2, labelKey: 'nav_developer' },
   { to: '/changelog', icon: Scroll, labelKey: 'nav_changelog' },
   { to: '/about', icon: Info, labelKey: 'menu_about' },

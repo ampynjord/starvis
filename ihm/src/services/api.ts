@@ -539,6 +539,7 @@ export const api = {
     list: (p: { env?: string; limit?: number; offset?: number; entity_type?: string; change_type?: string; markers_only?: boolean }) =>
       get<{ data: ChangelogEntry[]; total: number }>('/changelog', p),
     summary: (env?: string) => get<ChangelogSummary>('/changelog/summary', { env }),
+    gameVersions: (env?: string) => get<{ data: any[] }>('/game-versions', { env }),
   },
 
   // ─── Loadout simulator ─────────────────────────────────────────────

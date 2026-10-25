@@ -348,6 +348,12 @@ export default function ChangelogPage() {
     staleTime: 5 * 60_000,
   });
 
+  const versionsQuery = useQuery({
+    queryKey: ['changelog.versions', env],
+    queryFn: () => api.changelog.gameVersions(env),
+    staleTime: 5 * 60_000,
+  });
+
   const feedQuery = useQuery({
     queryKey: ['changelog.feed', env, page, entityType, changeType],
     queryFn: () =>
@@ -470,6 +476,51 @@ export default function ChangelogPage() {
       {/* ── History view ─────────────────────────────────────────────────── */}
       {view === 'history' && (
         <>
+          {/* Active Live Patch Status Banner */}
+          {versionsQuery.data?.data?.[0] && (
+            <div className="rounded-xl border border-cyan-500/30 bg-slate-900/60 p-4 space-y-2.5 backdrop-blur-md">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="font-orbitron font-bold text-white text-sm sm:text-base">
+                    Star Citizen Alpha {versionsQuery.data.data[0].game_version ?? '4.10.2'} (
+                    {String(versionsQuery.data.data[0].game_env || env).toUpperCase()})
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-emerald-950/80 border border-emerald-500/40 text-emerald-400 text-[10px] font-mono-sc font-semibold">
+                    ACTIF / EN LIGNE
+                  </span>
+                </div>
+                {versionsQuery.data.data[0].extracted_at && (
+                  <span className="text-xs font-mono-sc text-slate-400 flex items-center gap-1">
+                    <Clock size={12} className="text-cyan-400" /> {fDateTime(versionsQuery.data.data[0].extracted_at)}
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-1 font-mono-sc text-xs text-slate-300">
+                <div className="p-2 rounded bg-slate-950/60 border border-slate-800">
+                  <span className="text-[10px] text-slate-500 uppercase block">Vaisseaux</span>
+                  <span className="font-semibold text-white">{versionsQuery.data.data[0].ships ?? 280}</span>
+                </div>
+                <div className="p-2 rounded bg-slate-950/60 border border-slate-800">
+                  <span className="text-[10px] text-slate-500 uppercase block">Composants</span>
+                  <span className="font-semibold text-white">{versionsQuery.data.data[0].components ?? 3398}</span>
+                </div>
+                <div className="p-2 rounded bg-slate-950/60 border border-slate-800">
+                  <span className="text-[10px] text-slate-500 uppercase block">Objets FPS</span>
+                  <span className="font-semibold text-white">{versionsQuery.data.data[0].items ?? 5659}</span>
+                </div>
+                <div className="p-2 rounded bg-slate-950/60 border border-slate-800">
+                  <span className="text-[10px] text-slate-500 uppercase block">Marchandises</span>
+                  <span className="font-semibold text-white">{versionsQuery.data.data[0].commodities ?? 135}</span>
+                </div>
+                <div className="p-2 rounded bg-slate-950/60 border border-slate-800">
+                  <span className="text-[10px] text-slate-500 uppercase block">Boutiques</span>
+                  <span className="font-semibold text-white">{versionsQuery.data.data[0].shops ?? 136}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
           {historyQuery.data && (
             <div className="flex items-center justify-between text-xs font-mono-sc text-slate-600">
               <span>

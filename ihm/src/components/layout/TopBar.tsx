@@ -10,9 +10,9 @@ import {
   Settings,
   Menu,
   Orbit,
-  Compass,
   Code2,
   Scroll,
+  Shield,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
@@ -21,6 +21,7 @@ import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { ADMIN_ROLE } from '@/lib/app-constants';
 
 export function TopBar({
   onMenuToggle,
@@ -59,7 +60,6 @@ export function TopBar({
 
   const navLinks = [
     { href: '/', label: t('nav_nexus'), icon: Orbit },
-    { href: '/starmap', label: t('nav_starmap'), icon: Compass },
     { href: '/developer', label: t('nav_developer'), icon: Code2 },
     { href: '/changelog', label: t('nav_changelog'), icon: Scroll },
   ];
@@ -224,6 +224,16 @@ export function TopBar({
                     transition={{ duration: 0.12 }}
                     className="absolute right-0 top-full mt-2 w-48 bg-slate-950 border border-cyan-500/30 rounded-xl shadow-xl z-50 overflow-hidden backdrop-blur-xl"
                   >
+                    {user.role === ADMIN_ROLE && (
+                      <Link
+                        href="/admin"
+                        onMouseDown={() => setUserMenuOpen(false)}
+                        className="flex items-center gap-2.5 px-3.5 py-2.5 text-xs font-mono-sc text-cyan-400 hover:bg-cyan-950/50 hover:text-cyan-300 transition-colors border-b border-slate-800/80"
+                      >
+                        <Shield size={14} />
+                        {t('menu_admin')}
+                      </Link>
+                    )}
                     <Link
                       href="/profile"
                       onMouseDown={() => setUserMenuOpen(false)}
