@@ -17,6 +17,7 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "db:generate": "npm run generate --workspace=@starvis/db",
     "export:dataset": "npm run export:dataset --workspace=@starvis/extractor",
+    "sync:community": "npm run sync:community --workspace=@starvis/extractor",
     "db:push": "npm run push --workspace=@starvis/db",
     "db:studio": "npm run studio --workspace=@starvis/db",
     "quality:audit": "npm run quality:audit:contracts && npm run quality:audit:static-data -- --db-only && npm run quality:audit:data && npm run quality:audit:truth && npm run quality:audit:ui",

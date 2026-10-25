@@ -7,8 +7,6 @@ import Image from 'next/image';
 import {
   ArrowRight,
   BarChart3,
-  Bot,
-  BrainCircuit,
   BookOpen,
   Bug,
   ChevronRight,
@@ -17,6 +15,7 @@ import {
   Clock,
   Crosshair,
   Database,
+  ExternalLink,
   Globe,
   Layers,
   Minus,
@@ -39,7 +38,6 @@ import { useEnv } from '@/contexts/EnvContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
-import { OpenAiButton } from '@/components/ui/OpenAiButton';
 import { PageShell } from '@/components/ui/PageShell';
 import { NAV_GROUPS } from '@/components/layout/navigation';
 import { fDate, fNumber } from '@/utils/formatters';
@@ -125,29 +123,29 @@ const PLATFORM_PILLARS = [
   {
     to: '/about',
     icon: Database,
-    label: 'Unified Hub',
-    sub: 'One Star Citizen data platform instead of scattered tools',
+    label: 'Multi-Source Hub',
+    sub: 'P4K DataForge + Official RSI Scraper + UEX 2.0',
     accent: 'text-cyan-400',
-  },
-  {
-    to: '/ai',
-    icon: BrainCircuit,
-    label: 'AI Layer',
-    sub: 'Natural-language access to Starvis tools and data',
-    accent: 'text-violet-400',
   },
   {
     to: '/developer',
     icon: Code2,
-    label: 'External API',
-    sub: 'Authenticated REST API, Swagger and project tokens',
+    label: 'Public REST API',
+    sub: 'Open /api/v1 endpoints & Swagger without required key',
     accent: 'text-emerald-400',
   },
   {
-    to: '/discord',
-    icon: Bot,
-    label: 'Discord Bot',
-    sub: 'Slash commands connected to Starvis data',
+    to: '/developer#datasets',
+    icon: Layers,
+    label: 'Bulk Data Packs',
+    sub: 'Pre-computed JSON bundles per patch with SHA-256',
+    accent: 'text-violet-400',
+  },
+  {
+    to: '/changelog',
+    icon: BookOpen,
+    label: 'Patch History',
+    sub: 'Track LIVE/PTU extractions and version diffs',
     accent: 'text-blue-400',
   },
   {
@@ -389,7 +387,7 @@ export default function HomePage() {
             <div>
               <p className="font-mono-sc text-[9px] uppercase tracking-widest text-cyan-700">Platform direction</p>
               <h2 className="mt-1 font-orbitron text-sm font-bold uppercase tracking-widest text-cyan-300">
-                Database, tools, API and AI in one place
+                Open Data Engine, Calculators & Public API
               </h2>
             </div>
             <Link href="/about" className="sci-btn-ghost px-3 py-2 text-xs">
@@ -397,8 +395,7 @@ export default function HomePage() {
             </Link>
           </div>
           <p className="font-rajdhani text-sm leading-relaxed text-slate-400">
-            Starvis is built to reduce the need for countless disconnected Star Citizen tools. The same extracted data feeds the web interface, calculators, corporation workflows,
-            Discord commands, external API and AI assistant.
+            Starvis cross-references internal Star Citizen game files (Data.p4k), the official RSI website (Ship Matrix, Starmap, Galactapedia, Comm-Links, Roadmap), UEX Corp 2.0 economy data and bilingual EN/FR translations into one standardized platform.
           </p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             {PLATFORM_PILLARS.map(({ to, icon: Icon, label, sub, accent }) => (
@@ -411,27 +408,27 @@ export default function HomePage() {
           </div>
         </div>
 
-        <div className="sci-panel border-violet-900/50 bg-violet-950/10 p-5">
+        <div className="sci-panel border-cyan-900/50 bg-cyan-950/10 p-5">
           <div className="mb-4 flex items-center gap-2">
-            <BrainCircuit size={16} className="text-violet-400" />
+            <Code2 size={16} className="text-cyan-400" />
             <div>
-              <p className="font-mono-sc text-[9px] uppercase tracking-widest text-violet-500">AI layer</p>
-              <h2 className="font-orbitron text-sm font-bold uppercase tracking-widest text-slate-200">Ask the data directly</h2>
+              <p className="font-mono-sc text-[9px] uppercase tracking-widest text-cyan-500">Community Developers</p>
+              <h2 className="font-orbitron text-sm font-bold uppercase tracking-widest text-slate-200">Public API & Bulk Datasets</h2>
             </div>
           </div>
           <p className="font-rajdhani text-sm leading-relaxed text-slate-400">
-            The assistant uses Starvis tools and data to compare, summarize, recommend and guide you toward the right page, command or API endpoint.
+            Query `/api/v1/*` directly without an API key, explore interactive Swagger documentation, or download pre-computed JSON data packs per patch for your Star Citizen community project.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
-            <OpenAiButton
-              prompt="What can Starvis AI do with ships, economy, lore, corporation tools, Discord and the external API?"
-              className="rounded-sm border border-violet-800/50 bg-violet-950/30 px-3 py-2 font-mono-sc text-xs text-violet-300 transition-colors hover:border-violet-500/70 hover:bg-violet-950/50"
+            <Link
+              href="/developer"
+              className="rounded-sm border border-cyan-800/50 bg-cyan-950/30 px-3 py-2 font-mono-sc text-xs text-cyan-300 transition-colors hover:border-cyan-500/70 hover:bg-cyan-950/50"
             >
-              Ask Starvis AI
-            </OpenAiButton>
-            <Link href="/ai" className="sci-btn-ghost px-3 py-2 text-xs">
-              AI Roadmap
+              API & Datasets
             </Link>
+            <a href="/api-docs" target="_blank" rel="noreferrer" className="sci-btn-ghost px-3 py-2 text-xs">
+              Swagger UI <ExternalLink size={12} />
+            </a>
           </div>
         </div>
       </div>

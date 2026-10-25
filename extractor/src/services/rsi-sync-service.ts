@@ -15,7 +15,7 @@ import { scrapeCommLinkContent, scrapeGalactapediaContent } from '../scrapers/rs
 
 const RSI_ORGS_API_URL = `${RSI_BASE_URL}/api/orgs/getOrgs`;
 
-interface RsiOrgSummary {
+export interface RsiOrgSummary {
   symbol: string;
   name: string;
   logoUrl: string | null;
@@ -167,7 +167,7 @@ function parseOrganizationsHtml(html: string): RsiOrgSummary[] {
   return orgs;
 }
 
-async function fetchOrganizationBySymbol(symbol: string): Promise<RsiOrgSummary | null> {
+export async function fetchOrganizationBySymbol(symbol: string): Promise<RsiOrgSummary | null> {
   const res = await fetch(RSI_ORGS_API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'User-Agent': SCRAPER_USER_AGENT },
@@ -292,6 +292,13 @@ export class RsiSyncService {
         const rsiUrl = `${RSI_BASE_URL}/galactapedia/article/${id}-${slug}`;
 
         const content = article.body ? markdownToHtml(String(article.body)) : null;
+        const plainExcerpt = article.body
+          ? String(article.body)
+              .replace(/[#*_`[\]()]/g, '')
+              .replace(/\s+/g, ' ')
+              .trim()
+              .slice(0, 480)
+          : null;
 
         try {
           const result = await conn.query<any>(
@@ -304,9 +311,30 @@ export class RsiSyncService {
              ON CONFLICT (id) DO UPDATE SET
                slug=EXCLUDED.slug, title=EXCLUDED.title,
                content=COALESCE(EXCLUDED.content, rsi.galactapedia.content),
+               excerpt=COALESCE(EXCLUDED.excerpt, rsi.galactapedia.excerpt),
                rsi_url=EXCLUDED.rsi_url,
+               web_url=COALESCE(EXCLUDED.web_url, rsi.galactapedia.web_url),
                updated_at=NOW()`,
-            [id, slug, title, content, null, null, null, null, null, null, null, null, null, rsiUrl, null, null, null, json(article)],
+            [
+              id,
+              slug,
+              title,
+              content,
+              plainExcerpt,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              rsiUrl,
+              null,
+              rsiUrl,
+              null,
+              json(article),
+            ],
           );
           if (result.rowCount === 1) stats.inserted++;
           else stats.updated++;
@@ -939,6 +967,132 @@ export class RsiSyncService {
       }
     } finally {
       conn.release();
+    }
+    return stats;
+  }
+
+  // ── RSI Roadmap (Release View) & Server Status ────────────────────────────
+
+  async syncRoadmap(onProgress?: (msg: string) => void): Promise<{ synced: number; errors: number }> {
+    const stats = { synced: 0, errors: 0 };
+    const ROADMAP_URL = `${RSI_BASE_URL}/api/roadmap/v1/boards/1`;
+
+    let data: any;
+    try {
+      const res = await fetch(ROADMAP_URL, {
+        headers: { 'User-Agent': SCRAPER_USER_AGENT, Accept: 'application/json' },
+        signal: AbortSignal.timeout(30_000),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      data = await res.json();
+    } catch (err) {
+      logger.warn(`[rsi-roadmap] fetch error: ${(err as Error).message}`);
+      stats.errors++;
+      return stats;
+    }
+
+    const board = data?.data;
+    if (!board || !Array.isArray(board.releases)) {
+      stats.errors++;
+      return stats;
+    }
+
+    const categoriesMap = new Map<number, string>();
+    for (const cat of board.categories ?? []) {
+      if (cat?.id && cat?.name) categoriesMap.set(Number(cat.id), String(cat.name));
+    }
+
+    const conn = await this.pool.connect();
+    try {
+      for (const rel of board.releases) {
+        const releaseId = String(rel.id ?? rel.name ?? '');
+        if (!releaseId) continue;
+        const cards = (rel.cards ?? []).map((card: any) => ({
+          id: card.id,
+          name: card.name,
+          slug: card.url_slug ?? null,
+          description: card.description ?? null,
+          body: card.body ?? null,
+          status: card.status ?? (rel.released ? 'Released' : 'Tentative'),
+          released: Boolean(card.released ?? rel.released),
+          categoryId: card.category_id ?? null,
+          categoryName: categoriesMap.get(Number(card.category_id)) ?? null,
+          thumbnailUrl: resolveImageSrc(card.thumbnail?.urls?.large ?? card.thumbnail?.urls?.rect ?? card.thumbnail?.urls?.source ?? null),
+          timeModified: card.time_modified ?? null,
+        }));
+
+        const deterministicUuid = `00000000-0000-4000-8001-${String(rel.id ?? stats.synced)
+          .replace(/[^0-9a-f]/gi, '0')
+          .padStart(12, '0')
+          .slice(-12)}`;
+
+        await conn.query(
+          `INSERT INTO game.game_insights (uuid, env, category, source_type, class_name, name, raw_json, extracted_at)
+           VALUES ($1, 'live', 'rsi_roadmap', 'rsi_roadmap', $2, $3, $4::jsonb, NOW())
+           ON CONFLICT (uuid, env, category) DO UPDATE SET
+             class_name = EXCLUDED.class_name,
+             name = EXCLUDED.name,
+             source_type = EXCLUDED.source_type,
+             raw_json = EXCLUDED.raw_json,
+             extracted_at = NOW()`,
+          [
+            deterministicUuid,
+            `release:${releaseId}`,
+            String(rel.name ?? releaseId),
+            JSON.stringify({
+              id: rel.id,
+              name: rel.name,
+              slug: rel.url_slug ?? null,
+              description: rel.description ?? null,
+              released: Boolean(rel.released),
+              status: rel.status ?? null,
+              order: rel.order ?? 0,
+              cardsCount: cards.length,
+              cards,
+            }),
+          ],
+        );
+        stats.synced++;
+      }
+      onProgress?.(`  [rsi-roadmap] ${stats.synced} releases synced`);
+    } catch (err) {
+      logger.warn(`[rsi-roadmap] upsert error: ${(err as Error).message}`);
+      stats.errors++;
+    } finally {
+      conn.release();
+    }
+    return stats;
+  }
+
+  async syncServerStatus(onProgress?: (msg: string) => void): Promise<{ synced: number; errors: number }> {
+    const stats = { synced: 0, errors: 0 };
+    const STATUS_URL = 'https://status.robertsspaceindustries.com/index.json';
+    try {
+      const res = await fetch(STATUS_URL, {
+        headers: { 'User-Agent': SCRAPER_USER_AGENT, Accept: 'application/json' },
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const statusJson = (await res.json()) as { summaryStatus?: string; systems?: unknown[] };
+      const conn = await this.pool.connect();
+      try {
+        await conn.query(
+          `INSERT INTO game.game_insights (uuid, env, category, source_type, class_name, name, raw_json, extracted_at)
+           VALUES ('00000000-0000-4000-8002-000000000001', 'live', 'rsi_status', 'rsi_status', 'current', $1, $2::jsonb, NOW())
+           ON CONFLICT (uuid, env, category) DO UPDATE SET
+             name = EXCLUDED.name,
+             raw_json = EXCLUDED.raw_json,
+             extracted_at = NOW()`,
+          [String(statusJson?.summaryStatus ?? 'unknown'), JSON.stringify(statusJson)],
+        );
+        stats.synced = 1;
+        onProgress?.(`  [rsi-status] status=${statusJson?.summaryStatus ?? 'unknown'}`);
+      } finally {
+        conn.release();
+      }
+    } catch (err) {
+      logger.warn(`[rsi-status] error: ${(err as Error).message}`);
+      stats.errors++;
     }
     return stats;
   }

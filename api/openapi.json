@@ -13675,6 +13675,135 @@
           }
         }
       }
+    },
+    "/api/v1/refineries": {
+      "get": {
+        "tags": ["System"],
+        "summary": "List refinery stations and ore yield bonuses",
+        "operationId": "getRefineries",
+        "parameters": [
+          {
+            "name": "env",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "live"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Refinery terminals and yield bonuses"
+          }
+        }
+      }
+    },
+    "/api/v1/datasets": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Get bulk dataset manifest for community tools",
+        "operationId": "getDatasetManifest",
+        "parameters": [
+          {
+            "name": "env",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "live"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Available bulk JSON dataset packs and counts"
+          }
+        }
+      }
+    },
+    "/api/v1/datasets/{pack}": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Download a complete bulk dataset pack (ships, components, items, commodities, shops, manufacturers, translations, refineries)",
+        "operationId": "getDatasetPack",
+        "parameters": [
+          {
+            "name": "pack",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "env",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "live"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Complete dataset pack JSON"
+          },
+          "404": {
+            "description": "Dataset pack not found"
+          }
+        }
+      }
+    },
+    "/api/v1/rsi/roadmap": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Get Official RSI Roadmap Release View releases and cards",
+        "operationId": "getRsiRoadmap",
+        "responses": {
+          "200": {
+            "description": "Official RSI Roadmap releases and deliverables"
+          }
+        }
+      }
+    },
+    "/api/v1/rsi/status": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Get Official RSI Live / Platform / Persistent Universe server status",
+        "operationId": "getRsiStatus",
+        "responses": {
+          "200": {
+            "description": "Official RSI status snapshot"
+          }
+        }
+      }
+    },
+    "/api/v1/rsi/organizations/{symbol}": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Lookup an official Star Citizen organization by SID/symbol on RSI",
+        "operationId": "getRsiOrganization",
+        "parameters": [
+          {
+            "name": "symbol",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Official RSI organization profile"
+          },
+          "404": {
+            "description": "Organization not found"
+          }
+        }
+      }
     }
   }
 }

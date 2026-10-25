@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Bot, BrainCircuit, CheckCircle2, Code2, Database, FlaskConical, Rocket, ShieldAlert, Wrench } from 'lucide-react';
+import { CheckCircle2, Code2, Database, FlaskConical, GitBranch, Rocket, ShieldAlert, Wrench } from 'lucide-react';
 import { EarlyAccessNotice } from '@/components/ui/EarlyAccessNotice';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PageShell } from '@/components/ui/PageShell';
@@ -19,8 +19,8 @@ const LANES = [
     border: 'border-emerald-900/50',
     items: [
       'Public database browsing for ships, components, items, commodities, missions, manufacturers, lore and locations.',
-      'Authenticated external API access with Swagger, API tokens and admin supervision.',
-      'Discord bot command map connected to the Starvis API and data status.',
+      'Public REST API v1 (/api/v1/*) with Swagger UI (/api-docs) and optional high-throughput Bearer tokens.',
+      'Official RSI website scraping (Ship Matrix, Galactapedia, Comm-Links Alexandria, ARK Starmap) cross-referenced with Data.p4k.',
     ],
   },
   {
@@ -31,8 +31,8 @@ const LANES = [
     border: 'border-amber-900/50',
     items: [
       'Calculators for trade, mining, crafting and FPS values while extraction and validation continue.',
-      'Fleet manager, corporation bank and tactics workflows.',
-      'Starvis AI assistant across the web app, Discord and external API guidance.',
+      'Bilingual EN/FR localization and historical patch snapshots (?version=4.x.x).',
+      'Pre-computed Bulk JSON Data Packs (/api/v1/datasets) for desktop apps and overlays.',
     ],
   },
   {
@@ -42,9 +42,9 @@ const LANES = [
     dot: 'bg-red-400',
     border: 'border-red-900/50',
     items: [
-      'Shop locations are extracted, but shop inventory is disabled until a reliable source is available.',
       'Economy and calculator outputs need stronger confidence labels, source metadata and real data audits.',
       'Starmap and universe data need continued position, hierarchy and visual validation against extracted data.',
+      'Cross-referencing UEX 2.0 terminals and refinery yields with internal DataForge location UUIDs.',
     ],
   },
   {
@@ -54,18 +54,17 @@ const LANES = [
     dot: 'bg-cyan-400',
     border: 'border-cyan-900/50',
     items: [
-      'Deeper AI tool-use, page-aware context and confidence-aware answers.',
-      'More external API examples, SDK-style snippets and project onboarding.',
-      'Better quality audit dashboards for real user flows, API usage and data freshness.',
+      'Extended RSI scraping: Roadmap Release View, Loaner Ship Matrix, Storefront MSRP and Organization lookups.',
+      'More external API examples, SDK-style snippets and bulk dataset feeds for community projects.',
+      'Automated patch extraction and diffing across LIVE and PTU builds.',
     ],
   },
 ];
 
 const AREAS = [
   { href: '/about', icon: Database, label: 'Platform overview' },
-  { href: '/ai', icon: BrainCircuit, label: 'AI assistant' },
-  { href: '/developer', icon: Code2, label: 'External API' },
-  { href: '/discord', icon: Bot, label: 'Discord bot' },
+  { href: '/developer', icon: Code2, label: 'API & Datasets' },
+  { href: '/changelog', icon: GitBranch, label: 'Patch History' },
   { href: '/report-bug', icon: Wrench, label: 'Report issue' },
 ];
 

@@ -667,4 +667,231 @@ export class GameDataService {
       extracted_at: r.extracted_at,
     };
   }
+
+  async getRefineries(env = 'live'): Promise<Record<string, unknown>> {
+    const prisma = this.getClient(env);
+    const [terminals, yields] = await Promise.all([
+      prisma.$queryRawUnsafe<Row[]>(
+        toPostgres(
+          `SELECT uex_id, name, nickname, code, star_system, planet, orbit, moon, city, space_station, outpost, company_name, is_available, game_version
+           FROM game.uex_terminals
+           WHERE env = ? AND (type ILIKE '%refinery%' OR name ILIKE '%refinery%')
+           ORDER BY star_system ASC, name ASC`,
+        ),
+        env,
+      ),
+      prisma.$queryRawUnsafe<Row[]>(
+        toPostgres(
+          `SELECT uex_id, entity_uuid AS commodity_uuid, entity_name AS commodity_name, terminal_uex_id, terminal_name, price AS yield_bonus, raw_json, date_modified
+           FROM game.uex_market_prices
+           WHERE env = ? AND resource = 'refineries_yields'
+           ORDER BY terminal_name ASC, entity_name ASC`,
+        ),
+        env,
+      ),
+    ]);
+    return {
+      env,
+      terminals_count: terminals.length,
+      yields_count: yields.length,
+      terminals,
+      yields,
+    };
+  }
+
+  async getDatasetManifest(env = 'live'): Promise<Record<string, unknown>> {
+    const overview = await this.getPublicStats(env);
+    const packs = [
+      {
+        pack: 'ships',
+        description: 'All ships and ground/gravlev vehicles with P4K stats and RSI Matrix cross-ref',
+        count: overview.ships,
+      },
+      {
+        pack: 'components',
+        description: 'All vehicle components (shields, quantum drives, weapons, power plants, coolers)',
+        count: overview.components,
+      },
+      { pack: 'items', description: 'All FPS weapons, armor, clothing, attachments, consumables and utilities', count: overview.items },
+      { pack: 'commodities', description: 'All tradeable and minable commodities with UEX market metadata', count: overview.commodities },
+      { pack: 'shops', description: 'In-game shops and UEX terminals', count: overview.shops },
+      { pack: 'manufacturers', description: 'All ship, weapon and item manufacturers', count: overview.manufacturers },
+      { pack: 'translations', description: 'Bilingual EN/FR localization entries', count: null },
+      { pack: 'refineries', description: 'Refinery terminals and ore yield bonuses', count: null },
+    ].map((p) => ({
+      ...p,
+      endpoint: `/api/v1/datasets/${p.pack}?env=${encodeURIComponent(env)}`,
+    }));
+
+    return {
+      env,
+      game_version: overview.game_version ?? null,
+      last_extraction: overview.last_extraction ?? null,
+      packs,
+    };
+  }
+
+  async getDatasetPack(pack: string, env = 'live'): Promise<Record<string, unknown> | null> {
+    const prisma = this.getClient(env);
+    const key = pack.toLowerCase();
+    let rows: Row[] = [];
+
+    if (key === 'ships') {
+      rows = await prisma.$queryRawUnsafe<Row[]>(toPostgres('SELECT * FROM game.ships WHERE env = ? ORDER BY name ASC'), env);
+    } else if (key === 'components') {
+      rows = await prisma.$queryRawUnsafe<Row[]>(toPostgres('SELECT * FROM game.components WHERE env = ? ORDER BY name ASC'), env);
+    } else if (key === 'items') {
+      rows = await prisma.$queryRawUnsafe<Row[]>(toPostgres('SELECT * FROM game.items WHERE env = ? ORDER BY name ASC'), env);
+    } else if (key === 'commodities') {
+      rows = await prisma.$queryRawUnsafe<Row[]>(toPostgres('SELECT * FROM game.commodities WHERE env = ? ORDER BY name ASC'), env);
+    } else if (key === 'shops') {
+      rows = await prisma.$queryRawUnsafe<Row[]>(toPostgres('SELECT * FROM game.shops WHERE env = ? ORDER BY name ASC'), env);
+    } else if (key === 'manufacturers') {
+      rows = await prisma.$queryRawUnsafe<Row[]>('SELECT * FROM game.manufacturers ORDER BY name ASC');
+    } else if (key === 'translations') {
+      const res = await this.getTranslations({ env, page: 1, limit: 200 });
+      return { pack: key, env, total: res.total, count: res.data.length, data: res.data };
+    } else if (key === 'refineries') {
+      const ref = await this.getRefineries(env);
+      return { pack: key, ...ref };
+    } else {
+      return null;
+    }
+
+    return {
+      pack: key,
+      env,
+      count: rows.length,
+      data: rows,
+    };
+  }
+
+  async getRsiRoadmap(): Promise<Row[]> {
+    const prisma = this.getClient('live');
+    const rows = await prisma.$queryRawUnsafe<Row[]>(
+      `SELECT class_name AS release_key, name AS release_name, raw_json, extracted_at
+       FROM game.game_insights
+       WHERE category = 'rsi_roadmap'
+       ORDER BY extracted_at DESC, name DESC`,
+    );
+    return rows.map((r) => {
+      const parsed = typeof r.raw_json === 'string' ? JSON.parse(r.raw_json) : (r.raw_json as Record<string, unknown> | null);
+      return {
+        release_key: r.release_key,
+        release_name: r.release_name,
+        ...(parsed ?? {}),
+        synced_at: r.extracted_at,
+      };
+    });
+  }
+
+  async getRsiStatus(): Promise<Record<string, unknown>> {
+    const prisma = this.getClient('live');
+    const rows = await prisma.$queryRawUnsafe<Row[]>(
+      `SELECT name AS summary_status, raw_json, extracted_at
+       FROM game.game_insights
+       WHERE category = 'rsi_status' AND class_name = 'current'
+       LIMIT 1`,
+    );
+    const r = rows[0];
+    if (r) {
+      const parsed = typeof r.raw_json === 'string' ? JSON.parse(r.raw_json) : (r.raw_json as Record<string, unknown> | null);
+      return {
+        summary_status: r.summary_status,
+        synced_at: r.extracted_at,
+        ...(parsed ?? {}),
+      };
+    }
+    return { summary_status: 'unknown', synced_at: null };
+  }
+
+  async getRsiOrganization(symbol: string): Promise<Record<string, unknown> | null> {
+    const cleanSymbol = symbol.trim().toUpperCase();
+    if (!cleanSymbol || !/^[A-Z0-9_-]{1,20}$/.test(cleanSymbol)) return null;
+
+    const prisma = this.getClient('live');
+    const cached = await prisma.$queryRawUnsafe<Row[]>(
+      toPostgres(
+        `SELECT raw_json, extracted_at
+         FROM game.game_insights
+         WHERE category = 'rsi_org' AND UPPER(class_name) = ?
+           AND extracted_at >= NOW() - INTERVAL '24 hours'
+         LIMIT 1`,
+      ),
+      cleanSymbol,
+    );
+    if (cached[0]?.raw_json) {
+      const parsed = typeof cached[0].raw_json === 'string' ? JSON.parse(cached[0].raw_json) : cached[0].raw_json;
+      return { ...(parsed as Record<string, unknown>), cached_at: cached[0].extracted_at };
+    }
+
+    const res = await fetch('https://robertsspaceindustries.com/api/orgs/getOrgs', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (compatible; StarvisBot/2.0; +https://starvis.ampynjord.bzh)',
+      },
+      body: JSON.stringify({
+        sort: 'SIZE',
+        commitment: '',
+        roleplay: '',
+        membercount: '',
+        archetype: '',
+        language: '',
+        recruiting: '',
+        search: cleanSymbol,
+        pagesize: 5,
+        page: 1,
+      }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) return null;
+    const payload = (await res.json()) as { success?: number; data?: { html?: string } };
+    const html = payload?.data?.html ?? '';
+    const cells = html.split(/<div class="org-cell[^"]*">/);
+    for (const cell of cells.slice(1)) {
+      const orgName = cell.match(/class="trans-03s name">([^<]+)/)?.[1]?.trim() ?? null;
+      const orgSymbol = cell.match(/class="symbol">([^<]+)/)?.[1]?.trim() ?? null;
+      if (!orgName || !orgSymbol || orgSymbol.toUpperCase() !== cleanSymbol) continue;
+      const logoSrc = cell.match(/<span class="thumb">\s*<img src="([^"]+)"/)?.[1] ?? null;
+      const logoUrl = logoSrc ? (logoSrc.startsWith('http') ? logoSrc : `https://robertsspaceindustries.com${logoSrc}`) : null;
+      const memberCountRaw = cell.match(/Members: <\/span><span class="value">([^<]+)/)?.[1]?.trim() ?? null;
+      const orgData = {
+        symbol: orgSymbol,
+        name: orgName,
+        logo_url: logoUrl,
+        archetype: cell.match(/Archetype: <\/span><span class="value">([^<]+)/)?.[1]?.trim() ?? null,
+        language: cell.match(/Lang: <\/span><span class="value">([^<]+)/)?.[1]?.trim() ?? null,
+        commitment: cell.match(/Commitment: <\/span><span class="value[^"]*">([^<]+)/)?.[1]?.trim() ?? null,
+        recruiting: cell.match(/Recruiting: <\/span><span class="value[^"]*">([^<]+)/)?.[1]?.trim() === 'Yes',
+        roleplay: cell.match(/Role play: <\/span><span class="value[^"]*">([^<]+)/)?.[1]?.trim() === 'Yes',
+        member_count: memberCountRaw ? Number.parseInt(memberCountRaw, 10) : null,
+        rsi_url: `https://robertsspaceindustries.com/orgs/${orgSymbol}`,
+      };
+      const hexSuffix = Buffer.from(cleanSymbol, 'utf8').toString('hex').padStart(12, '0').slice(-12);
+      const deterministicUuid = `00000000-0000-4000-8003-${hexSuffix}`;
+      await prisma.$executeRawUnsafe(
+        toPostgres(
+          `INSERT INTO game.game_insights (uuid, env, category, source_type, class_name, name, subtype, value_numeric, value_text, raw_json, extracted_at)
+           VALUES (?, 'live', 'rsi_org', 'rsi_orgs', ?, ?, ?, ?, ?, ?::jsonb, NOW())
+           ON CONFLICT (uuid, env, category) DO UPDATE SET
+             name = EXCLUDED.name,
+             subtype = EXCLUDED.subtype,
+             value_numeric = EXCLUDED.value_numeric,
+             value_text = EXCLUDED.value_text,
+             raw_json = EXCLUDED.raw_json,
+             extracted_at = NOW()`,
+        ),
+        deterministicUuid,
+        cleanSymbol,
+        orgData.name,
+        orgData.archetype ?? 'Organization',
+        orgData.member_count ?? 0,
+        orgData.language ?? null,
+        JSON.stringify(orgData),
+      );
+      return orgData;
+    }
+    return null;
+  }
 }

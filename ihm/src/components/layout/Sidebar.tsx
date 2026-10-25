@@ -6,7 +6,6 @@ import {
   AlertTriangle,
   BookOpen,
   Bug,
-  Code2,
   ExternalLink,
   Home,
   Info,
@@ -154,14 +153,6 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
           <NavGroup key={group.id} label={group.label} items={group.items} onNavigate={onClose} />
         ))}
 
-        {hasDeveloperAccess(user?.role) && (
-          <NavGroup
-            label="Developer"
-            items={[{ to: '/developer', icon: Code2, label: 'API Access', earlyAccess: true }]}
-            onNavigate={onClose}
-          />
-        )}
-
         {user?.role === ADMIN_ROLE && (
           <NavGroup
             label="Administration"
@@ -211,8 +202,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
               <span className="font-mono-sc">Sign in</span>
             </Link>
             <p className="text-[10px] leading-snug text-slate-700">
-              Create a free account to unlock connected features: profile, corporation tools, reports, API access
-              and AI assistant.
+              Create a free account to unlock connected features: profile, bug reports and extended API rate-limit tokens.
             </p>
             <Link href="/register" className="inline-flex text-[10px] font-mono-sc text-cyan-600 hover:text-cyan-400">
               Create account

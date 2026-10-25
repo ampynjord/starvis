@@ -140,4 +140,64 @@ export function mountSystemRoutes(router: Router, deps: RouteDependencies): void
       sendDataWithETag(req, res, row);
     }),
   );
+
+  router.get(
+    '/api/v1/refineries',
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const data = await gameDataService!.getRefineries(getQueryEnv(req));
+      sendDataWithETag(req, res, data);
+    }),
+  );
+
+  router.get(
+    '/api/v1/datasets',
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const data = await gameDataService!.getDatasetManifest(getQueryEnv(req));
+      sendDataWithETag(req, res, data);
+    }),
+  );
+
+  router.get(
+    '/api/v1/datasets/:pack',
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const data = await gameDataService!.getDatasetPack(req.params.pack, getQueryEnv(req));
+      if (!data) {
+        return void res.status(404).json({ success: false, error: 'Dataset pack not found' });
+      }
+      sendDataWithETag(req, res, data);
+    }),
+  );
+
+  router.get(
+    '/api/v1/rsi/roadmap',
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const data = await gameDataService!.getRsiRoadmap();
+      sendDataWithETag(req, res, data);
+    }),
+  );
+
+  router.get(
+    '/api/v1/rsi/status',
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const data = await gameDataService!.getRsiStatus();
+      sendDataWithETag(req, res, data);
+    }),
+  );
+
+  router.get(
+    '/api/v1/rsi/organizations/:symbol',
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const data = await gameDataService!.getRsiOrganization(req.params.symbol);
+      if (!data) {
+        return void res.status(404).json({ success: false, error: 'Organization not found' });
+      }
+      sendDataWithETag(req, res, data);
+    }),
+  );
 }

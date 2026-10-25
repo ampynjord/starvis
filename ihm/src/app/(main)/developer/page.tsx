@@ -24,7 +24,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PageShell } from '@/components/ui/PageShell';
 import { EarlyAccessNotice } from '@/components/ui/EarlyAccessNotice';
-import { OpenAiButton } from '@/components/ui/OpenAiButton';
 import { useAuth } from '@/contexts/AuthContext';
 import { ADMIN_ROLE, DEVELOPER_ROLE, hasDeveloperAccess } from '@/lib/app-constants';
 
@@ -177,11 +176,9 @@ export default function DeveloperPage() {
   }, [hasAccess, loading]);
 
   const swaggerLabel = useMemo(() => {
-    if (!user) return 'Login required';
-    if (!hasAccess) return 'Developer role required';
-    if (isAdmin) return 'Full admin documentation';
-    return 'Non-admin documentation';
-  }, [hasAccess, isAdmin, user]);
+    if (isAdmin) return 'Full admin + public documentation';
+    return 'Public OpenAPI documentation';
+  }, [isAdmin]);
 
   const generateToken = async () => {
     setGenerating(true);
@@ -273,32 +270,93 @@ export default function DeveloperPage() {
   return (
     <PageShell size="xl" className="p-4 md:p-6">
       <PageHeader
-        eyebrow="Developer"
-        title="API Access"
-        subtitle="External API, Swagger documentation, project tokens and AI endpoints for tools built on Starvis data."
+        eyebrow="Open Data & Developer Hub"
+        title="API & Datasets"
+        subtitle="Public REST API v1, interactive OpenAPI/Swagger documentation, versioned JSON data packs and optional high-throughput tokens."
         actions={
-          hasAccess ? (
-            <a
-              href="/api-docs"
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-2 rounded border border-cyan-700/50 bg-cyan-900/30 px-3 py-2 font-mono-sc text-xs text-cyan-300 transition-colors hover:border-cyan-500/70 hover:bg-cyan-900/50"
-            >
-              <BookOpen size={14} />
-              Open Swagger
-              <ExternalLink size={11} className="text-cyan-600" />
-            </a>
-          ) : undefined
+          <a
+            href="/api-docs"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-2 rounded border border-cyan-700/50 bg-cyan-900/30 px-3 py-2 font-mono-sc text-xs text-cyan-300 transition-colors hover:border-cyan-500/70 hover:bg-cyan-900/50"
+          >
+            <BookOpen size={14} />
+            Open Swagger
+            <ExternalLink size={11} className="text-cyan-600" />
+          </a>
         }
       />
 
       <EarlyAccessNotice className="mb-4">
-        External API schemas are stabilizing, but Starvis is still in early access. Use Swagger as the source of truth and expect some data fields to evolve with extraction improvements.
+        All read endpoints under `/api/v1/*` and `/api-docs` are publicly accessible without an API key. Optional Bearer tokens are available below for high-throughput community integrations.
       </EarlyAccessNotice>
+
+      <section className="sci-panel p-5">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.55fr)]">
+          <div>
+            <p className="mb-2 font-mono-sc text-[9px] uppercase tracking-widest text-cyan-600">Platform surface</p>
+            <h2 className="font-orbitron text-lg font-bold uppercase tracking-widest text-cyan-300">Build on Starvis instead of rebuilding Starvis</h2>
+            <p className="mt-3 max-w-3xl font-rajdhani text-sm leading-relaxed text-slate-400">
+              Cross-referenced Star Citizen data from `Data.p4k` (DataForge), the official RSI website (Ship Matrix, Store, Starmap, Galactapedia, Comm-Links, Roadmap), UEX Corp 2.0 and bilingual EN/FR localization—available via REST or single-request JSON packs.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-start gap-2 lg:justify-end">
+            <a href="/api-docs" target="_blank" rel="noreferrer" className="sci-btn-primary px-3 py-2 text-xs">
+              Open Swagger
+            </a>
+            <a href="/api/v1/datasets" target="_blank" rel="noreferrer" className="sci-btn-ghost px-3 py-2 text-xs">
+              Bulk Datasets JSON <ExternalLink size={12} />
+            </a>
+          </div>
+        </div>
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {API_USE_CASES.map(({ icon: Icon, title, text }) => (
+            <div key={title} className="rounded-sm border border-slate-800 bg-slate-950/35 p-3">
+              <Icon size={15} className="mb-2 text-cyan-400" />
+              <p className="font-orbitron text-[10px] font-bold uppercase tracking-widest text-slate-300">{title}</p>
+              <p className="mt-2 font-rajdhani text-xs leading-relaxed text-slate-500">{text}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <div className="grid gap-4 lg:grid-cols-2" id="datasets">
+        <Section title="Quickstart — Public REST API (No Key Required)" icon={Terminal}>
+          <div className="space-y-3">
+            <p className="font-rajdhani text-sm text-slate-400">
+              Query any `/api/v1/*` endpoint directly. Pass `?version=live|ptu|4.x.x` to query a specific patch or `?lang=fr` for French localization where supported.
+            </p>
+            <CodeBlock>{`# Public anonymous request (no API key needed)
+curl "${apiBaseUrl}/ships?limit=20&page=1"
+
+# Query a specific patch & bilingual translations
+curl "${apiBaseUrl}/ships?version=4.10.1&limit=5"
+curl "${apiBaseUrl}/translations?search=aurora&limit=10"`}</CodeBlock>
+          </div>
+        </Section>
+
+        <Section title="Base & Cross-Referenced Endpoints" icon={BookOpen}>
+          <CodeBlock>{`${apiBaseUrl}/ships
+${apiBaseUrl}/components
+${apiBaseUrl}/items
+${apiBaseUrl}/commodities
+${apiBaseUrl}/refineries
+${apiBaseUrl}/missions
+${apiBaseUrl}/missions/brokers
+${apiBaseUrl}/locations
+${apiBaseUrl}/starmap/positions
+${apiBaseUrl}/translations
+${apiBaseUrl}/datasets
+${apiBaseUrl}/rsi/roadmap
+${apiBaseUrl}/rsi/loaners
+${apiBaseUrl}/rsi/organizations/ CIG
+${apiBaseUrl}/rsi/status`}</CodeBlock>
+        </Section>
+      </div>
 
       {!loading && user && !hasAccess && (
         <div className="grid gap-4 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
-          <Section title="Restricted developer area" icon={Lock}>
+          <Section title="Optional: High-Throughput API Token Access" icon={Lock}>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-sm border border-slate-800 bg-slate-950/40 px-3 py-3">
                 <p className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">Session</p>
@@ -312,13 +370,12 @@ export default function DeveloperPage() {
             <div className="flex items-start gap-3 rounded-sm border border-amber-800/40 bg-amber-950/10 px-4 py-3">
               <Lock size={14} className="mt-0.5 shrink-0 text-amber-500" />
               <p className="font-rajdhani text-sm leading-relaxed text-slate-400">
-                Swagger, API token generation and developer tooling are reserved for <span className="font-semibold text-cyan-300">developer</span> and{' '}
-                <span className="font-semibold text-cyan-300">admin</span> accounts. Send an access request for external API usage.
+                Public `/api/v1/*` and Swagger `/api-docs` are already unlocked for everyone. If you need a dedicated Bearer token with higher rate limits for a production server or bot, request the <span className="font-semibold text-cyan-300">developer</span> role.
               </p>
             </div>
           </Section>
 
-          <Section title="External API access request" icon={Send}>
+          <Section title="High-Throughput Token Request" icon={Send}>
             {requestLoading ? (
               <p className="font-mono-sc text-xs text-slate-600">Loading current request...</p>
             ) : accessRequest ? (
@@ -350,7 +407,7 @@ export default function DeveloperPage() {
                     minLength={40}
                     maxLength={2000}
                     rows={7}
-                    placeholder="Explain your project, expected API usage, Discord bot/tool name, data needs, and how you plan to respect Starvis rate limits and attribution."
+                    placeholder="Explain your project, expected API usage, tool name, data needs, and how you plan to respect Starvis rate limits and attribution."
                     disabled={requestSubmitting}
                     className="w-full resize-y rounded-sm border border-slate-800 bg-slate-950/70 px-3 py-2 font-rajdhani text-sm text-slate-200 outline-none transition-colors placeholder:text-slate-700 focus:border-cyan-700/70 disabled:opacity-50"
                   />
@@ -384,67 +441,35 @@ export default function DeveloperPage() {
 
       {!loading && user && !hasAccess ? null : (
         <>
-
-      <section className="sci-panel p-5">
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.55fr)]">
-          <div>
-            <p className="mb-2 font-mono-sc text-[9px] uppercase tracking-widest text-cyan-600">Platform surface</p>
-            <h2 className="font-orbitron text-lg font-bold uppercase tracking-widest text-cyan-300">Build on Starvis instead of rebuilding Starvis</h2>
-            <p className="mt-3 max-w-3xl font-rajdhani text-sm leading-relaxed text-slate-400">
-              The external API is the integration layer for third-party projects: bots, community tools, corporation dashboards, audits and AI workflows can reuse the same extracted and normalized data as the web interface.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-start gap-2 lg:justify-end">
-            <OpenAiButton
-              prompt="Help me build a third-party integration with the Starvis external API. Explain authentication, useful endpoints and one example workflow."
-              className="rounded-sm border border-violet-800/50 bg-violet-950/20 px-3 py-2 font-mono-sc text-xs text-violet-300 transition-colors hover:border-violet-500/70 hover:bg-violet-950/40"
-            >
-              Ask AI for an integration plan
-            </OpenAiButton>
-            <a href="/api-docs" target="_blank" rel="noreferrer" className="sci-btn-primary px-3 py-2 text-xs">
-              Open Swagger
-            </a>
-          </div>
-        </div>
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {API_USE_CASES.map(({ icon: Icon, title, text }) => (
-            <div key={title} className="rounded-sm border border-slate-800 bg-slate-950/35 p-3">
-              <Icon size={15} className="mb-2 text-cyan-400" />
-              <p className="font-orbitron text-[10px] font-bold uppercase tracking-widest text-slate-300">{title}</p>
-              <p className="mt-2 font-rajdhani text-xs leading-relaxed text-slate-500">{text}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
         <div className="space-y-4">
           <Section title="Access state" icon={ShieldCheck}>
             <div className="grid gap-3 sm:grid-cols-3">
               <div className="rounded-sm border border-slate-800 bg-slate-950/40 px-3 py-3">
                 <p className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">Session</p>
-                <p className="mt-1 truncate font-orbitron text-sm text-slate-200">{loading ? 'Checking...' : user ? user.username : 'Not connected'}</p>
+                <p className="mt-1 truncate font-orbitron text-sm text-slate-200">{loading ? 'Checking...' : user ? user.username : 'Public / Anonymous'}</p>
               </div>
               <div className="rounded-sm border border-slate-800 bg-slate-950/40 px-3 py-3">
                 <p className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">Role</p>
-                <p className={`mt-1 font-orbitron text-sm ${hasAccess ? 'text-cyan-300' : 'text-slate-500'}`}>{roleLabel}</p>
+                <p className={`mt-1 font-orbitron text-sm ${hasAccess ? 'text-cyan-300' : 'text-slate-400'}`}>{roleLabel}</p>
               </div>
               <div className="rounded-sm border border-slate-800 bg-slate-950/40 px-3 py-3">
-                <p className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">Swagger</p>
-                <p className={`mt-1 font-orbitron text-sm ${hasAccess ? 'text-emerald-400' : 'text-amber-400'}`}>{swaggerLabel}</p>
+                <p className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">Swagger & REST API</p>
+                <p className="mt-1 font-orbitron text-sm text-emerald-400">{swaggerLabel}</p>
               </div>
             </div>
 
             <div className="rounded-sm border border-slate-800/80 bg-slate-950/30 px-4">
-              <StatusRow ok={hasAccess} label="Swagger UI" />
-              <StatusRow ok={hasAccess} label="API token generation" />
+              <StatusRow ok={true} label="Public REST API (/api/v1/*)" />
+              <StatusRow ok={true} label="Swagger UI (/api-docs)" />
+              <StatusRow ok={hasAccess} label="Optional Bearer API token generation" />
               <StatusRow ok={isAdmin} label="Admin routes in Swagger" />
             </div>
 
             {!user && !loading && (
-              <div className="flex flex-wrap items-center gap-3 rounded-sm border border-amber-800/40 bg-amber-950/10 px-4 py-3">
-                <UserRound size={14} className="text-amber-500" />
-                <p className="flex-1 font-rajdhani text-sm text-slate-400">Sign in with a developer or admin account to unlock Swagger and token generation.</p>
+              <div className="flex flex-wrap items-center gap-3 rounded-sm border border-cyan-800/40 bg-cyan-950/10 px-4 py-3">
+                <UserRound size={14} className="text-cyan-500" />
+                <p className="flex-1 font-rajdhani text-sm text-slate-400">Public API access requires no login. Sign in only if you need to generate a dedicated Bearer token for higher rate limits.</p>
                 <Link href="/login?redirect=/developer" className="rounded border border-slate-700 px-3 py-2 font-mono-sc text-xs text-slate-300 hover:border-cyan-700/60">
                   Login
                 </Link>

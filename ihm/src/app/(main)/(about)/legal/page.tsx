@@ -17,8 +17,6 @@ const HOST_NAME = env('LEGAL_HOST_NAME', 'EU VPS hosting provider');
 const HOST_ADDRESS = env('LEGAL_HOST_ADDRESS', 'European Union');
 const HOST_PHONE = env('LEGAL_HOST_PHONE', 'Available from the hosting provider legal notice.');
 const SITE_URL = env('NEXT_PUBLIC_SITE_URL', 'https://starvis.ampynjord.bzh');
-const CHAT_PROVIDER = env('NEXT_PUBLIC_CHAT_PROVIDER_NAME', 'Mistral AI');
-const CHAT_PROVIDER_URL = env('NEXT_PUBLIC_CHAT_PROVIDER_URL', 'https://mistral.ai');
 
 export const metadata: Metadata = {
   title: 'Legal notice and privacy policy - STARVIS',
@@ -96,8 +94,8 @@ export default function LegalPage() {
       <Section title="About the project">
         <P>
           <span className="font-semibold text-slate-200">STARVIS</span> is an unofficial, independent,
-          non-commercial community project for Star Citizen players. It provides searchable game data, calculators,
-          comparison tools, corporation tools, a Discord bot and an optional AI assistant.
+          non-commercial Open Data & Public API project for Star Citizen players and community developers. It provides
+          searchable game data, calculators, comparison tools, a public REST API and versioned JSON datasets.
         </P>
         <P>
           STARVIS is not an official Cloud Imperium Games product and is not affiliated with, endorsed by,
@@ -110,12 +108,12 @@ export default function LegalPage() {
         <P>
           The service is provided free of charge on a best-effort basis. Game data may be incomplete, outdated,
           approximate or affected by Star Citizen patches, extractor limitations, RSI website changes, cache delays
-          or AI/tooling errors.
+          or third-party community source updates.
         </P>
         <Ul
           items={[
             'Do not use STARVIS for illegal activity, harassment, automated abuse, credential sharing, scraping abuse or service disruption.',
-            'Do not submit unlawful, confidential, sensitive, defamatory or third-party personal data in bug reports, corporation notes, Discord prompts or AI chat messages.',
+            'Do not submit unlawful, confidential, sensitive, defamatory or third-party personal data in bug reports or account fields.',
             'Developer and API tokens are personal credentials. Store them securely and revoke or rotate them if exposed.',
             'External projects using STARVIS APIs are responsible for their own legal notices, privacy disclosures, rate limiting and data accuracy warnings.',
             'Access may be suspended or removed to protect the service, users, infrastructure, or third-party rights.',
@@ -166,8 +164,7 @@ export default function LegalPage() {
             'Security data: bcrypt password hash, session JWT, API JWT, email verification token hash, password reset token hash, encrypted 2FA secret and 2FA status.',
             'User content: bug report titles/descriptions/attachments, corporation memberships, ranks, fleet notes and moderation/admin updates.',
             'Technical data: server logs, request metadata required for security, error diagnosis and abuse prevention.',
-            'AI and Discord data: prompts/messages sent to the STARVIS assistant or Discord bot, limited to the message content needed to generate an answer.',
-            'Public game/community data: RSI organization data and public game data cached from public or game-derived sources.',
+            'Public game/community data: RSI organization data, UEX economy data and public game data cached from public or game-derived sources.',
           ]}
         />
 
@@ -176,8 +173,8 @@ export default function LegalPage() {
           items={[
             'Account creation, authentication and profile management: performance of the requested service.',
             'Email verification, password reset, 2FA, API token access, rate limiting, logging and abuse prevention: security and legitimate interest.',
-            'Bug reports, corporation tools and support requests: performance of the requested service and legitimate interest in maintaining the project.',
-            'AI assistant and Discord bot answers: user request and performance of the requested feature.',
+            'Bug reports and support requests: performance of the requested service and legitimate interest in maintaining the project.',
+            'Public API and dataset delivery: performance of the requested community data service.',
             'Legal notices, right-holder requests and compliance handling: legal obligation and legitimate interest.',
           ]}
         />
@@ -188,8 +185,6 @@ export default function LegalPage() {
             'STARVIS administrators can access account, support and moderation data when required to operate or secure the service.',
             `The hosting provider ${HOST_NAME} hosts the application, database and logs.`,
             'The configured SMTP provider processes email addresses and message metadata for verification, reset and notification emails.',
-            `${CHAT_PROVIDER} may process AI prompts and contextual messages when the AI assistant or Discord AI command is used.`,
-            'Discord may process messages and metadata when users interact with the STARVIS Discord bot.',
           ]}
         />
         <P>
@@ -205,7 +200,6 @@ export default function LegalPage() {
             '2FA secrets are kept while 2FA is configured and are deleted when 2FA is disabled.',
             'Bug reports and support exchanges are kept while useful for maintenance, security, audit history or legal defense, then deleted or anonymized.',
             'Server logs are kept only as long as needed for security, debugging and abuse prevention, according to the production logging configuration.',
-            'AI prompts are not intentionally stored by STARVIS outside technical logs, but may be processed by the AI provider according to its own service terms.',
           ]}
         />
 
@@ -228,8 +222,8 @@ export default function LegalPage() {
           users. It is configured as HttpOnly and Secure in production. It is not used for advertising or analytics.
         </P>
         <P>
-          Local storage may keep interface preferences such as cookie notice state, selected game environment,
-          chat panel size and theme/UI preferences. These values stay on your device and are not used for tracking.
+          Local storage may keep interface preferences such as cookie notice state, selected game environment
+          and theme/UI preferences. These values stay on your device and are not used for tracking.
         </P>
         <P>
           Declining the cookie notice only records the choice and does not disable the strictly necessary
@@ -237,15 +231,17 @@ export default function LegalPage() {
         </P>
       </Section>
 
-      <Section title="AI assistant transparency">
+      <Section title="Public API & Open Data transparency">
         <P>
-          The AI assistant is optional and restricted to authorized users. When used, messages and contextual prompts
-          are sent to {CHAT_PROVIDER} through its API endpoint ({CHAT_PROVIDER_URL}) to produce an answer. Do not send
-          passwords, API tokens, private keys, personal data, confidential information or third-party secrets in prompts.
+          The STARVIS REST API (`/api/v1/*`) and OpenAPI specification (`/api-docs`) are publicly accessible for read
+          operations without requiring an account. Optional Bearer tokens are available for registered community
+          developers who need higher rate limits.
         </P>
         <P>
-          The assistant may query a restricted read-only subset of STARVIS game tables. It is designed for convenience,
-          not as an authoritative legal, financial, medical, safety or operational decision system.
+          STARVIS aggregates and normalizes data from Star Citizen game files (`Data.p4k`), official Roberts Space
+          Industries web endpoints, UEX Corp 2.0 and community localization files (`SC-FR`). External projects
+          consuming STARVIS data must attribute Cloud Imperium Games / Roberts Space Industries in accordance with the
+          CIG Fandom FAQ.
         </P>
       </Section>
     </PageShell>

@@ -1,10 +1,9 @@
 import {
   BarChart3,
-  Bot,
   Boxes,
-  BrainCircuit,
   CalendarClock,
   ClipboardList,
+  Code2,
   Crosshair,
   Database,
   Factory,
@@ -41,8 +40,7 @@ export type NavGroupDef = {
 
 const PLATFORM_ITEMS: NavItemDef[] = [
   { to: '/about', icon: Database, label: 'About Starvis' },
-  { to: '/ai', icon: BrainCircuit, label: 'AI Assistant', earlyAccess: true },
-  { to: '/discord', icon: Bot, label: 'Discord Bot', earlyAccess: true },
+  { to: '/developer', icon: Code2, label: 'API & Datasets' },
   { to: '/roadmap', icon: CalendarClock, label: 'Roadmap' },
 ];
 
