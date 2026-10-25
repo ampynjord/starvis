@@ -235,6 +235,50 @@ async function installMobileFixtures(page: Page) {
 
     return route.fulfill({ json: { success: true, data: [] } });
   });
+
+  await page.route('**/api/v2/universe/**', async (route) => {
+    const url = new URL(route.request().url());
+    const path = url.pathname;
+    if (path.includes('/omni-search')) {
+      return route.fulfill({
+        json: {
+          success: true,
+          data: [
+            {
+              id: ship.uuid,
+              uuid: ship.uuid,
+              name: ship.name,
+              category: 'ships',
+              type: 'Vaisseau',
+              badge: { label: 'Flight Ready', color: 'emerald' },
+            },
+          ],
+        },
+      });
+    }
+    if (path.includes('/explore')) {
+      return route.fulfill({
+        json: {
+          success: true,
+          data: [
+            {
+              id: ship.uuid,
+              uuid: ship.uuid,
+              name: ship.name,
+              category: 'ships',
+              type: 'Vaisseau',
+              badge: { label: 'Flight Ready', color: 'emerald' },
+            },
+          ],
+          total: 1,
+          page: 1,
+          limit: 24,
+          pages: 1,
+        },
+      });
+    }
+    return route.fulfill({ json: { success: true, data: [] } });
+  });
 }
 
 async function expectNoShellHorizontalOverflow(page: Page) {
@@ -287,7 +331,7 @@ test.describe('@mobile responsive shell', () => {
   });
 
   for (const target of [
-    { path: '/', heading: /^STARVIS$/i },
+    { path: '/', heading: /STARVIS/i },
     { path: '/developer', heading: /^(Public API & Datasets|API & Datasets)$/i },
     { path: '/ships', heading: /^Ships$/i },
     { path: '/components', heading: /^Components$/i },
@@ -305,7 +349,7 @@ test.describe('@mobile responsive shell', () => {
       } else {
         await expect(page.getByText(target.text).first()).toBeVisible({ timeout: 15_000 });
       }
-      await expect(page.getByRole('button', { name: /search ships/i })).toBeVisible();
+      await expect(page.getByRole('button', { name: /search/i })).toBeVisible();
       await expect(page.getByLabel('Open menu')).toBeVisible();
       await expectNoShellHorizontalOverflow(page);
     });

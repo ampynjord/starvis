@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   Activity,
@@ -83,7 +84,11 @@ function NavGroup({ label, items, onNavigate }: { label: string; items: NavItemD
 export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { env, setEnv } = useEnv();
   const { user } = useAuth();
+  const [mounted, setMounted] = useState(false);
 
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   return (
     <>
@@ -92,7 +97,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
         // Desktop: static sidebar
         'md:relative md:translate-x-0 md:w-64',
         // Mobile: fixed drawer
-        'fixed inset-y-0 left-0 z-40 w-72',
+        'fixed inset-y-0 left-0 z-50 w-72',
         'transition-transform duration-300 ease-in-out',
         open ? 'translate-x-0' : '-translate-x-full',
         'shrink-0 flex flex-col border-r border-border bg-panel/95 backdrop-blur-sm',
@@ -153,7 +158,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
           <NavGroup key={group.id} label={group.label} items={group.items} onNavigate={onClose} />
         ))}
 
-        {user?.role === ADMIN_ROLE && (
+        {mounted && user?.role === ADMIN_ROLE && (
           <NavGroup
             label="Administration"
             items={[
@@ -169,7 +174,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
       {/* Footer */}
       <div className="px-4 py-3 border-t border-border space-y-2.5">
         {/* User or sign-in */}
-        {user ? (
+        {mounted && user ? (
           <Link
             href="/profile"
             className="flex items-center gap-2 group"
@@ -218,7 +223,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
           <Link href="/about" className="flex items-center gap-1 text-[10px] text-slate-700 hover:text-slate-500 transition-colors font-mono-sc">
             <Info size={9} /> About
           </Link>
-          {user && (
+          {mounted && user && (
             <Link href="/report-bug" className="flex items-center gap-1 text-[10px] text-slate-700 hover:text-slate-500 transition-colors font-mono-sc">
               <Bug size={9} /> Report bug
             </Link>

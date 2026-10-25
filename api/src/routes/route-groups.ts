@@ -25,6 +25,7 @@ import { mountShopRoutes } from './shops.js';
 import { mountSystemRoutes } from './system.js';
 import { mountTradeRoutes } from './trade.js';
 import type { RouteDependencies } from './types.js';
+import { mountUniverseNexusRoutes } from './universe-nexus.js';
 
 export type RouteMount = (router: import('express').Router, deps: RouteDependencies) => void;
 
@@ -65,6 +66,7 @@ export const routeGroups = [
       mountCalculateRoutes,
       mountTradeRoutes,
       mountCorrelationRoutes,
+      mountUniverseNexusRoutes,
     ],
   },
   {

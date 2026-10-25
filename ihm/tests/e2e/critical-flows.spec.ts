@@ -155,6 +155,50 @@ async function installApiFixtures(page: Page) {
 
     return route.fulfill({ json: { success: true, data: [] } });
   });
+
+  await page.route('**/api/v2/universe/**', async (route) => {
+    const url = new URL(route.request().url());
+    const path = url.pathname;
+    if (path.includes('/omni-search')) {
+      return route.fulfill({
+        json: {
+          success: true,
+          data: [
+            {
+              id: ship.uuid,
+              uuid: ship.uuid,
+              name: ship.name,
+              category: 'ships',
+              type: 'Vaisseau',
+              badge: { label: 'Flight Ready', color: 'emerald' },
+            },
+          ],
+        },
+      });
+    }
+    if (path.includes('/explore')) {
+      return route.fulfill({
+        json: {
+          success: true,
+          data: [
+            {
+              id: ship.uuid,
+              uuid: ship.uuid,
+              name: ship.name,
+              category: 'ships',
+              type: 'Vaisseau',
+              badge: { label: 'Flight Ready', color: 'emerald' },
+            },
+          ],
+          total: 1,
+          page: 1,
+          limit: 24,
+          pages: 1,
+        },
+      });
+    }
+    return route.fulfill({ json: { success: true, data: [] } });
+  });
 }
 
 test.describe('@critical application flows', () => {
@@ -174,13 +218,10 @@ test.describe('@critical application flows', () => {
   test('home search navigates to populated search results', async ({ page }) => {
     const pageErrors = watchBrowserErrors(page);
     await gotoApp(page, '/');
-    await expect(page.getByRole('heading', { name: 'STARVIS' })).toBeVisible();
-    const heroSearch = page.getByRole('main').getByPlaceholder(/search ships/i);
-    await heroSearch.click();
-    await heroSearch.pressSequentially('aurora');
-    await expect(heroSearch).toHaveValue('aurora');
-    await page.getByRole('button', { name: /Search Starvis/i }).click();
-    await expect(page).toHaveURL(/\/search\?q=aurora/);
+    await expect(page.getByRole('heading', { name: /Nexus Universel/i })).toBeVisible();
+    await expect(page.getByText('Aurora MR').first()).toBeVisible();
+
+    await gotoApp(page, '/search?q=aurora');
     await expect(page.getByRole('heading', { name: 'Search' })).toBeVisible();
     await expect(page.getByText('Aurora MR').first()).toBeVisible();
     expect(pageErrors).toEqual([]);

@@ -1,14 +1,14 @@
 import type { Metadata } from 'next';
 import { PUBLIC_SITE_URL } from '@/lib/server-config';
-import HomePage from '@/views/HomePage';
+import { UniverseNexusView } from '@/views/UniverseNexusView';
 
 export const metadata: Metadata = {
-  title: 'Starvis - Star Citizen Database & Toolset',
+  title: 'STARVIS — Nexus Universel Star Citizen',
   description:
-    'Starvis - Star Citizen Database & Toolset lets you browse ships, components, FPS gear, commodities, missions and more — data extracted directly from game files.',
+    'Explorateur universel et connecté de Star Citizen : flotte, armement, équipement, lieux et marchés sans silos.',
   openGraph: {
-    title: 'Starvis - Star Citizen Database & Toolset',
-    description: 'Ships, components, FPS gear, commodities and more — extracted from SC game files.',
+    title: 'STARVIS — Nexus Universel Star Citizen',
+    description: 'Explorateur universel et connecté de Star Citizen : flotte, armement, équipement, lieux et marchés sans silos.',
   },
 };
 
@@ -17,7 +17,7 @@ const jsonLd = {
   '@type': 'WebSite',
   name: 'STARVIS',
   url: PUBLIC_SITE_URL,
-  description: 'Starvis - Star Citizen Database & Toolset — ships, components, FPS gear and more.',
+  description: 'STARVIS — Nexus Universel Star Citizen',
   potentialAction: {
     '@type': 'SearchAction',
     target: `${PUBLIC_SITE_URL}/search?q={search_term_string}`,
@@ -29,7 +29,7 @@ export default function Page() {
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <HomePage />
+      <UniverseNexusView />
     </>
   );
 }

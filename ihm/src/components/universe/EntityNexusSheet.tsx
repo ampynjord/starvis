@@ -1,0 +1,416 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  X,
+  ArrowLeft,
+  Rocket,
+  Zap,
+  ExternalLink,
+  Box,
+  ShoppingCart,
+  Loader2,
+} from 'lucide-react';
+import { useEnv } from '@/contexts/EnvContext';
+import { fetchEntityNexus } from '@/services/universe-api';
+import type { UniverseEntityNexus } from '@/types/universe';
+import { fNumber } from '@/utils/formatters';
+import { ShipHoloViewer } from '@/components/ship/ShipHoloViewer';
+
+interface EntityNexusSheetProps {
+  category: 'ships' | 'components' | 'items' | 'locations' | 'commodities' | null;
+  id: string | null;
+  open: boolean;
+  onClose: () => void;
+  onOpenModel3D?: (ship: any) => void;
+}
+
+interface HistoryItem {
+  category: 'ships' | 'components' | 'items' | 'locations' | 'commodities';
+  id: string;
+  name: string;
+}
+
+export function EntityNexusSheet({ category, id, open, onClose, onOpenModel3D }: EntityNexusSheetProps) {
+  const { env } = useEnv();
+  const [data, setData] = useState<UniverseEntityNexus | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [show3D, setShow3D] = useState(false);
+
+  // Current entity target
+  const currentTarget = history.length > 0 ? history[history.length - 1] : category && id ? { category, id, name: '' } : null;
+
+  useEffect(() => {
+    setShow3D(false);
+    if (open && category && id) {
+      setHistory([{ category, id, name: '' }]);
+    } else if (!open) {
+      setHistory([]);
+      setData(null);
+    }
+  }, [open, category, id]);
+
+  useEffect(() => {
+    if (!currentTarget) return;
+
+    let active = true;
+    setLoading(true);
+
+    fetchEntityNexus(currentTarget.category, currentTarget.id, env)
+      .then((nexus) => {
+        if (active && nexus) {
+          setData(nexus);
+        }
+      })
+      .catch((err) => console.error('Failed to load nexus sheet', err))
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [currentTarget?.category, currentTarget?.id, env]);
+
+  const handlePivot = (newCategory: 'ships' | 'components' | 'items' | 'locations' | 'commodities', newId: string, newName = '') => {
+    setShow3D(false);
+    setHistory((prev) => [...prev, { category: newCategory, id: newId, name: newName }]);
+  };
+
+  const handleBack = () => {
+    setShow3D(false);
+    setHistory((prev) => prev.slice(0, -1));
+  };
+
+  if (!open || !currentTarget) return null;
+
+  const entity = data?.entity;
+  const connections = data?.connections;
+
+  return (
+    <AnimatePresence>
+      <div className="fixed inset-0 z-50 overflow-hidden">
+        {/* Backdrop */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm"
+          onClick={onClose}
+        />
+
+        {/* Slide-over Drawer */}
+        <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
+          <motion.div
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', damping: 28, stiffness: 280 }}
+            className="w-screen max-w-2xl bg-slate-950/95 border-l border-cyan-500/30 shadow-2xl backdrop-blur-2xl flex flex-col h-full text-slate-100 z-50"
+          >
+            {/* Header / Nav toolbar */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800/80 bg-slate-900/60">
+              <div className="flex items-center gap-3">
+                {history.length > 1 && (
+                  <button
+                    onClick={handleBack}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-800 hover:bg-cyan-950 border border-slate-700 text-xs font-mono-sc text-cyan-300 transition-colors"
+                  >
+                    <ArrowLeft size={13} />
+                    <span>Retour</span>
+                  </button>
+                )}
+                <span className="text-xs uppercase font-mono-sc tracking-widest text-cyan-400">
+                  Nexus 360° • {currentTarget.category}
+                </span>
+              </div>
+              <button
+                onClick={onClose}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/80 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Content area */}
+            <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6">
+              {loading ? (
+                <div className="flex flex-col items-center justify-center py-24 space-y-3">
+                  <Loader2 size={32} className="text-cyan-400 animate-spin" />
+                  <p className="text-xs font-mono-sc text-slate-500">Chargement de la fiche Nexus...</p>
+                </div>
+              ) : entity ? (
+                <>
+                  {/* Entity Hero */}
+                  <div className="space-y-4">
+                    {/* Thumbnail banner if available */}
+                    {entity.thumbnail && (
+                      <div className="relative w-full h-48 sm:h-56 rounded-xl overflow-hidden border border-slate-800 bg-slate-900">
+                        <img
+                          src={entity.thumbnail}
+                          alt={entity.name}
+                          className="w-full h-full object-cover object-center"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent" />
+                        {entity.production_status && (
+                          <div className="absolute top-3 right-3">
+                            <span
+                              className={`px-2.5 py-1 rounded-full text-xs font-mono-sc uppercase tracking-wider font-semibold border ${
+                                entity.production_status === 'lore'
+                                  ? 'bg-purple-950/90 text-purple-300 border-purple-600'
+                                  : entity.production_status === 'flight-ready'
+                                  ? 'bg-emerald-950/90 text-emerald-300 border-emerald-600'
+                                  : 'bg-amber-950/90 text-amber-300 border-amber-600'
+                              }`}
+                            >
+                              {entity.production_status}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Titles & Manufacturer */}
+                    <div>
+                      <div className="flex items-center gap-2 text-xs font-mono-sc text-slate-400">
+                        {entity.manufacturer_name && (
+                          <span className="text-cyan-400 font-medium">{entity.manufacturer_name}</span>
+                        )}
+                        {entity.role && <span>• {entity.role}</span>}
+                        {entity.type && <span>• {entity.type}</span>}
+                        {entity.system_code && <span>• Système {entity.system_code}</span>}
+                      </div>
+                      <h2 className="text-2xl sm:text-3xl font-bold font-rajdhani text-white mt-1">
+                        {entity.name}
+                      </h2>
+                    </div>
+
+                    {/* Actions bar (3D, Store...) */}
+                    {currentTarget.category === 'ships' && (
+                      <div className="flex flex-wrap items-center gap-2 pt-1">
+                        <button
+                          onClick={() => {
+                            setShow3D((v) => !v);
+                            if (onOpenModel3D) onOpenModel3D(entity);
+                          }}
+                          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono-sc transition-all ${
+                            show3D
+                              ? 'bg-cyan-500 text-slate-950 font-bold shadow-lg shadow-cyan-500/20'
+                              : 'bg-cyan-950/60 hover:bg-cyan-900/80 border border-cyan-500/40 text-cyan-300'
+                          }`}
+                        >
+                          <Box size={14} />
+                          <span>{show3D ? 'Fermer Holoviewer 3D' : 'Visionneuse 3D Holoviewer'}</span>
+                        </button>
+                        {entity.store_url && (
+                          <a
+                            href={entity.store_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 text-xs font-mono-sc transition-colors"
+                          >
+                            <span>Fiche RSI Officielle</span>
+                            <ExternalLink size={12} />
+                          </a>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Interactive 3D Holoviewer Container */}
+                    {currentTarget.category === 'ships' && show3D && (
+                      <div className="rounded-xl overflow-hidden border border-cyan-500/40 bg-slate-950 shadow-2xl mt-2">
+                        <ShipHoloViewer shipUuid={entity.uuid} shipName={entity.name} />
+                      </div>
+                    )}
+
+                    {/* Description */}
+                    {(entity.description || entity.sm_description) && (
+                      <p className="text-sm text-slate-300 leading-relaxed font-rajdhani border-l-2 border-cyan-500/50 pl-3 py-0.5">
+                        {entity.description || entity.sm_description}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Telemetry Physical Stats Grid */}
+                  {currentTarget.category === 'ships' && (
+                    <div className="space-y-3">
+                      <h3 className="text-xs font-mono-sc uppercase text-slate-400 tracking-wider flex items-center gap-2">
+                        <Rocket size={14} className="text-cyan-400" />
+                        <span>Télémétrie & Spécifications Physiques</span>
+                      </h3>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                        <div className="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
+                          <span className="text-[10px] font-mono-sc text-slate-500 uppercase block">Dimensions</span>
+                          <span className="text-sm font-semibold font-mono-sc text-white">
+                            {entity.size_y || '-'}m × {entity.size_x || '-'}m
+                          </span>
+                        </div>
+                        <div className="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
+                          <span className="text-[10px] font-mono-sc text-slate-500 uppercase block">Masse</span>
+                          <span className="text-sm font-semibold font-mono-sc text-white">
+                            {entity.mass ? `${fNumber(Math.round(entity.mass))} kg` : '-'}
+                          </span>
+                        </div>
+                        <div className="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
+                          <span className="text-[10px] font-mono-sc text-slate-500 uppercase block">Vitesse SCM / Max</span>
+                          <span className="text-sm font-semibold font-mono-sc text-white">
+                            {entity.scm_speed || '-'} / {entity.max_speed || '-'} m/s
+                          </span>
+                        </div>
+                        <div className="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
+                          <span className="text-[10px] font-mono-sc text-slate-500 uppercase block">Capacité Cargo</span>
+                          <span className="text-sm font-semibold font-mono-sc text-white">
+                            {entity.cargo_capacity ?? 0} SCU
+                          </span>
+                        </div>
+                        <div className="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
+                          <span className="text-[10px] font-mono-sc text-slate-500 uppercase block">Points de Coque</span>
+                          <span className="text-sm font-semibold font-mono-sc text-cyan-300">
+                            {entity.total_hp ? fNumber(entity.total_hp) : '-'} HP
+                          </span>
+                        </div>
+                        <div className="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
+                          <span className="text-[10px] font-mono-sc text-slate-500 uppercase block">Équipage Min/Max</span>
+                          <span className="text-sm font-semibold font-mono-sc text-white">
+                            {entity.crew_size || 1}
+                          </span>
+                        </div>
+                        <div className="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
+                          <span className="text-[10px] font-mono-sc text-slate-500 uppercase block">Carburant Quantique</span>
+                          <span className="text-sm font-semibold font-mono-sc text-white">
+                            {entity.quantum_fuel_capacity ? `${entity.quantum_fuel_capacity} M` : '-'}
+                          </span>
+                        </div>
+                        <div className="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
+                          <span className="text-[10px] font-mono-sc text-slate-500 uppercase block">DPS Armes Total</span>
+                          <span className="text-sm font-semibold font-mono-sc text-rose-300">
+                            {entity.weapon_damage_total ? fNumber(Math.round(entity.weapon_damage_total)) : '-'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Connected Relationships: Where to Buy in Game */}
+                  {connections?.purchasableAt && connections.purchasableAt.length > 0 && (
+                    <div className="space-y-3">
+                      <h3 className="text-xs font-mono-sc uppercase text-slate-400 tracking-wider flex items-center gap-2">
+                        <ShoppingCart size={14} className="text-emerald-400" />
+                        <span>Où l'acheter en jeu (Prix aUEC)</span>
+                      </h3>
+                      <div className="divide-y divide-slate-800/60 rounded-xl border border-slate-800 bg-slate-900/40 overflow-hidden">
+                        {connections.purchasableAt.map((shop, i) => (
+                          <div
+                            key={i}
+                            className="p-3 flex items-center justify-between hover:bg-slate-900/80 transition-colors"
+                          >
+                            <div>
+                              <span className="text-sm font-semibold text-white font-rajdhani block">
+                                {shop.shop_name}
+                              </span>
+                              <span className="text-xs font-mono-sc text-slate-400">
+                                {shop.city || shop.planet_moon || shop.location} • Système {shop.system || 'Stanton'}
+                              </span>
+                            </div>
+                            <div className="text-right">
+                              {shop.price_auec && (
+                                <span className="text-sm font-bold font-mono-sc text-emerald-400 block">
+                                  {fNumber(Math.round(shop.price_auec))} aUEC
+                                </span>
+                              )}
+                              {shop.rental_price_1d && (
+                                <span className="text-[11px] font-mono-sc text-slate-400">
+                                  Location: {fNumber(Math.round(shop.rental_price_1d))} aUEC/j
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Connected Relationships: Default Loadout with Pivots */}
+                  {connections?.loadout && connections.loadout.length > 0 && (
+                    <div className="space-y-3">
+                      <h3 className="text-xs font-mono-sc uppercase text-slate-400 tracking-wider flex items-center gap-2">
+                        <Zap size={14} className="text-amber-400" />
+                        <span>Équipement Installé par Défaut (Cliquez pour inspecter)</span>
+                      </h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {connections.loadout.map((slot, i) => (
+                          <div
+                            key={i}
+                            onClick={() =>
+                              slot.component_uuid &&
+                              handlePivot('components', slot.component_uuid, slot.component_name || slot.component_class_name)
+                            }
+                            className={`p-2.5 rounded-lg border transition-all flex items-center justify-between ${
+                              slot.component_uuid
+                                ? 'bg-slate-900/60 hover:bg-cyan-950/50 border-slate-800 hover:border-cyan-500/40 cursor-pointer group'
+                                : 'bg-slate-900/20 border-slate-800/40 opacity-75'
+                            }`}
+                          >
+                            <div className="min-w-0 pr-2">
+                              <span className="text-[10px] font-mono-sc text-slate-500 block truncate">
+                                {slot.port_name} ({slot.port_type})
+                              </span>
+                              <span className="text-xs font-semibold text-white font-rajdhani truncate block group-hover:text-cyan-300">
+                                {slot.component_name || slot.component_class_name}
+                              </span>
+                            </div>
+                            {slot.component_size && (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono-sc bg-slate-800 text-slate-300 border border-slate-700 shrink-0">
+                                T{slot.component_size}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Connected Relationships for Components: Equipped on Ships */}
+                  {connections?.equippedOn && connections.equippedOn.length > 0 && (
+                    <div className="space-y-3">
+                      <h3 className="text-xs font-mono-sc uppercase text-slate-400 tracking-wider flex items-center gap-2">
+                        <Rocket size={14} className="text-cyan-400" />
+                        <span>Installé d'origine sur ces vaisseaux (Cliquez pour pivoter)</span>
+                      </h3>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {connections.equippedOn.map((ship, i) => (
+                          <div
+                            key={i}
+                            onClick={() => handlePivot('ships', ship.uuid, ship.name)}
+                            className="p-2 rounded-lg bg-slate-900/60 hover:bg-cyan-950/50 border border-slate-800 hover:border-cyan-500/40 cursor-pointer transition-all flex items-center gap-2"
+                          >
+                            <div className="w-8 h-8 rounded bg-slate-950 shrink-0 overflow-hidden border border-slate-800">
+                              {ship.thumbnail ? (
+                                <img src={ship.thumbnail} alt={ship.name} className="w-full h-full object-cover" />
+                              ) : (
+                                <Rocket size={14} className="m-auto text-cyan-400" />
+                              )}
+                            </div>
+                            <span className="text-xs font-semibold text-white font-rajdhani truncate">
+                              {ship.name}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-center py-16 text-slate-500 font-mono-sc text-sm">
+                  Entité introuvable dans le Nexus.
+                </div>
+              )}
+            </div>
+          </motion.div>
+        </div>
+      </div>
+    </AnimatePresence>
+  );
+}

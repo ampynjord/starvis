@@ -13830,6 +13830,222 @@
           }
         }
       }
+    },
+    "/api/v2/universe/omni-search": {
+      "get": {
+        "tags": ["Universe Nexus"],
+        "summary": "Omni-Search across all Star Citizen entities",
+        "operationId": "universeOmniSearch",
+        "description": "Fast multi-domain global search traversing ships, components, items, locations and commodities. Strips all placeholders and dev prefixes.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Search query"
+          },
+          {
+            "name": "env",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "live"
+            },
+            "description": "Game environment"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 20
+            },
+            "description": "Maximum items to return"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Omni-search results with rich badges and in-game names",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "count": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/universe/explore": {
+      "get": {
+        "tags": ["Universe Nexus"],
+        "summary": "Unified exploration across the universe",
+        "operationId": "universeExplore",
+        "description": "Unified pagination and dynamic facets across universe entity categories.",
+        "parameters": [
+          {
+            "name": "category",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["all", "ships", "components", "items", "locations", "commodities"],
+              "default": "all"
+            },
+            "description": "Category to explore"
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Full-text filter"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            },
+            "description": "Page number"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 24
+            },
+            "description": "Page size"
+          },
+          {
+            "name": "env",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "live"
+            },
+            "description": "Game environment"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated universe exploration with facets",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "page": {
+                      "type": "integer"
+                    },
+                    "limit": {
+                      "type": "integer"
+                    },
+                    "pages": {
+                      "type": "integer"
+                    },
+                    "facets": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/universe/entities/{category}/{id}": {
+      "get": {
+        "tags": ["Universe Nexus"],
+        "summary": "360° Pivot Nexus Sheet for an entity",
+        "operationId": "universeGetEntityNexus",
+        "description": "Returns an entity with its complete connected universe graph (loadouts, shops, locations, compatible vessels, price spreads).",
+        "parameters": [
+          {
+            "name": "category",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": ["ships", "components", "items", "locations", "commodities"]
+            },
+            "description": "Entity category"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "UUID or class name identifier"
+          },
+          {
+            "name": "env",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "live"
+            },
+            "description": "Game environment"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Complete 360° nexus entity with graph connections",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Entity not found"
+          }
+        }
+      }
     }
   }
 }
