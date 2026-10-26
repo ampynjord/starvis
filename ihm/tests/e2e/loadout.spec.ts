@@ -304,10 +304,9 @@ async function installLoadoutFixtures(page: Page) {
       return route.fulfill({
         json: {
           success: true,
-          data:
-            path.endsWith('/version')
-              ? { game_version: '4.10.2', game_env: 'live', extracted_at: '2026-10-01T10:00:00.000Z' }
-              : { ships: 3, components: 0, items: 0, commodities: 0 },
+          data: path.endsWith('/version')
+            ? { game_version: '4.10.2', game_env: 'live', extracted_at: '2026-10-01T10:00:00.000Z' }
+            : { ships: 3, components: 0, items: 0, commodities: 0 },
         },
       });
     }
