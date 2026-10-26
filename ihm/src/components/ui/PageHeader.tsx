@@ -25,18 +25,18 @@ export function PageHeader({
   eyebrow,
 }: Props) {
   return (
-    <header className="mb-4 flex flex-wrap items-start justify-between gap-4 border-b border-slate-800/70 pb-4">
+    <header className="mb-4 flex flex-wrap items-start justify-between gap-4 border-b border-slate-800/80 pb-4">
       <div className="min-w-0">
         {eyebrow && (
-          <p className="mb-1 font-mono-sc text-[9px] uppercase tracking-[0.28em] text-cyan-700">
+          <p className="mb-1 font-orbitron text-[9px] uppercase tracking-[0.28em] text-cyan-600/90">
             {eyebrow}
           </p>
         )}
-        <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase leading-tight">
+        <h1 className="font-rajdhani text-2xl font-bold text-cyan-400 tracking-wide uppercase leading-tight">
           {title}
         </h1>
         {subtitle && (
-          <p className="mt-0.5 max-w-2xl text-xs text-slate-600 font-mono-sc">{subtitle}</p>
+          <p className="mt-0.5 max-w-2xl text-xs text-slate-500 font-mono-sc">{subtitle}</p>
         )}
         {count != null && (
           <p className="mt-0.5 text-sm text-slate-500 font-mono-sc">

@@ -295,7 +295,7 @@ export default function DeveloperPage() {
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.55fr)]">
           <div>
             <p className="mb-2 font-mono-sc text-[9px] uppercase tracking-widest text-cyan-600">Platform surface</p>
-            <h2 className="font-orbitron text-lg font-bold uppercase tracking-widest text-cyan-300">Build on Starvis instead of rebuilding Starvis</h2>
+            <h2 className="font-rajdhani text-lg font-bold uppercase tracking-wide text-cyan-300">Build on Starvis instead of rebuilding Starvis</h2>
             <p className="mt-3 max-w-3xl font-rajdhani text-sm leading-relaxed text-slate-400">
               Cross-referenced Star Citizen data from `Data.p4k` (DataForge), the official RSI website (Ship Matrix, Store, Starmap, Galactapedia, Comm-Links, Roadmap), UEX Corp 2.0 and bilingual EN/FR localization—available via REST or single-request JSON packs.
             </p>

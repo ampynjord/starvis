@@ -1,11 +1,11 @@
 @import 'tailwindcss';
 
 @theme {
-  --color-void: #050b14;
-  --color-panel: #0a1628;
+  --color-void: #050911;
+  --color-panel: #0a1018;
 
-  --color-border: #1a3a5c;
-  --color-border-bright: #2a5f8f;
+  --color-border: #1e293b; /* slate-800 */
+  --color-border-bright: #334155; /* slate-700 */
 
   --color-cyan-50: #e0fffe;
   --color-cyan-100: #b8fffe;
@@ -39,14 +39,10 @@
 
   --background-size-grid-void: 32px 32px;
 
-  --shadow-cyan-glow:
-    0 1px 3px rgba(0, 0, 0, 0.5), 0 0 12px rgba(6, 182, 212, 0.12);
-  --shadow-amber-glow:
-    0 1px 3px rgba(0, 0, 0, 0.5), 0 0 12px rgba(245, 158, 11, 0.12);
-  --shadow-panel:
-    0 4px 20px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  --shadow-panel-hover:
-    0 8px 24px rgba(0, 0, 0, 0.7), 0 0 16px rgba(6, 182, 212, 0.08);
+  --shadow-cyan-glow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --shadow-amber-glow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --shadow-panel: 0 2px 12px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  --shadow-panel-hover: 0 4px 16px rgba(0, 0, 0, 0.55);
 
   @keyframes fadeIn {
     from {
@@ -88,24 +84,20 @@
 
 /* ─── Sci-fi panel ──────────────────────────────────────────────────────────── */
 @utility sci-panel {
-  @apply relative bg-panel border border-border rounded-lg;
-  box-shadow:
-    0 4px 20px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  @apply relative bg-panel border border-slate-800/80 rounded-lg;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 @utility holo-card {
-  /* Hover glow card */
+  /* Subtle hover — no neon halo */
   @apply sci-panel transition-all duration-200 cursor-pointer;
   &:hover {
-    @apply border-cyan-500/60;
-    box-shadow:
-      0 6px 20px rgba(0, 0, 0, 0.6),
-      0 0 12px rgba(6, 182, 212, 0.1);
+    @apply border-cyan-500/30;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
     transform: translateY(-1px);
   }
 }
 @utility glow-text {
-  /* Cockpit accented text */
+  /* Cockpit accented text (no text-shadow) */
   @apply text-cyan-400 font-semibold;
 }
 @utility stat-bar-track {
@@ -114,8 +106,7 @@
 }
 @utility stat-bar-fill {
   @apply h-full rounded-full transition-all duration-700;
-  background: linear-gradient(90deg, var(--cyan), rgba(0, 212, 255, 0.5));
-  box-shadow: 0 0 6px rgba(0, 212, 255, 0.4);
+  background: linear-gradient(90deg, var(--cyan), rgba(0, 212, 255, 0.45));
 }
 @utility sci-badge {
   /* Badge */
@@ -174,10 +165,12 @@
   background-size: 40px 40px;
 }
 @utility text-glow-cyan {
-  text-shadow: 0 0 8px rgba(0, 212, 255, 0.5);
+  /* Sobriety: no neon text-shadow halo (DA cockpit) */
+  color: rgb(34 211 238);
 }
 @utility border-glow-cyan {
-  box-shadow: 0 0 8px rgba(0, 212, 255, 0.3);
+  box-shadow: none;
+  border-color: rgba(6, 182, 212, 0.3);
 }
 @utility truncate-2 {
   display: -webkit-box;
@@ -387,23 +380,6 @@
 
 @layer utilities {
   /* ─── Animations ────────────────────────────────────────────────────────────── */
-  @keyframes scanline {
-    0% {
-      transform: translateY(-100%);
-      opacity: 0;
-    }
-    10% {
-      opacity: 0.03;
-    }
-    90% {
-      opacity: 0.03;
-    }
-    100% {
-      transform: translateY(100vh);
-      opacity: 0;
-    }
-  }
-
   @keyframes blink {
     0%,
     100% {
@@ -420,9 +396,6 @@
     }
   }
 
-  .animate-scanline {
-    animation: scanline 6s linear infinite;
-  }
   .animate-blink {
     animation: blink 1.2s ease-in-out infinite;
   }

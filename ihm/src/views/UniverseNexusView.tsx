@@ -200,24 +200,23 @@ export function UniverseNexusView({ initialCategory }: UniverseNexusViewProps = 
   return (
     <div className="space-y-6 sm:space-y-8">
       {/* Cockpit HUD Hero Header */}
-      <div className="relative rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-cyan-500/20 p-6 sm:p-8 overflow-hidden shadow-2xl backdrop-blur-xl">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/5 rounded-full blur-3xl pointer-events-none" />
+      <div className="relative rounded-xl bg-slate-950 border border-slate-800/80 p-6 sm:p-8 overflow-hidden">
         <div className="relative z-10 max-w-3xl space-y-3">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-950/60 border border-cyan-500/30 text-cyan-400 text-xs font-mono-sc">
-            <Sparkles size={13} className="animate-pulse" />
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-sm bg-slate-950 border border-cyan-500/30 text-cyan-400 text-xs font-orbitron uppercase tracking-widest">
+            <Sparkles size={13} />
             <span>{t('hero_badge')}</span>
           </div>
           <h1 className="text-3xl sm:text-5xl font-black font-rajdhani text-white tracking-wide">
             {t('hero_title')}
           </h1>
-          <p className="text-sm sm:text-base text-slate-300 font-rajdhani leading-relaxed">
+          <p className="text-sm sm:text-base text-slate-400 font-rajdhani leading-relaxed">
             {t('hero_desc')}
           </p>
         </div>
       </div>
 
       {/* Cockpit Unified Command Console */}
-      <div className="rounded-xl bg-slate-900/60 border border-slate-800/80 p-3 sm:p-4 space-y-3 backdrop-blur-md shadow-xl">
+      <div className="rounded-xl bg-slate-950/80 border border-slate-800/80 p-3 sm:p-4 space-y-3">
         {/* Category Pills Bar */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
           {categories.map((cat) => {

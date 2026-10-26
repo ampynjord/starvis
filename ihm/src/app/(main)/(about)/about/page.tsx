@@ -60,7 +60,11 @@ function Panel({ children, className = '' }: { children: React.ReactNode; classN
 }
 
 function Pill({ children }: { children: React.ReactNode }) {
-  return <span className="rounded-sm border border-cyan-900/50 bg-cyan-950/20 px-2 py-1 font-mono-sc text-[10px] uppercase tracking-widest text-cyan-400">{children}</span>;
+  return (
+    <span className="rounded-sm border border-cyan-500/30 bg-slate-950 px-2 py-1 font-orbitron text-[10px] uppercase tracking-widest text-cyan-400">
+      {children}
+    </span>
+  );
 }
 
 export default function AboutPage() {
@@ -101,7 +105,7 @@ export default function AboutPage() {
               <Pill>Public API v1</Pill>
               <Pill>EN + FR Localization</Pill>
             </div>
-            <h2 className="font-orbitron text-2xl font-black uppercase tracking-widest text-cyan-300">
+            <h2 className="font-rajdhani text-2xl font-black uppercase tracking-wide text-cyan-300">
               One standard dataset for the whole Star Citizen community
             </h2>
             <p className="mt-3 max-w-3xl font-rajdhani text-base leading-relaxed text-slate-400">
