@@ -27,6 +27,22 @@ import { USER_ROLE, USER_ROLES } from '../utils/config.js';
 import type { RouteDependencies } from './types.js';
 
 const STRONG_PASSWORD = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[^a-zA-Z0-9]).{8,}$/;
+const AVATAR_URL_MAX = 500; // meta.users.avatar_url is VARCHAR(500)
+
+function isValidUsername(username: unknown): boolean {
+  return typeof username === 'string' && username.length >= 3 && username.length <= 50 && /^[a-zA-Z0-9_-]+$/.test(username);
+}
+
+/** Only absolute http(s) URLs that fit the column; anything else (javascript:, data:, …) is refused. */
+function isValidAvatarUrl(avatarUrl: unknown): boolean {
+  if (typeof avatarUrl !== 'string' || avatarUrl.length > AVATAR_URL_MAX) return false;
+  try {
+    const { protocol } = new URL(avatarUrl);
+    return protocol === 'https:' || protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
 
 export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
   if (!process.env.JWT_SECRET) return;
@@ -152,13 +168,20 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
   router.put('/auth/me', requireJwt, denyApiToken, async (req, res) => {
     const payload = req.jwtPayload;
     const { username, avatarUrl } = req.body ?? {};
+    if (username !== undefined && !isValidUsername(username)) {
+      return void res.status(400).json({ success: false, error: 'Username must be 3-50 chars, letters/numbers/_ only' });
+    }
+    if (avatarUrl !== undefined && !isValidAvatarUrl(avatarUrl)) {
+      return void res.status(400).json({ success: false, error: `avatarUrl must be an http(s) URL of ${AVATAR_URL_MAX} chars or less` });
+    }
     try {
       const user = await authService.updateProfile(payload.sub, {
         username: typeof username === 'string' ? username : undefined,
         avatarUrl: typeof avatarUrl === 'string' ? avatarUrl : undefined,
       });
       res.json({ success: true, user });
-    } catch {
+    } catch (e: any) {
+      if (e?.code === 'P2002') return void res.status(409).json({ success: false, error: 'Username already taken' });
       res.status(500).json({ success: false, error: 'Profile update failed' });
     }
   });
@@ -376,11 +399,14 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
   router.put('/admin/users/:id', requireJwtAdmin, async (req, res) => {
     const id = Number(req.params.id);
     const { username, email, avatarUrl } = req.body ?? {};
-    if (
-      username !== undefined &&
-      (typeof username !== 'string' || username.length < 3 || username.length > 50 || !/^[a-zA-Z0-9_-]+$/.test(username))
-    ) {
+    if (!Number.isInteger(id) || id <= 0) {
+      return void res.status(400).json({ success: false, error: 'Invalid user id' });
+    }
+    if (username !== undefined && !isValidUsername(username)) {
       return void res.status(400).json({ success: false, error: 'Invalid username' });
+    }
+    if (avatarUrl !== undefined && !isValidAvatarUrl(avatarUrl)) {
+      return void res.status(400).json({ success: false, error: 'Invalid avatarUrl' });
     }
     if (email !== undefined && (typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) {
       return void res.status(400).json({ success: false, error: 'Invalid email' });

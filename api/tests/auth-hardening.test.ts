@@ -188,3 +188,37 @@ describe('point 4 — API tokens stay on the external API surface', () => {
     expect(res.status).toBe(200);
   });
 });
+
+describe('point 9 — profile fields are validated', () => {
+  const session = () => bearer(sign(claims(2, 'user')));
+  const admin = () => bearer(sign(claims(1, 'admin')));
+
+  it.each([['ab'], ['x'.repeat(51)], ['bad name'], ['<script>']])('rejects username %j on PUT /auth/me', async (username) => {
+    const res = await request(app).put('/auth/me').set(session()).send({ username });
+    expect(res.status).toBe(400);
+  });
+
+  it.each([['javascript:alert(1)'], ['ftp://example.com/a.png'], [`https://example.com/${'a'.repeat(500)}`]])(
+    'rejects avatarUrl %j on PUT /auth/me and PUT /admin/users/:id',
+    async (avatarUrl) => {
+      const own = await request(app).put('/auth/me').set(session()).send({ avatarUrl });
+      const byAdmin = await request(app).put('/admin/users/2').set(admin()).send({ avatarUrl });
+      expect([own.status, byAdmin.status]).toEqual([400, 400]);
+    },
+  );
+
+  it('answers 409 when the username is already taken', async () => {
+    prismaMock.user.update.mockRejectedValueOnce(Object.assign(new Error('unique'), { code: 'P2002' }));
+    const res = await request(app).put('/auth/me').set(session()).send({ username: 'user1' });
+    expect(res.status).toBe(409);
+  });
+
+  it('accepts a valid username and an https avatar', async () => {
+    const res = await request(app)
+      .put('/auth/me')
+      .set(session())
+      .send({ username: 'New_Name-2', avatarUrl: 'https://cdn.example.com/a.png' });
+    expect(res.status).toBe(200);
+    expect(res.body.user).toMatchObject({ username: 'New_Name-2', avatarUrl: 'https://cdn.example.com/a.png' });
+  });
+});
