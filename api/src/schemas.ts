@@ -125,6 +125,8 @@ export const ChangelogQuery = z
     entity_type: qStr,
     change_type: qStr,
     markers_only: qStr,
+    /** Filtre optionnel sur `meta.extraction_log.game_version` (ex. `4.10.2`). */
+    game_version: qStr,
   })
   .passthrough();
 

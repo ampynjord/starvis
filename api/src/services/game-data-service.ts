@@ -319,6 +319,8 @@ export class GameDataService {
     entityType?: string;
     changeType?: string;
     markersOnly?: boolean;
+    /** Lignes de diff uniquement (`field_name` renseigné), exclut les marqueurs d'entité. */
+    changesOnly?: boolean;
   }): Promise<{ data: PublicChangelogEntry[]; total: number }> {
     const env = params.env ?? 'live';
     const prisma = this.getClient(env);
@@ -338,6 +340,8 @@ export class GameDataService {
     }
     if (params.markersOnly) {
       where.push('c.field_name IS NULL');
+    } else if (params.changesOnly) {
+      where.push('c.field_name IS NOT NULL');
     }
 
     const w = ` WHERE ${where.join(' AND ')}`;
@@ -542,9 +546,16 @@ export class GameDataService {
 
   async getVersionChangelog(
     version: string,
-    opts: { env?: string; limit?: string; offset?: string; changesOnly?: boolean } = {},
+    opts: {
+      env?: string;
+      limit?: string;
+      offset?: string;
+      changesOnly?: boolean;
+      entityType?: string;
+      changeType?: string;
+    } = {},
   ): Promise<{
-    data: Row[];
+    data: PublicChangelogEntry[];
     total: number;
     version: string;
     env: string;
@@ -555,7 +566,9 @@ export class GameDataService {
       gameVersion: version,
       limit: opts.limit,
       offset: opts.offset,
-      markersOnly: opts.changesOnly ? false : undefined,
+      entityType: opts.entityType,
+      changeType: opts.changeType,
+      changesOnly: opts.changesOnly === true,
     });
     return { ...result, version, env };
   }

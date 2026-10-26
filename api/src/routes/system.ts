@@ -33,6 +33,7 @@ export function mountSystemRoutes(router: Router, deps: RouteDependencies): void
       const filters = ChangelogQuery.parse(req.query);
       const result = await gameDataService!.getChangelog({
         env: filters.env,
+        gameVersion: filters.game_version,
         limit: filters.limit,
         offset: filters.offset,
         entityType: filters.entity_type,
@@ -151,6 +152,8 @@ export function mountSystemRoutes(router: Router, deps: RouteDependencies): void
         env: getQueryEnv(req),
         limit: getQueryString(req, 'limit'),
         offset: getQueryString(req, 'offset'),
+        entityType: getQueryString(req, 'entity_type'),
+        changeType: getQueryString(req, 'change_type'),
       });
       sendWithETag(req, res, { success: true, ...result });
     }),
@@ -164,6 +167,8 @@ export function mountSystemRoutes(router: Router, deps: RouteDependencies): void
         env: getQueryEnv(req),
         limit: getQueryString(req, 'limit'),
         offset: getQueryString(req, 'offset'),
+        entityType: getQueryString(req, 'entity_type'),
+        changeType: getQueryString(req, 'change_type'),
         changesOnly: true,
       });
       sendWithETag(req, res, { success: true, ...result });

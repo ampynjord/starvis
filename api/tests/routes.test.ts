@@ -920,6 +920,13 @@ describe('GET /api/v1/changelog', () => {
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
   });
+
+  it('transmet game_version au service', async () => {
+    gds.getChangelog.mockClear();
+    const res = await request(app).get('/api/v1/changelog?game_version=4.10.2&limit=10');
+    expect(res.status).toBe(200);
+    expect(gds.getChangelog).toHaveBeenCalledWith(expect.objectContaining({ gameVersion: '4.10.2', limit: '10' }));
+  });
 });
 
 describe('GET /api/v1/changelog/summary', () => {
@@ -951,6 +958,13 @@ describe('GET /api/v1/game-versions/:version/changelog', () => {
     const res = await request(app).get('/api/v1/game-versions/4.8.1/changelog');
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
+  });
+
+  it('changelog/changes demande changesOnly au service', async () => {
+    gds.getVersionChangelog.mockClear();
+    const res = await request(app).get('/api/v1/game-versions/4.10.2/changelog/changes?limit=20');
+    expect(res.status).toBe(200);
+    expect(gds.getVersionChangelog).toHaveBeenCalledWith('4.10.2', expect.objectContaining({ changesOnly: true, limit: '20' }));
   });
 });
 

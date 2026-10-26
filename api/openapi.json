@@ -8566,6 +8566,14 @@
             "description": "Game environment"
           },
           {
+            "name": "game_version",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          {
             "name": "limit",
             "in": "query",
             "schema": {
@@ -8627,6 +8635,14 @@
             },
             "required": true,
             "description": "Game environment"
+          },
+          {
+            "name": "game_version",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
           },
           {
             "name": "limit",
