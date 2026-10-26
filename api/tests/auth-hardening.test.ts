@@ -143,3 +143,12 @@ describe('point 1 — purpose-bound tokens are not sessions', () => {
     expect(me.status).toBe(200);
   });
 });
+
+describe('point 2 — deleted users lose access immediately', () => {
+  it('rejects an admin session token whose user no longer exists', async () => {
+    const token = sign(claims(99, 'admin'));
+    const admin = await request(app).get('/admin/users').set(bearer(token));
+    const me = await request(app).get('/auth/me').set(bearer(token));
+    expect([admin.status, me.status]).toEqual([401, 401]);
+  });
+});

@@ -39,7 +39,7 @@ async function resolveCurrentPayload(token: string): Promise<JwtPayload> {
     where: { id: payload.sub },
     select: { uuid: true, email: true, username: true, role: true },
   });
-  if (!currentUser) return payload;
+  if (!currentUser) throw new Error('USER_NOT_FOUND');
   return {
     ...payload,
     uuid: currentUser.uuid,
