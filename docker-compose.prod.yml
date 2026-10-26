@@ -96,7 +96,7 @@ services:
     labels:
       traefik.enable: "true"
       traefik.docker.network: "${TRAEFIK_NETWORK}"
-      traefik.http.routers.starvis-api.rule: "Host(`${DOMAIN}`) && (PathPrefix(`/api/v1`) || PathPrefix(`/api/v2`) || PathPrefix(`/api/universe`) || PathPrefix(`/api-docs`) || PathPrefix(`/health`))"
+      traefik.http.routers.starvis-api.rule: "Host(`${DOMAIN}`) && (PathPrefix(`/api/v1`) || PathPrefix(`/api/v2`) || PathPrefix(`/api-docs`) || PathPrefix(`/health`))"
       traefik.http.routers.starvis-api.entrypoints: "${TRAEFIK_ENTRYPOINT}"
       traefik.http.routers.starvis-api.tls.certresolver: "${TRAEFIK_CERT_RESOLVER}"
       traefik.http.routers.starvis-api.service: "starvis-api-svc"

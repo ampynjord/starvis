@@ -145,7 +145,9 @@ export class RsiWebsiteService {
     return rows.map((r) => String(r.category));
   }
 
-  async getCommLinkImages(opts: { search?: string; page?: number; limit?: number } = {}): Promise<PaginatedResult<PublicCommLinkImage>> {
+  async getCommLinkImages(
+    opts: { search?: string; page?: number; limit?: number } = {},
+  ): Promise<PaginatedResult<PublicCommLinkImage>> {
     const where: string[] = ['cl.thumbnail_url IS NOT NULL', "cl.thumbnail_url != ''"];
     const params: (string | number)[] = [];
     if (opts.search) {
@@ -204,7 +206,9 @@ export class RsiWebsiteService {
 
   // ── Starmap (RSI web version) ──────────────────────────────────────────────
 
-  async getStarmapSystems(opts: { search?: string; page?: number; limit?: number } = {}): Promise<PaginatedResult<PublicStarmapLocation>> {
+  async getStarmapSystems(
+    opts: { search?: string; page?: number; limit?: number } = {},
+  ): Promise<PaginatedResult<PublicStarmapLocation>> {
     const where: string[] = ["sl.type IN ('star', 'StarSystem')"];
     const params: (string | number)[] = [];
 

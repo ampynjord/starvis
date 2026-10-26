@@ -11,10 +11,9 @@ import type { NextFunction, Request, Response } from 'express';
  * consommé par des intégrations tierces, et la pagination vit en racine côté
  * `{ success }` là où JSend la placerait sous `meta`. Ce middleware complète donc
  * chaque réponse avec le discriminant manquant, sans jamais déplacer ni écraser
- * quoi que ce soit : les deux lectures restent valides. La surface Nexus
- * (`/api/universe` et son alias `/api/v2`) en est exclue — elle porte
- * l'enveloppe unique que ce dispositif ne pouvait pas imposer à la v1 sans
- * la casser.
+ * quoi que ce soit : les deux lectures restent valides. `/api/v2` en est
+ * exclue — elle porte l'enveloppe unique que ce dispositif ne pouvait pas
+ * imposer à la v1 sans la casser.
  *
  * La valeur est dérivée du code HTTP, pas devinée depuis le corps : `/health/ready`
  * renvoie `{ status: 'not_ready' }` avec un 503 et doit bien être marqué en échec.
@@ -34,18 +33,16 @@ export function withStatusDiscriminators(body: unknown, ok: boolean): void {
 }
 
 /**
- * La surface Nexus sort du dispositif (chemin canonique + alias `/api/v2`).
+ * `/api/v2` sort du dispositif.
  *
  * Elle porte une enveloppe unique ou le code HTTP suffit a dire l'issue :
- * ajouter `success` a cote y reintroduirait la redondance que cette surface
- * vise a eviter, et autoriserait les deux a diverger.
+ * ajouter `success` a cote y reintroduirait la redondance que la v2 supprime,
+ * et autoriserait les deux a diverger.
  */
-function isNexusSurface(path: string): boolean {
-  return path.startsWith('/api/universe') || path.startsWith('/api/v2');
-}
+const V2_PREFIX = '/api/v2';
 
 export function responseShapeMiddleware(req: Request, res: Response, next: NextFunction): void {
-  if (isNexusSurface(req.path)) {
+  if (req.path.startsWith(V2_PREFIX)) {
     next();
     return;
   }

@@ -13,6 +13,12 @@ import { CommodityQueryService } from './commodity-query-service.js';
 import { COMPONENT_VISIBLE_WHERE, ComponentQueryService } from './component-query-service.js';
 import { CorrelationService } from './correlation-service.js';
 import { CraftingService } from './crafting-service.js';
+import { ItemQueryService } from './item-query-service.js';
+import { LoadoutService } from './loadout-service.js';
+import { LocationQueryService } from './location-query-service.js';
+import { MiningQueryService } from './mining-query-service.js';
+import { MissionService } from './mission-service.js';
+import { PaintQueryService } from './paint-query-service.js';
 import type {
   PublicChangelogEntry,
   PublicExtractionLogEntry,
@@ -21,18 +27,13 @@ import type {
   PublicTranslation,
   PublicUnifiedSearchHit,
 } from './game-data/cross-cutting-types.js';
-import { ItemQueryService } from './item-query-service.js';
-import { LoadoutService } from './loadout-service.js';
-import { LocationQueryService } from './location-query-service.js';
-import { MiningQueryService } from './mining-query-service.js';
-import { MissionService } from './mission-service.js';
-import { PaintQueryService } from './paint-query-service.js';
 import type { PaginatedResult, Row } from './shared.js';
 import { parseIncludes, toPostgres } from './shared.js';
 import { ShipQueryService } from './ship-query-service.js';
 import { ShopService } from './shop-service.js';
 import { TradeService } from './trade-service.js';
 
+export type { PaginatedResult, Row };
 export type {
   PublicChangelogEntry,
   PublicExtractionLogEntry,
@@ -41,7 +42,6 @@ export type {
   PublicTranslation,
   PublicUnifiedSearchHit,
 } from './game-data/cross-cutting-types.js';
-export type { PaginatedResult, Row };
 
 export type ObjectDetailType = 'ship' | 'component' | 'item' | 'commodity' | 'shop' | 'location';
 

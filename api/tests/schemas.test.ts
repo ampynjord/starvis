@@ -21,8 +21,8 @@ import {
   StarmapLocationsQuery,
   TranslationQuery,
 } from '../src/schemas.js';
-import { PublicTranslation } from '../src/services/game-data/cross-cutting-types.js';
 import { PublicGalactapediaEntry, PublicStarmapLocation } from '../src/services/rsi/rsi-types.js';
+import { PublicTranslation } from '../src/services/game-data/cross-cutting-types.js';
 
 // ── Tests ──
 

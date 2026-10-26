@@ -2,9 +2,6 @@ import type { TaxonomyCategory, UniverseEntityNexus, UniverseOmniResult } from '
 
 type NexusLang = 'fr' | 'en';
 
-/** Surface Nexus canonique (sans préfixe de version). `/api/v2/universe` reste un alias côté API. */
-const UNIVERSE_API_BASE = '/api/universe';
-
 function getBaseUrl(): string {
   if (typeof window !== 'undefined') return '';
   return (process.env.API_URL ?? 'http://127.0.0.1:3000').replace(/\/$/, '');
@@ -12,7 +9,7 @@ function getBaseUrl(): string {
 
 export async function fetchUniverseTaxonomy(env = 'live'): Promise<TaxonomyCategory[]> {
   const base = getBaseUrl();
-  const res = await fetch(`${base}${UNIVERSE_API_BASE}/taxonomy?env=${encodeURIComponent(env)}`);
+  const res = await fetch(`${base}/api/v2/universe/taxonomy?env=${encodeURIComponent(env)}`);
   if (!res.ok) return [];
   const json = await res.json();
   return json.data || [];
@@ -22,7 +19,7 @@ export async function fetchOmniSearch(query: string, env = 'live', limit = 20, l
   if (!query || query.trim().length === 0) return [];
   const base = getBaseUrl();
   const res = await fetch(
-    `${base}${UNIVERSE_API_BASE}/omni-search?q=${encodeURIComponent(query)}&env=${encodeURIComponent(env)}&lang=${lang}&limit=${limit}`,
+    `${base}/api/v2/universe/omni-search?q=${encodeURIComponent(query)}&env=${encodeURIComponent(env)}&lang=${lang}&limit=${limit}`,
   );
   if (!res.ok) return [];
   const json = await res.json();
@@ -56,7 +53,7 @@ export async function fetchUniverseExplore(params: {
   if (params.lang) query.set('lang', params.lang);
 
   const base = getBaseUrl();
-  const res = await fetch(`${base}${UNIVERSE_API_BASE}/explore?${query.toString()}`);
+  const res = await fetch(`${base}/api/v2/universe/explore?${query.toString()}`);
   if (!res.ok) throw new Error('Failed to fetch universe exploration data');
   return res.json();
 }
@@ -69,7 +66,7 @@ export async function fetchEntityNexus(
 ): Promise<UniverseEntityNexus | null> {
   const base = getBaseUrl();
   const res = await fetch(
-    `${base}${UNIVERSE_API_BASE}/entities/${encodeURIComponent(category)}/${encodeURIComponent(id)}?env=${encodeURIComponent(env)}&lang=${lang}`,
+    `${base}/api/v2/universe/entities/${encodeURIComponent(category)}/${encodeURIComponent(id)}?env=${encodeURIComponent(env)}&lang=${lang}`,
   );
   if (!res.ok) return null;
   const json = await res.json();
