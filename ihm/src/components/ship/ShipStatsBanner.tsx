@@ -19,7 +19,7 @@ function flattenNodes(nodes: LoadoutNode[]): LoadoutNode[] {
   const r: LoadoutNode[] = [];
   for (const nd of nodes) {
     r.push(nd);
-    if (nd.children.length) r.push(...flattenNodes(nd.children));
+    if (nd.children?.length) r.push(...flattenNodes(nd.children));
   }
   return r;
 }
