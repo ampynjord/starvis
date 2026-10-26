@@ -128,7 +128,11 @@ export type AuthDb = Pick<PrismaClient, '$transaction' | 'apiToken' | 'externalA
 
 /** Verify a Starvis JWT and return its payload. Throws on invalid/expired tokens. */
 export function verifyAuthToken(token: string): JwtPayload {
-  return jwt.verify(token, getSecret()) as unknown as JwtPayload;
+  const payload = jwt.verify(token, getSecret()) as unknown as JwtPayload;
+  // Only sessions (no `type`) and API tokens authenticate. Purpose-bound tokens
+  // (2fa_pending, rsi_hangar_sync) share the secret and must never act as one.
+  if (payload.type !== undefined && payload.type !== 'api_token') throw new Error('INVALID_TOKEN_TYPE');
+  return payload;
 }
 
 export function signRsiHangarSyncToken(userId: number): string {
