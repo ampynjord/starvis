@@ -43,7 +43,7 @@ const LANES = [
     border: 'border-red-900/50',
     items: [
       'Economy and calculator outputs need stronger confidence labels, source metadata and real data audits.',
-      'Starmap and universe data need continued position, hierarchy and visual validation against extracted data.',
+      'Location and universe data need continued position, hierarchy and validation against extracted game data.',
       'Cross-referencing UEX 2.0 terminals and refinery yields with internal DataForge location UUIDs.',
     ],
   },

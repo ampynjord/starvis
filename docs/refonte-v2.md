@@ -1,4 +1,4 @@
-# Refonte Starvis v2 — plan
+# Refonte Starvis — plan
 
 > Plan de la refonte demandée le 27/07/2026 : repenser l'interface, l'API, la
 > base, l'extracteur, la CLI et la CI. Il fait suite à
@@ -275,12 +275,14 @@ renseignent.
 **C12 — Ce qui est extrait est exposé.** `game_insights`, tables de butin,
 réputation, munitions : 7 008 lignes extraites que rien ne sert.
 
-**C13 — L'API se réaligne sur le schéma, sous une nouvelle version.** Les
+**C13 — L'API se réaligne sur le schéma, sans préfixe de version.** Les
 ressources suivent les entités du nouveau modèle plutôt que les tables
-d'aujourd'hui. `/api/v2` porte la nouvelle surface ; **`/api/v1` reste servi**
-tant que les tiers n'ont pas migré — c'est l'engagement pris envers eux, et
-Stelliverse en dépend. La v1 devient une couche de compatibilité au-dessus du
-nouveau modèle, pas un second chemin vers la donnée.
+d'aujourd'hui. La surface canonique n'a pas de numéro de version
+(`/api/universe/…` pour le Nexus déjà servi) ; **`/api/v1` reste servi**,
+figée, tant que les tiers n'ont pas migré — c'est l'engagement pris envers eux.
+`/api/v2` reste un alias des mêmes gestionnaires, pas une seconde API. `/api/v1`
+devient une couche de compatibilité au-dessus du nouveau modèle, pas un second
+chemin vers la donnée.
 
 **C14 — L'IHM est refaite.** Elle entre par l'intention et non par la table : on
 pose une question — où vendre ce minerai, quel vaisseau pour du minage solo, où
@@ -302,32 +304,34 @@ Chaque étape reste déployable, et la production fonctionnelle.
 | 12 | Hiérarchie et coordonnées des lieux (C9) | Socle du wiki spatial |
 | 13 | Identité canonique (C10) + provenance (C11) | Ce qui rend le croisement durable |
 | 14 | Exposer l'extrait non servi (C12) | Sans valeur tant que 9-13 ne sont pas faits |
-| 15 | Surface `/api/v2` alignée sur le schéma (C13) | Ne peut pas précéder le schéma qu'elle expose |
+| 15 | Surface sans version alignée sur le schéma (C13) | Ne peut pas précéder le schéma qu'elle expose |
 | 16 | IHM refaite par l'intention (C14) | S'appuie sur 15 |
 
 **Contrainte tenue tout du long** : `/api/v1` continue de répondre. La
-restructuration se fait sous `/api/v2` ; la v1 devient une couche de
+restructuration se fait sur des chemins sans version ; `/api/v1` devient une couche de
 compatibilité au-dessus du nouveau modèle, jamais un second chemin vers la
-donnée.
+donnée. `/api/v2` n'est que l'alias de ce qui est déjà servi, jusqu'à décision
+de retrait.
 
-*Pourquoi deux versions, et jusqu'à quand.* Trois intégrations tierces
+*Pourquoi une couche de compatibilité, et jusqu'à quand.* Trois intégrations tierces
 appellent réellement l'API — « Moteur organisationnel » (5 039 requêtes),
 « FlightDockxDNR » (150), « stelliverse » (10). Changer l'enveloppe en place les
 casserait sans erreur visible : un client lisant `data.total` recevrait
 `undefined` et des listes tronquées sans le savoir.
 
-Deux versions permanentes seraient pourtant une dette, pas une architecture. La
+Deux surfaces permanentes seraient pourtant une dette, pas une architecture. La
 règle est donc :
 
-1. **La v1 est figée** — plus de nouvelle ressource, seulement les correctifs
+1. **`/api/v1` est figée** — plus de nouvelle ressource, seulement les correctifs
    qu'un défaut impose.
-2. **La v2 devient la surface complète**, ressource par ressource.
-3. **La v1 s'arrête** quand les trois tiers ont migré ; leurs jetons donnent de
+2. **La surface sans version devient la surface complète**, ressource par ressource.
+   `/api/v2` en est l'alias, retiré seulement après décision explicite.
+3. **`/api/v1` s'arrête** quand les trois tiers ont migré ; leurs jetons donnent de
    quoi les joindre.
 
-À noter, honnêtement : sur les trois défauts que la v2 corrige, deux — la
+À noter, honnêtement : sur les trois défauts que le passage sans version corrige, deux — la
 pagination à deux endroits et les colonnes vides — auraient pu l'être par ajout
-sur la v1, sans version nouvelle. Seul le retrait de `success` l'exigeait.
+sur `/api/v1`, sans chemin nouveau. Seul le retrait de `success` l'exigeait.
 
 ## 7. Suggestions ajoutées
 
@@ -352,5 +356,5 @@ Non demandées, proposées parce que le coût est faible et l'effet durable.
 - Pas de « big bang » : aucune étape ne demande de geler la production.
 - Pas de retour sur le recentrage wiki : le social et le temps réel restent chez
   Stelliverse.
-- Pas de rupture du contrat `/api/v1` sans version : les évolutions se font par
-  ajout, ou derrière une v2 explicite.
+- Pas de rupture du contrat `/api/v1` : les évolutions se font par
+  ajout, sur des chemins sans version.

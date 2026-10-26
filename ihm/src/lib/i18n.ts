@@ -4,7 +4,6 @@ export const TRANSLATIONS = {
   fr: {
     // Navigation & Cockpit
     nav_nexus: 'Nexus Universel',
-    nav_starmap: 'Starmap 3D',
     nav_developer: 'API & Jeux de Données',
     nav_changelog: 'Changelog',
     search_placeholder: "Rechercher dans tout l'univers...",
@@ -21,7 +20,7 @@ export const TRANSLATIONS = {
     hero_badge: 'UNIVERS CONNECTÉ STAR CITIZEN 4.10.2',
     hero_title: 'STARVIS — NEXUS UNIVERSEL',
     hero_desc:
-      "Fin des silos cloisonnés : naviguez d'un vaisseau vers ses armes, les stations qui le vendent, les prix aUEC et la Starmap en temps réel, sans aucune coupure de contexte.",
+      "Fin des silos cloisonnés : naviguez d'un vaisseau vers ses armes, les stations qui le vendent, les prix aUEC et les lieux du Nexus, sans aucune coupure de contexte.",
 
     // Categories
     cat_all: "Tout l'Univers",
@@ -35,7 +34,7 @@ export const TRANSLATIONS = {
     cat_ammo: 'Munitions',
     cat_sustenance: 'Sustenance',
     cat_items: 'Équipement FPS',
-    cat_locations: 'Lieux & Starmap',
+    cat_locations: 'Lieux',
     cat_commodities: 'Marché & Fret',
     sub_all: 'Tous',
 
@@ -120,7 +119,6 @@ export const TRANSLATIONS = {
     menu_missions: 'Missions',
     menu_factions: 'Factions',
     menu_universe: 'Univers',
-    menu_starmap: 'Starmap 3D',
     menu_galactapedia: 'Galactapedia',
     menu_commlinks: 'Comm-Links',
     menu_admin: 'Administration',
@@ -142,7 +140,6 @@ export const TRANSLATIONS = {
   en: {
     // Navigation & Cockpit
     nav_nexus: 'Universal Nexus',
-    nav_starmap: '3D Starmap',
     nav_developer: 'API & Datasets',
     nav_changelog: 'Changelog',
     search_placeholder: 'Search the entire universe...',
@@ -159,7 +156,7 @@ export const TRANSLATIONS = {
     hero_badge: 'STAR CITIZEN 4.10.2 CONNECTED UNIVERSE',
     hero_title: 'STARVIS — UNIVERSAL NEXUS',
     hero_desc:
-      'No more isolated silos: navigate from a ship to its weapons, selling stations, real-time aUEC prices, and 3D Starmap without losing context.',
+      'No more isolated silos: navigate from a ship to its weapons, selling stations, real-time aUEC prices, and Nexus locations without losing context.',
 
     // Categories
     cat_all: 'Entire Universe',
@@ -173,7 +170,7 @@ export const TRANSLATIONS = {
     cat_ammo: 'Ammo',
     cat_sustenance: 'Sustenance',
     cat_items: 'FPS Equipment',
-    cat_locations: 'Locations & Starmap',
+    cat_locations: 'Locations',
     cat_commodities: 'Market & Cargo',
     sub_all: 'All',
 
@@ -258,7 +255,6 @@ export const TRANSLATIONS = {
     menu_missions: 'Missions',
     menu_factions: 'Factions',
     menu_universe: 'Universe',
-    menu_starmap: '3D Starmap',
     menu_galactapedia: 'Galactapedia',
     menu_commlinks: 'Comm-Links',
     menu_admin: 'Administration',

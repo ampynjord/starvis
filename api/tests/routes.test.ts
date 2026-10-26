@@ -920,6 +920,13 @@ describe('GET /api/v1/changelog', () => {
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
   });
+
+  it('transmet game_version au service', async () => {
+    gds.getChangelog.mockClear();
+    const res = await request(app).get('/api/v1/changelog?game_version=4.10.2&limit=10');
+    expect(res.status).toBe(200);
+    expect(gds.getChangelog).toHaveBeenCalledWith(expect.objectContaining({ gameVersion: '4.10.2', limit: '10' }));
+  });
 });
 
 describe('GET /api/v1/changelog/summary', () => {
@@ -951,6 +958,13 @@ describe('GET /api/v1/game-versions/:version/changelog', () => {
     const res = await request(app).get('/api/v1/game-versions/4.8.1/changelog');
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
+  });
+
+  it('changelog/changes demande changesOnly au service', async () => {
+    gds.getVersionChangelog.mockClear();
+    const res = await request(app).get('/api/v1/game-versions/4.10.2/changelog/changes?limit=20');
+    expect(res.status).toBe(200);
+    expect(gds.getVersionChangelog).toHaveBeenCalledWith('4.10.2', expect.objectContaining({ changesOnly: true, limit: '20' }));
   });
 });
 
@@ -1166,12 +1180,19 @@ describe('OpenAPI coverage', () => {
     const routeFiles = listRouteFiles(routeDir);
     const routes: Array<{ method: string; path: string; file: string }> = [];
     const routeRe = /router\.(get|post|put|patch|delete)\(\s*([`'"])(.*?)\2/gs;
+    const routeArrayRe = /router\.(get|post|put|patch|delete)\(\s*\[([^\]]*)\]/g;
+    const quotedRe = /[`'"]([^`'"]+)[`'"]/g;
     const envDataRouteRe = /mountEnvDataRoute\(\s*router\s*,\s*([`'"])(.*?)\1/gs;
 
     for (const file of routeFiles) {
       const text = readFileSync(file, 'utf8');
       for (const match of text.matchAll(routeRe)) {
         routes.push({ method: match[1], path: match[3], file });
+      }
+      for (const match of text.matchAll(routeArrayRe)) {
+        for (const quoted of match[2].matchAll(quotedRe)) {
+          routes.push({ method: match[1], path: quoted[1], file });
+        }
       }
       for (const match of text.matchAll(envDataRouteRe)) {
         routes.push({ method: 'get', path: match[2], file });

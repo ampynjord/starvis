@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import { PUBLIC_SITE_URL } from '@/lib/server-config';
 import { UniverseNexusView } from '@/views/UniverseNexusView';
 
@@ -28,7 +29,9 @@ export default function Page() {
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <UniverseNexusView />
+      <Suspense>
+        <UniverseNexusView />
+      </Suspense>
     </>
   );
 }

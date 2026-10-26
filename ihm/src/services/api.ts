@@ -545,8 +545,20 @@ export const api = {
 
   // ─── Changelog ─────────────────────────────────────────────────────
   changelog: {
-    list: (p: { env?: string; limit?: number; offset?: number; entity_type?: string; change_type?: string; markers_only?: boolean }) =>
-      get<{ data: ChangelogEntry[]; total: number }>('/changelog', p),
+    list: (p: {
+      env?: string;
+      limit?: number;
+      offset?: number;
+      entity_type?: string;
+      change_type?: string;
+      markers_only?: boolean;
+      game_version?: string;
+    }) => get<{ data: ChangelogEntry[]; total: number }>('/changelog', p),
+    byVersion: (version: string, p?: { env?: string; limit?: number; offset?: number; entity_type?: string; change_type?: string }) =>
+      get<{ data: ChangelogEntry[]; total: number; version: string; env: string }>(
+        `/game-versions/${encodeURIComponent(version)}/changelog`,
+        p,
+      ),
     summary: (env?: string) => get<ChangelogSummary>('/changelog/summary', { env }),
     gameVersions: (env?: string) => get<{ data: any[] }>('/game-versions', { env }),
   },

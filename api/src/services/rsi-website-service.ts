@@ -5,10 +5,31 @@
  *   - galactapedia     (lore encyclopedia)
  *   - starmap_locations (RSI web starmap, distinct from in-game)
  *   - comm_links       (RSI communications / news)
+ *
+ * Les formes de sortie sont déclarées dans `rsi/rsi-types.ts` (contrats zod).
  */
 import type { PrismaLike as PrismaClient } from '@starvis/db';
+import type {
+  PublicCommLink,
+  PublicCommLinkImage,
+  PublicGalactapediaEntry,
+  PublicJumpPoint,
+  PublicStarmapFilterOption,
+  PublicStarmapLocation,
+  PublicStarmapPosition,
+} from './rsi/rsi-types.js';
 import type { PaginatedResult, Row } from './shared.js';
 import { toPostgres } from './shared.js';
+
+export type {
+  PublicCommLink,
+  PublicCommLinkImage,
+  PublicGalactapediaEntry,
+  PublicJumpPoint,
+  PublicStarmapFilterOption,
+  PublicStarmapLocation,
+  PublicStarmapPosition,
+} from './rsi/rsi-types.js';
 
 export class RsiWebsiteService {
   constructor(private prisma: PrismaClient) {}
@@ -17,7 +38,7 @@ export class RsiWebsiteService {
 
   async getGalactapediaEntries(
     opts: { search?: string; category?: string; letter?: string; page?: number; limit?: number } = {},
-  ): Promise<PaginatedResult> {
+  ): Promise<PaginatedResult<PublicGalactapediaEntry>> {
     const where: string[] = [];
     const params: (string | number)[] = [];
 
@@ -47,7 +68,7 @@ export class RsiWebsiteService {
     );
     const total = Number(countRows[0]?.total) || 0;
 
-    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
+    const rows = await this.prisma.$queryRawUnsafe<PublicGalactapediaEntry[]>(
       toPostgres(`SELECT g.id, g.slug, g.title, g.excerpt, g.type, g.template,
               g.categories, g.tags, g.categories_count, g.tags_count, g.related_articles_count,
               g.thumbnail_url, g.rsi_url, g.api_url, g.web_url, g.source_created_at, g.updated_at
@@ -57,8 +78,8 @@ export class RsiWebsiteService {
     return { data: rows, total, page, limit, pages: Math.ceil(total / limit) };
   }
 
-  async getGalactapediaEntry(id: string): Promise<Row | null> {
-    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
+  async getGalactapediaEntry(id: string): Promise<PublicGalactapediaEntry | null> {
+    const rows = await this.prisma.$queryRawUnsafe<PublicGalactapediaEntry[]>(
       toPostgres(`SELECT * FROM rsi.galactapedia WHERE id = ? OR slug = ? LIMIT 1`),
       id,
       id,
@@ -68,7 +89,9 @@ export class RsiWebsiteService {
 
   // ── Comm-links ─────────────────────────────────────────────────────────────
 
-  async getCommLinks(opts: { search?: string; category?: string; page?: number; limit?: number } = {}): Promise<PaginatedResult> {
+  async getCommLinks(
+    opts: { search?: string; category?: string; page?: number; limit?: number } = {},
+  ): Promise<PaginatedResult<PublicCommLink>> {
     const where: string[] = [];
     const params: (string | number)[] = [];
 
@@ -93,7 +116,7 @@ export class RsiWebsiteService {
     );
     const total = Number(countRows[0]?.total) || 0;
 
-    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
+    const rows = await this.prisma.$queryRawUnsafe<PublicCommLink[]>(
       toPostgres(`SELECT cl.id, cl.rsi_id, cl.slug, cl.title, cl.excerpt, cl.category,
               cl.source_category, cl.channel, cl.series, cl.thumbnail_url, cl.rsi_url,
               cl.api_url, cl.api_public_url, cl.images_count, cl.links_count, cl.comment_count,
@@ -104,9 +127,9 @@ export class RsiWebsiteService {
     return { data: rows, total, page, limit, pages: Math.ceil(total / limit) };
   }
 
-  async getCommLink(id: string): Promise<Row | null> {
+  async getCommLink(id: string): Promise<PublicCommLink | null> {
     const isNumeric = /^\d+$/.test(id);
-    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
+    const rows = await this.prisma.$queryRawUnsafe<PublicCommLink[]>(
       isNumeric
         ? toPostgres(`SELECT * FROM rsi.comm_links WHERE id = ? LIMIT 1`)
         : toPostgres(`SELECT * FROM rsi.comm_links WHERE slug = ? OR rsi_id = ? LIMIT 1`),
@@ -122,7 +145,7 @@ export class RsiWebsiteService {
     return rows.map((r) => String(r.category));
   }
 
-  async getCommLinkImages(opts: { search?: string; page?: number; limit?: number } = {}): Promise<PaginatedResult> {
+  async getCommLinkImages(opts: { search?: string; page?: number; limit?: number } = {}): Promise<PaginatedResult<PublicCommLinkImage>> {
     const where: string[] = ['cl.thumbnail_url IS NOT NULL', "cl.thumbnail_url != ''"];
     const params: (string | number)[] = [];
     if (opts.search) {
@@ -139,7 +162,7 @@ export class RsiWebsiteService {
       ...params,
     );
     const total = Number(countRows[0]?.total) || 0;
-    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
+    const rows = await this.prisma.$queryRawUnsafe<PublicCommLinkImage[]>(
       toPostgres(`SELECT cl.id, cl.rsi_id, cl.slug, cl.title, cl.category, cl.channel, cl.series,
               cl.thumbnail_url as url, cl.thumbnail_url, cl.rsi_url, cl.api_url, cl.api_public_url,
               cl.images_count, cl.published_at
@@ -151,8 +174,8 @@ export class RsiWebsiteService {
     return { data: rows, total, page, limit, pages: Math.ceil(total / limit) };
   }
 
-  async getRandomCommLinkImage(): Promise<Row | null> {
-    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
+  async getRandomCommLinkImage(): Promise<PublicCommLinkImage | null> {
+    const rows = await this.prisma.$queryRawUnsafe<PublicCommLinkImage[]>(
       `SELECT cl.id, cl.rsi_id, cl.slug, cl.title, cl.category, cl.channel, cl.series,
               cl.thumbnail_url as url, cl.thumbnail_url, cl.rsi_url, cl.api_url, cl.api_public_url,
               cl.images_count, cl.published_at
@@ -164,9 +187,9 @@ export class RsiWebsiteService {
     return rows[0] ?? null;
   }
 
-  async getCommLinkImage(id: string): Promise<Row | null> {
+  async getCommLinkImage(id: string): Promise<PublicCommLinkImage | null> {
     const isNumeric = /^\d+$/.test(id);
-    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
+    const rows = await this.prisma.$queryRawUnsafe<PublicCommLinkImage[]>(
       toPostgres(`SELECT cl.id, cl.rsi_id, cl.slug, cl.title, cl.category, cl.channel, cl.series,
               cl.thumbnail_url as url, cl.thumbnail_url, cl.rsi_url, cl.api_url, cl.api_public_url,
               cl.images_count, cl.published_at
@@ -181,7 +204,7 @@ export class RsiWebsiteService {
 
   // ── Starmap (RSI web version) ──────────────────────────────────────────────
 
-  async getStarmapSystems(opts: { search?: string; page?: number; limit?: number } = {}): Promise<PaginatedResult> {
+  async getStarmapSystems(opts: { search?: string; page?: number; limit?: number } = {}): Promise<PaginatedResult<PublicStarmapLocation>> {
     const where: string[] = ["sl.type IN ('star', 'StarSystem')"];
     const params: (string | number)[] = [];
 
@@ -202,7 +225,7 @@ export class RsiWebsiteService {
     );
     const total = Number(countRows[0]?.total) || 0;
 
-    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
+    const rows = await this.prisma.$queryRawUnsafe<PublicStarmapLocation[]>(
       toPostgres(`SELECT sl.id, sl.rsi_id, sl.name, sl.type, sl.status, sl.star_type,
               sl.system_code, sl.system_name, sl.faction_name, sl.affiliations,
               sl.thumbnail, sl.description, sl.web_url, sl.coordinates, sl.aggregated,
@@ -232,7 +255,7 @@ export class RsiWebsiteService {
 
   async getStarmapLocations(
     opts: { search?: string; type?: string; system?: string; affiliation?: string; page?: number; limit?: number } = {},
-  ): Promise<PaginatedResult> {
+  ): Promise<PaginatedResult<PublicStarmapLocation>> {
     const where: string[] = [];
     const params: (string | number)[] = [];
 
@@ -265,7 +288,7 @@ export class RsiWebsiteService {
     );
     const total = Number(countRows[0]?.total) || 0;
 
-    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
+    const rows = await this.prisma.$queryRawUnsafe<PublicStarmapLocation[]>(
       toPostgres(`SELECT sl.id, sl.rsi_id, sl.name, sl.type, sl.status, sl.star_type,
               sl.system_code, sl.system_name, sl.parent_id, sl.faction_name, sl.affiliations,
               sl.thumbnail, sl.description, sl.web_url, sl.coordinates, sl.aggregated,
@@ -295,9 +318,9 @@ export class RsiWebsiteService {
     return { data: rows, total, page, limit, pages: Math.ceil(total / limit) };
   }
 
-  async getStarmapLocation(identifier: string): Promise<Row | null> {
+  async getStarmapLocation(identifier: string): Promise<PublicStarmapLocation | null> {
     const isNumeric = /^\d+$/.test(identifier);
-    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
+    const rows = await this.prisma.$queryRawUnsafe<PublicStarmapLocation[]>(
       toPostgres(`SELECT sl.*,
         (
           SELECT json_build_object(
@@ -333,21 +356,21 @@ export class RsiWebsiteService {
     return rows[0] ?? null;
   }
 
-  async getStarmapFilters(): Promise<{ filters: Record<string, Row[]> }> {
+  async getStarmapFilters(): Promise<{ filters: Record<string, PublicStarmapFilterOption[]> }> {
     const [types, systems, affiliations, statuses] = await Promise.all([
-      this.prisma.$queryRawUnsafe<Row[]>(
+      this.prisma.$queryRawUnsafe<PublicStarmapFilterOption[]>(
         `SELECT type as value, type as label, COUNT(*) as count FROM rsi.starmap_locations GROUP BY type ORDER BY type`,
       ),
-      this.prisma.$queryRawUnsafe<Row[]>(
+      this.prisma.$queryRawUnsafe<PublicStarmapFilterOption[]>(
         `SELECT system_code as value, COALESCE(system_name, system_code) as label, COUNT(*) as count
          FROM rsi.starmap_locations WHERE system_code IS NOT NULL GROUP BY system_code, system_name ORDER BY label`,
       ),
-      this.prisma.$queryRawUnsafe<Row[]>(
+      this.prisma.$queryRawUnsafe<PublicStarmapFilterOption[]>(
         `SELECT faction_name as value, faction_name as label, COUNT(*) as count
          FROM rsi.starmap_locations WHERE faction_name IS NOT NULL AND faction_name != ''
          GROUP BY faction_name ORDER BY faction_name`,
       ),
-      this.prisma.$queryRawUnsafe<Row[]>(
+      this.prisma.$queryRawUnsafe<PublicStarmapFilterOption[]>(
         `SELECT status as value, status as label, COUNT(*) as count
          FROM rsi.starmap_locations WHERE status IS NOT NULL AND status != ''
          GROUP BY status ORDER BY status`,
@@ -356,8 +379,8 @@ export class RsiWebsiteService {
     return { filters: { type: types, system: systems, affiliation: affiliations, status: statuses } };
   }
 
-  async getStarmapPositions(): Promise<Row[]> {
-    return this.prisma.$queryRawUnsafe<Row[]>(
+  async getStarmapPositions(): Promise<PublicStarmapPosition[]> {
+    return this.prisma.$queryRawUnsafe<PublicStarmapPosition[]>(
       `SELECT sl.id, sl.rsi_id, sl.name, sl.type, sl.system_code, sl.system_name,
               sl.status, sl.faction_name, sl.parent_id, parent.id as parent_db_id,
               sl.raw_json->>'designation' as designation,
@@ -396,8 +419,8 @@ export class RsiWebsiteService {
     );
   }
 
-  async getJumpPoints(): Promise<Row[]> {
-    return this.prisma.$queryRawUnsafe<Row[]>(
+  async getJumpPoints(): Promise<PublicJumpPoint[]> {
+    return this.prisma.$queryRawUnsafe<PublicJumpPoint[]>(
       `SELECT id, rsi_id, name, system_code, system_name, jump_points, web_url
        FROM rsi.starmap_locations
        WHERE jump_points IS NOT NULL
@@ -405,8 +428,8 @@ export class RsiWebsiteService {
     );
   }
 
-  async getStarmapSystem(codeOrId: string): Promise<Row | null> {
-    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
+  async getStarmapSystem(codeOrId: string): Promise<PublicStarmapLocation | null> {
+    const rows = await this.prisma.$queryRawUnsafe<PublicStarmapLocation[]>(
       toPostgres(`SELECT sl.*,
         (
           SELECT json_build_object(

@@ -60,7 +60,7 @@ const ECONOMY_ITEMS: NavItemDef[] = [
 ];
 
 const UNIVERSE_ITEMS: NavItemDef[] = [
-  { to: '/starmap', icon: MapPin, label: 'Starmap' },
+  { to: '/locations', icon: MapPin, label: 'Locations' },
   { to: '/galactapedia', icon: Globe, label: 'Galactapedia' },
   { to: '/comm-links', icon: Newspaper, label: 'Comm-Links' },
 ];

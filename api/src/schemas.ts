@@ -125,6 +125,8 @@ export const ChangelogQuery = z
     entity_type: qStr,
     change_type: qStr,
     markers_only: qStr,
+    /** Filtre optionnel sur `meta.extraction_log.game_version` (ex. `4.10.2`). */
+    game_version: qStr,
   })
   .passthrough();
 
@@ -229,6 +231,71 @@ export const CommodityQuery = z
     page: qInt(1),
     limit: qInt(50, 200),
     format: qStr,
+  })
+  .passthrough();
+
+/** Filtres de `/api/v1/galactapedia` — `letter` est servi mais absent d'OpenAPI historique. */
+export const GalactapediaQuery = z
+  .object({
+    search: qStr,
+    category: qStr,
+    letter: qStr,
+    page: qInt(1),
+    limit: qInt(20, 100),
+  })
+  .passthrough();
+
+export const CommLinkQuery = z
+  .object({
+    search: qStr,
+    category: qStr,
+    page: qInt(1),
+    limit: qInt(20, 100),
+  })
+  .passthrough();
+
+export const CommLinkImageQuery = z
+  .object({
+    search: qStr,
+    query: qStr,
+    q: qStr,
+    page: qInt(1),
+    limit: qInt(20, 100),
+  })
+  .passthrough();
+
+export const StarmapLocationsQuery = z
+  .object({
+    search: qStr,
+    query: qStr,
+    q: qStr,
+    type: qStr,
+    system: qStr,
+    system_code: qStr,
+    affiliation: qStr,
+    faction: qStr,
+    page: qInt(1),
+    limit: qInt(50, 200),
+  })
+  .passthrough();
+
+export const StarmapSystemsQuery = z
+  .object({
+    search: qStr,
+    query: qStr,
+    q: qStr,
+    page: qInt(1),
+    limit: qInt(20, 100),
+  })
+  .passthrough();
+
+export const TranslationQuery = z
+  .object({
+    env: qEnv,
+    domain: qStr,
+    search: qStr,
+    page: qInt(1),
+    limit: qInt(50, 200),
   })
   .passthrough();
 

@@ -6,8 +6,10 @@ import { describe, expect, it } from 'vitest';
 import { ZodError } from 'zod';
 import {
   arrayToCsv,
+  CommLinkQuery,
   CommodityQuery,
   ComponentQuery,
+  GalactapediaQuery,
   ItemQuery,
   LoadoutBody,
   ModuleSelectionQuery,
@@ -16,7 +18,11 @@ import {
   qStr,
   SearchQuery,
   ShipQuery,
+  StarmapLocationsQuery,
+  TranslationQuery,
 } from '../src/schemas.js';
+import { PublicTranslation } from '../src/services/game-data/cross-cutting-types.js';
+import { PublicGalactapediaEntry, PublicStarmapLocation } from '../src/services/rsi/rsi-types.js';
 
 // ── Tests ──
 
@@ -315,6 +321,38 @@ describe('ModuleSelectionQuery', () => {
   it('rejects malformed or injected tokens', () => {
     expect(() => ModuleSelectionQuery.parse({ modules: 'hardpoint_front_module' })).toThrow(ZodError);
     expect(() => ModuleSelectionQuery.parse({ modules: "slot:Class' OR 1=1" })).toThrow(ZodError);
+  });
+});
+
+describe('GalactapediaQuery / CommLinkQuery / StarmapLocationsQuery / TranslationQuery', () => {
+  it('defaults page and limit for galactapedia', () => {
+    expect(GalactapediaQuery.parse({})).toMatchObject({ page: 1, limit: 20 });
+    expect(GalactapediaQuery.parse({ letter: 'A', search: 'Banu' }).letter).toBe('A');
+  });
+
+  it('caps comm-link limit at 100', () => {
+    expect(CommLinkQuery.parse({ limit: '999' }).limit).toBe(100);
+  });
+
+  it('accepts starmap location filters', () => {
+    const q = StarmapLocationsQuery.parse({ system: 'STANTON', type: 'Planet', page: '2' });
+    expect(q).toMatchObject({ system: 'STANTON', type: 'Planet', page: 2, limit: 50 });
+  });
+
+  it('defaults translation env to live', () => {
+    expect(TranslationQuery.parse({ search: 'Aurora' })).toMatchObject({ env: 'live', page: 1, limit: 50 });
+  });
+});
+
+describe('contrats RSI / game-data (zod)', () => {
+  it('accepte une entrée galactapedia minimale', () => {
+    const entry = PublicGalactapediaEntry.parse({ id: 'abc', title: 'Banu' });
+    expect(entry.title).toBe('Banu');
+  });
+
+  it('accepte un lieu starmap et une traduction', () => {
+    expect(PublicStarmapLocation.parse({ id: 1, name: 'Stanton' }).name).toBe('Stanton');
+    expect(PublicTranslation.parse({ uuid: 'u1', env: 'live', name_fr: 'Aurora' }).name_fr).toBe('Aurora');
   });
 });
 

@@ -32,7 +32,7 @@ import type { ChangelogEntry } from '@/types/api';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
-const HISTORY_LIMIT = 1000;
+const VERSION_CHANGELOG_LIMIT = 1000;
 const FEED_LIMIT = 40;
 const AUTO_EXPAND_MAX = 4;
 
@@ -62,16 +62,6 @@ function entityHref(type: string, uuid: string): string | null {
 }
 
 // ── Grouping ──────────────────────────────────────────────────────────────────
-
-function groupByVersion(entries: ChangelogEntry[]): Map<string, ChangelogEntry[]> {
-  const map = new Map<string, ChangelogEntry[]>();
-  for (const e of entries) {
-    const v = e.game_version ?? 'Unknown';
-    if (!map.has(v)) map.set(v, []);
-    map.get(v)!.push(e);
-  }
-  return map;
-}
 
 function groupByEntity(entries: ChangelogEntry[]): Map<string, ChangelogEntry[]> {
   const map = new Map<string, ChangelogEntry[]>();
@@ -187,16 +177,44 @@ function EntityCard({ entityKey, entries }: { entityKey: string; entries: Change
 
 // ── Version section ───────────────────────────────────────────────────────────
 
-function VersionSection({ version, entries }: { version: string; entries: ChangelogEntry[] }) {
-  const [open, setOpen] = useState(true);
+function VersionSection({
+  version,
+  env,
+  entityType,
+  changeType,
+  extractedAt,
+  defaultOpen,
+}: {
+  version: string;
+  env: string;
+  entityType: string;
+  changeType: string;
+  extractedAt?: string | null;
+  defaultOpen: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const changelogQuery = useQuery({
+    queryKey: ['changelog.byVersion', version, env, entityType, changeType],
+    queryFn: () =>
+      api.changelog.byVersion(version, {
+        env,
+        limit: VERSION_CHANGELOG_LIMIT,
+        entity_type: entityType || undefined,
+        change_type: changeType || undefined,
+      }),
+    staleTime: 5 * 60_000,
+    enabled: open && !!version,
+  });
+
+  const entries = changelogQuery.data?.data ?? [];
   const grouped = groupByEntity(entries);
 
   // Count entity-level stats (not row-level) so field-detail rows don't inflate counts
   const byChange = { added: 0, removed: 0, modified: 0 };
   const byType: Record<string, number> = {};
   for (const [, ents] of grouped) {
-    const entityType = ents[0]?.entity_type ?? '';
-    byType[entityType] = (byType[entityType] ?? 0) + 1;
+    const et = ents[0]?.entity_type ?? '';
+    byType[et] = (byType[et] ?? 0) + 1;
     const marker = ents.find((e) => e.field_name == null);
     const hasModified = ents.some((e) => e.change_type === 'modified');
     if (marker?.change_type === 'added') byChange.added++;
@@ -204,7 +222,8 @@ function VersionSection({ version, entries }: { version: string; entries: Change
     else if (hasModified) byChange.modified++;
   }
 
-  const date = entries[0]?.created_at;
+  const date = entries[0]?.created_at ?? extractedAt ?? undefined;
+  const total = changelogQuery.data?.total;
 
   return (
     <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="rounded border border-slate-800 overflow-hidden">
@@ -213,7 +232,6 @@ function VersionSection({ version, entries }: { version: string; entries: Change
         className="w-full flex items-start gap-3 px-4 py-3 bg-slate-900/80 hover:bg-slate-900/50 transition-colors text-left"
       >
         <div className="flex-1 min-w-0 space-y-1.5">
-          {/* Version + date */}
           <div className="flex items-center gap-3 flex-wrap">
             <span className="font-orbitron text-sm font-bold text-cyan-400">SC {version}</span>
             {date && (
@@ -221,38 +239,52 @@ function VersionSection({ version, entries }: { version: string; entries: Change
                 <Clock size={10} /> {fDate(date)}
               </span>
             )}
-            <span className="font-mono-sc text-xs text-slate-600">
-              {grouped.size} {grouped.size === 1 ? 'entity' : 'entities'}
-            </span>
+            {open && !changelogQuery.isLoading && (
+              <span className="font-mono-sc text-xs text-slate-600">
+                {grouped.size} {grouped.size === 1 ? 'entity' : 'entities'}
+                {total != null && total > entries.length ? ` · ${entries.length}/${total}` : ''}
+              </span>
+            )}
           </div>
 
-          {/* Entity type breakdown + change counts */}
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            {Object.entries(byType)
-              .sort(([, a], [, b]) => b - a)
-              .map(([t, n]) => (
-                <span key={t} className="flex items-center gap-1 text-[10px] font-mono-sc text-slate-500">
-                  <EntityIcon type={t} />
-                  {n} {t}
-                </span>
-              ))}
-            <span className="text-slate-800 hidden sm:inline">·</span>
-            {byChange.added    > 0 && <GlowBadge color="green" size="xs">+{byChange.added} added</GlowBadge>}
-            {byChange.removed  > 0 && <GlowBadge color="red"   size="xs">-{byChange.removed} removed</GlowBadge>}
-            {byChange.modified > 0 && <GlowBadge color="amber" size="xs">~{byChange.modified} modified</GlowBadge>}
-          </div>
+          {open && !changelogQuery.isLoading && grouped.size > 0 && (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              {Object.entries(byType)
+                .sort(([, a], [, b]) => b - a)
+                .map(([t, n]) => (
+                  <span key={t} className="flex items-center gap-1 text-[10px] font-mono-sc text-slate-500">
+                    <EntityIcon type={t} />
+                    {n} {t}
+                  </span>
+                ))}
+              <span className="text-slate-800 hidden sm:inline">·</span>
+              {byChange.added > 0 && <GlowBadge color="green" size="xs">+{byChange.added} added</GlowBadge>}
+              {byChange.removed > 0 && <GlowBadge color="red" size="xs">-{byChange.removed} removed</GlowBadge>}
+              {byChange.modified > 0 && <GlowBadge color="amber" size="xs">~{byChange.modified} modified</GlowBadge>}
+            </div>
+          )}
         </div>
 
         {open
-          ? <ChevronDown  size={14} className="text-slate-600 mt-1 shrink-0" />
+          ? <ChevronDown size={14} className="text-slate-600 mt-1 shrink-0" />
           : <ChevronRight size={14} className="text-slate-600 mt-1 shrink-0" />}
       </button>
 
       {open && (
         <div className="bg-slate-950/30">
-          {[...grouped.entries()].map(([key, ents]) => (
-            <EntityCard key={key} entityKey={key} entries={ents} />
-          ))}
+          {changelogQuery.isLoading ? (
+            <div className="px-4 py-6 text-center text-xs font-mono-sc text-slate-600">Loading…</div>
+          ) : changelogQuery.error ? (
+            <div className="px-4 py-4">
+              <ErrorState error={changelogQuery.error as Error} onRetry={() => void changelogQuery.refetch()} />
+            </div>
+          ) : grouped.size === 0 ? (
+            <div className="px-4 py-6 text-center text-xs font-mono-sc text-slate-600">No changes for this version</div>
+          ) : (
+            [...grouped.entries()].map(([key, ents]) => (
+              <EntityCard key={key} entityKey={key} entries={ents} />
+            ))
+          )}
         </div>
       )}
     </motion.div>
@@ -368,23 +400,23 @@ export default function ChangelogPage() {
     enabled: view === 'feed',
   });
 
-  const historyQuery = useQuery({
-    queryKey: ['changelog.history', env, entityType, changeType],
-    queryFn: () =>
-      api.changelog.list({
-        env,
-        limit: HISTORY_LIMIT,
-        offset: 0,
-        entity_type: entityType || undefined,
-        change_type: changeType || undefined,
-      }),
-    staleTime: 5 * 60_000,
-    enabled: view === 'history',
-  });
-
   const totalPages = feedQuery.data ? Math.ceil(feedQuery.data.total / FEED_LIMIT) : 0;
-  const grouped = historyQuery.data ? groupByVersion(historyQuery.data.data) : new Map<string, ChangelogEntry[]>();
   const hasFilters = !!(entityType || changeType);
+  const versionRows = (versionsQuery.data?.data ?? []).filter(
+    (row: { game_version?: string | null }) => !!row.game_version,
+  );
+  const latestVersion = versionRows[0] as
+    | {
+        game_version?: string | null;
+        game_env?: string | null;
+        extracted_at?: string | null;
+        ships?: number | null;
+        components?: number | null;
+        items?: number | null;
+        commodities?: number | null;
+        shops?: number | null;
+      }
+    | undefined;
 
   return (
     <PageShell>
@@ -476,75 +508,67 @@ export default function ChangelogPage() {
       {/* ── History view ─────────────────────────────────────────────────── */}
       {view === 'history' && (
         <>
-          {/* Active Live Patch Status Banner */}
-          {versionsQuery.data?.data?.[0] && (
+          {latestVersion?.game_version && (
             <div className="rounded-xl border border-cyan-500/30 bg-slate-900/60 p-4 space-y-2.5 backdrop-blur-md">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2.5">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                   <span className="font-orbitron font-bold text-white text-sm sm:text-base">
-                    Star Citizen Alpha {versionsQuery.data.data[0].game_version ?? '4.10.2'} (
-                    {String(versionsQuery.data.data[0].game_env || env).toUpperCase()})
+                    Star Citizen Alpha {latestVersion.game_version} (
+                    {String(latestVersion.game_env || env).toUpperCase()})
                   </span>
                   <span className="px-2 py-0.5 rounded bg-emerald-950/80 border border-emerald-500/40 text-emerald-400 text-[10px] font-mono-sc font-semibold">
                     ACTIF / EN LIGNE
                   </span>
                 </div>
-                {versionsQuery.data.data[0].extracted_at && (
+                {latestVersion.extracted_at && (
                   <span className="text-xs font-mono-sc text-slate-400 flex items-center gap-1">
-                    <Clock size={12} className="text-cyan-400" /> {fDateTime(versionsQuery.data.data[0].extracted_at)}
+                    <Clock size={12} className="text-cyan-400" /> {fDateTime(latestVersion.extracted_at)}
                   </span>
                 )}
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-1 font-mono-sc text-xs text-slate-300">
-                <div className="p-2 rounded bg-slate-950/60 border border-slate-800">
-                  <span className="text-[10px] text-slate-500 uppercase block">Vaisseaux</span>
-                  <span className="font-semibold text-white">{versionsQuery.data.data[0].ships ?? 280}</span>
-                </div>
-                <div className="p-2 rounded bg-slate-950/60 border border-slate-800">
-                  <span className="text-[10px] text-slate-500 uppercase block">Composants</span>
-                  <span className="font-semibold text-white">{versionsQuery.data.data[0].components ?? 3398}</span>
-                </div>
-                <div className="p-2 rounded bg-slate-950/60 border border-slate-800">
-                  <span className="text-[10px] text-slate-500 uppercase block">Objets FPS</span>
-                  <span className="font-semibold text-white">{versionsQuery.data.data[0].items ?? 5659}</span>
-                </div>
-                <div className="p-2 rounded bg-slate-950/60 border border-slate-800">
-                  <span className="text-[10px] text-slate-500 uppercase block">Marchandises</span>
-                  <span className="font-semibold text-white">{versionsQuery.data.data[0].commodities ?? 135}</span>
-                </div>
-                <div className="p-2 rounded bg-slate-950/60 border border-slate-800">
-                  <span className="text-[10px] text-slate-500 uppercase block">Boutiques</span>
-                  <span className="font-semibold text-white">{versionsQuery.data.data[0].shops ?? 136}</span>
-                </div>
+                {(
+                  [
+                    ['Vaisseaux', latestVersion.ships],
+                    ['Composants', latestVersion.components],
+                    ['Objets FPS', latestVersion.items],
+                    ['Marchandises', latestVersion.commodities],
+                    ['Boutiques', latestVersion.shops],
+                  ] as const
+                ).map(([label, value]) => (
+                  <div key={label} className="p-2 rounded bg-slate-950/60 border border-slate-800">
+                    <span className="text-[10px] text-slate-500 uppercase block">{label}</span>
+                    <span className="font-semibold text-white">
+                      {value != null ? Number(value).toLocaleString('en-US') : '—'}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
           )}
 
-          {historyQuery.data && (
-            <div className="flex items-center justify-between text-xs font-mono-sc text-slate-600">
-              <span>
-                {historyQuery.data.data.length.toLocaleString('en-US')} entries · {grouped.size}{' '}
-                {grouped.size === 1 ? 'version' : 'versions'}
-              </span>
-              {historyQuery.data.total > HISTORY_LIMIT && (
-                <span className="text-amber-600">
-                  Showing first {HISTORY_LIMIT.toLocaleString('en-US')} of {historyQuery.data.total.toLocaleString('en-US')} — apply a filter to narrow
-                </span>
-              )}
-            </div>
-          )}
-
-          {historyQuery.isLoading ? (
+          {versionsQuery.isLoading ? (
             <LoadingGrid message="LOADING HISTORY…" />
-          ) : historyQuery.error ? (
-            <ErrorState error={historyQuery.error as Error} onRetry={() => void historyQuery.refetch()} />
-          ) : grouped.size === 0 ? (
-            <div className="text-center py-16 text-slate-600 text-sm font-rajdhani">No changes found for the selected filters</div>
+          ) : versionsQuery.error ? (
+            <ErrorState error={versionsQuery.error as Error} onRetry={() => void versionsQuery.refetch()} />
+          ) : versionRows.length === 0 ? (
+            <div className="text-center py-16 text-slate-600 text-sm font-rajdhani">No game versions found</div>
           ) : (
             <div className="space-y-2">
-              {[...grouped.entries()].map(([version, entries]) => (
-                <VersionSection key={version} version={version} entries={entries} />
+              <div className="text-xs font-mono-sc text-slate-600">
+                {versionRows.length} {versionRows.length === 1 ? 'version' : 'versions'}
+              </div>
+              {versionRows.map((row: { game_version: string; extracted_at?: string | null }, index: number) => (
+                <VersionSection
+                  key={row.game_version}
+                  version={row.game_version}
+                  env={env}
+                  entityType={entityType}
+                  changeType={changeType}
+                  extractedAt={row.extracted_at}
+                  defaultOpen={index < AUTO_EXPAND_MAX}
+                />
               ))}
             </div>
           )}

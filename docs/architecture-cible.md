@@ -139,7 +139,7 @@ l'autre romprait le contrat : `/api/v1` est consommé par des tiers, et la
 pagination vit en racine côté `{ success }` là où JSend la placerait sous `meta`.
 La transition passe donc par un **surensemble** — chaque réponse porte les deux
 discriminants (`status` et `success`), sans rien déplacer — et `success` sera
-retiré en v2, une fois les consommateurs migrés.
+retiré une fois les consommateurs migrés.
 
 ### D5 — Le cache suit la donnée, pas l'horloge
 

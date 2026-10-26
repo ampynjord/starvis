@@ -23,6 +23,7 @@ import {
   Coffee,
   Cpu,
 } from 'lucide-react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEnv } from '@/contexts/EnvContext';
 import { useEntityNexus } from '@/contexts/NexusContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -30,6 +31,25 @@ import { fetchUniverseExplore, fetchUniverseTaxonomy } from '@/services/universe
 import { localizeCatalogLabel } from '@/lib/catalog-labels';
 import type { TaxonomyCategory, UniverseOmniResult } from '@/types/universe';
 import { fNumber } from '@/utils/formatters';
+
+const NEXUS_CATEGORY_IDS = new Set([
+  'all',
+  'ships',
+  'vehicles',
+  'armor',
+  'clothing',
+  'weapons',
+  'utility',
+  'ammo',
+  'sustenance',
+  'locations',
+  'commodities',
+]);
+
+function resolveCategory(raw: string | null | undefined, fallback = 'all'): string {
+  if (raw && NEXUS_CATEGORY_IDS.has(raw)) return raw;
+  return fallback;
+}
 
 function getBadgeClass(color?: string): string {
   switch (color) {
@@ -82,10 +102,18 @@ function renderCategoryIcon(category: string, size = 40) {
   }
 }
 
-export function UniverseNexusView() {
+type UniverseNexusViewProps = {
+  /** Prefer this category when the URL has none (e.g. `/locations`). */
+  initialCategory?: string;
+};
+
+export function UniverseNexusView({ initialCategory }: UniverseNexusViewProps = {}) {
   const { env } = useEnv();
   const { openNexus } = useEntityNexus();
   const { language, t } = useLanguage();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   const categories = [
     { id: 'all', label: t('cat_all'), icon: Sparkles, color: 'text-cyan-400' },
@@ -101,7 +129,9 @@ export function UniverseNexusView() {
     { id: 'commodities', label: t('cat_commodities'), icon: TrendingUp, color: 'text-rose-400' },
   ];
 
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedCategory, setSelectedCategory] = useState<string>(() =>
+    resolveCategory(searchParams.get('category'), resolveCategory(initialCategory)),
+  );
   const [selectedSubCategory, setSelectedSubCategory] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'flight-ready' | 'in-concept' | 'lore'>('all');
   const [search, setSearch] = useState('');
@@ -111,6 +141,23 @@ export function UniverseNexusView() {
   useEffect(() => {
     document.title = t('doc_title');
   }, [language, t]);
+
+  useEffect(() => {
+    const fromUrl = resolveCategory(searchParams.get('category'), resolveCategory(initialCategory));
+    setSelectedCategory((prev) => (prev === fromUrl ? prev : fromUrl));
+  }, [searchParams, initialCategory]);
+
+  useEffect(() => {
+    if (pathname !== '/' && pathname !== '/explore') return;
+    const current = searchParams.get('category');
+    const next = selectedCategory === 'all' ? null : selectedCategory;
+    if ((current ?? null) === next) return;
+    const params = new URLSearchParams(searchParams.toString());
+    if (next) params.set('category', next);
+    else params.delete('category');
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }, [selectedCategory, pathname, router, searchParams]);
 
   // Live Taxonomy Query
   const { data: taxonomy } = useQuery({
@@ -153,24 +200,23 @@ export function UniverseNexusView() {
   return (
     <div className="space-y-6 sm:space-y-8">
       {/* Cockpit HUD Hero Header */}
-      <div className="relative rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-cyan-500/20 p-6 sm:p-8 overflow-hidden shadow-2xl backdrop-blur-xl">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/5 rounded-full blur-3xl pointer-events-none" />
+      <div className="relative rounded-xl bg-slate-950 border border-slate-800/80 p-6 sm:p-8 overflow-hidden">
         <div className="relative z-10 max-w-3xl space-y-3">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-950/60 border border-cyan-500/30 text-cyan-400 text-xs font-mono-sc">
-            <Sparkles size={13} className="animate-pulse" />
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-sm bg-slate-950 border border-cyan-500/30 text-cyan-400 text-xs font-orbitron uppercase tracking-widest">
+            <Sparkles size={13} />
             <span>{t('hero_badge')}</span>
           </div>
           <h1 className="text-3xl sm:text-5xl font-black font-rajdhani text-white tracking-wide">
             {t('hero_title')}
           </h1>
-          <p className="text-sm sm:text-base text-slate-300 font-rajdhani leading-relaxed">
+          <p className="text-sm sm:text-base text-slate-400 font-rajdhani leading-relaxed">
             {t('hero_desc')}
           </p>
         </div>
       </div>
 
       {/* Cockpit Unified Command Console */}
-      <div className="rounded-xl bg-slate-900/60 border border-slate-800/80 p-3 sm:p-4 space-y-3 backdrop-blur-md shadow-xl">
+      <div className="rounded-xl bg-slate-950/80 border border-slate-800/80 p-3 sm:p-4 space-y-3">
         {/* Category Pills Bar */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
           {categories.map((cat) => {

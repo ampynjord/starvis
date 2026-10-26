@@ -29,12 +29,15 @@ function isSameOriginRequest(req: NextRequest): boolean {
 /**
  * Le proxy public, parametre par la version amont.
  *
- * Le chemin `/api/v1/` etait code en dur : `/api/v2` etait donc injoignable
- * depuis le site, et un tiers passant par le proxy ne pouvait pas l'atteindre
- * non plus. La version se lit maintenant du segment de route, ce qui evite de
- * recopier le proxy a chaque version.
+ * Le chemin amont est le segment de route (`v1`, `v2`, ou `universe`).
+ * `v1` et `v2` gardent le même préfixe qu'avant. `universe` vise le chemin
+ * canonique sans version, sans recopier le proxy.
  */
-export async function proxyPublicApi(req: NextRequest, context: { params: Promise<{ path?: string[] }> }, apiVersion: 'v1' | 'v2' = 'v1') {
+export async function proxyPublicApi(
+  req: NextRequest,
+  context: { params: Promise<{ path?: string[] }> },
+  apiMount: 'v1' | 'v2' | 'universe' = 'v1',
+) {
   if (!ALLOWED_METHODS.has(req.method)) {
     return NextResponse.json({ success: false, error: 'Method not allowed' }, { status: 405 });
   }
@@ -46,7 +49,7 @@ export async function proxyPublicApi(req: NextRequest, context: { params: Promis
   }
 
   const { path = [] } = await context.params;
-  const upstreamPath = `/api/${apiVersion}/${path.map(encodeURIComponent).join('/')}${req.nextUrl.search}`;
+  const upstreamPath = `/api/${apiMount}/${path.map(encodeURIComponent).join('/')}${req.nextUrl.search}`;
   const headers: Record<string, string> = {
     ...forwardedClientHeadersFromHeaders(req.headers),
     Accept: req.headers.get('accept') ?? 'application/json',

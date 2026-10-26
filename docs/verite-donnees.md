@@ -1,6 +1,6 @@
 # Vérité des données — état mesuré
 
-> Étape 1 de [refonte-v2.md](refonte-v2.md). Ce document consigne ce que
+> Étape 1 du [plan de refonte](refonte-v2.md). Ce document consigne ce que
 > l'audit `quality/data-truth-audit.mjs` mesure réellement sur le patch 4.9.0,
 > et les défauts qu'il a mis au jour. Les corrections relèvent des étapes
 > suivantes : ici on établit la vérité, on ne la répare pas encore.

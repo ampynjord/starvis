@@ -32,14 +32,6 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-dvh min-w-0 overflow-hidden bg-void">
-      {/* Sci-fi Scan line effect */}
-      <div
-        className="animate-scanline pointer-events-none fixed left-0 right-0 h-20 z-50"
-        style={{
-          background: 'linear-gradient(to bottom, transparent, rgba(0,212,255,0.025), transparent)',
-        }}
-      />
-
       {/* Drawer Overlay (Both Mobile & Desktop) */}
       <AnimatePresence>
         {sidebarOpen && (

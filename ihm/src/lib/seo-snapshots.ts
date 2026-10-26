@@ -1,14 +1,5 @@
 import type { SeoEntityLink } from '@/components/seo/SeoEntitySnapshot';
-import type {
-  CommLink,
-  Commodity,
-  ComponentListItem,
-  GalactapediaEntry,
-  ItemListItem,
-  Location,
-  ShipListItem,
-  StarmapPosition,
-} from '@/types/api';
+import type { CommLink, Commodity, ComponentListItem, GalactapediaEntry, ItemListItem, Location, ShipListItem } from '@/types/api';
 import { serverGetAllPaginated } from './server-api';
 import { PUBLIC_SITE_URL } from './server-config';
 
@@ -114,20 +105,10 @@ export async function getLocationSeoLinks(): Promise<SeoEntityLink[]> {
     { maxItems: SNAPSHOT_LIMIT },
   );
   return locations.map((location) => ({
-    href: `/locations?focus=${encodeURIComponent(location.uuid)}`,
+    href: `/locations/${encodeURIComponent(location.uuid)}`,
     name: location.name,
     meta: compact([location.system_code, location.type]),
     description: location.description,
-  }));
-}
-
-export async function getStarmapSeoLinks(): Promise<SeoEntityLink[]> {
-  const positions = await serverGetAllPaginated<StarmapPosition>('/starmap/locations', {}, { maxItems: SNAPSHOT_LIMIT });
-  return positions.map((position) => ({
-    href: `/starmap?focus=${encodeURIComponent(position.rsi_id ?? String(position.id))}`,
-    name: position.name,
-    meta: compact([position.system_name, position.type, position.faction_name]),
-    description: position.description,
   }));
 }
 

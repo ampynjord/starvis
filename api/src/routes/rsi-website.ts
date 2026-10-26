@@ -2,9 +2,11 @@
  * RSI Website routes — galactapedia, comm-links, starmap
  *
  * Data comes from the rsi_website database (scraped from RSI/SC Wiki).
+ * Query params are déclarés dans `schemas.ts` et le registre OpenAPI.
  */
 import type { Router } from 'express';
-import { asyncHandler, getFilterString, getQueryNumber, getQueryString, sendDataWithETag, sendWithETag } from './helpers.js';
+import { CommLinkImageQuery, CommLinkQuery, GalactapediaQuery, StarmapLocationsQuery, StarmapSystemsQuery } from '../schemas.js';
+import { asyncHandler, getFilterString, sendDataWithETag, sendWithETag } from './helpers.js';
 import type { RouteDependencies } from './types.js';
 
 export function mountRsiWebsiteRoutes(router: Router, deps: RouteDependencies): void {
@@ -16,12 +18,13 @@ export function mountRsiWebsiteRoutes(router: Router, deps: RouteDependencies): 
   router.get(
     '/api/v1/galactapedia',
     asyncHandler(async (req, res) => {
+      const q = GalactapediaQuery.parse(req.query);
       const result = await rsiWebsiteService.getGalactapediaEntries({
-        search: getQueryString(req, 'search'),
-        category: getQueryString(req, 'category'),
-        letter: getQueryString(req, 'letter'),
-        page: getQueryNumber(req, 'page'),
-        limit: getQueryNumber(req, 'limit'),
+        search: q.search,
+        category: q.category,
+        letter: q.letter,
+        page: q.page,
+        limit: q.limit,
       });
       sendWithETag(req, res, { success: true, ...result });
     }),
@@ -49,11 +52,12 @@ export function mountRsiWebsiteRoutes(router: Router, deps: RouteDependencies): 
   router.get(
     '/api/v1/comm-links',
     asyncHandler(async (req, res) => {
+      const q = CommLinkQuery.parse(req.query);
       const result = await rsiWebsiteService.getCommLinks({
-        search: getQueryString(req, 'search'),
-        category: getQueryString(req, 'category'),
-        page: getQueryNumber(req, 'page'),
-        limit: getQueryNumber(req, 'limit'),
+        search: q.search,
+        category: q.category,
+        page: q.page,
+        limit: q.limit,
       });
       sendWithETag(req, res, { success: true, ...result });
     }),
@@ -71,10 +75,11 @@ export function mountRsiWebsiteRoutes(router: Router, deps: RouteDependencies): 
   router.get(
     '/api/v1/comm-link-images/search',
     asyncHandler(async (req, res) => {
+      const q = CommLinkImageQuery.parse(req.query);
       const result = await rsiWebsiteService.getCommLinkImages({
-        search: getFilterString(req, 'query', 'search', 'q'),
-        page: getQueryNumber(req, 'page'),
-        limit: getQueryNumber(req, 'limit'),
+        search: getFilterString(req, 'query', 'search', 'q') ?? q.search ?? q.query ?? q.q,
+        page: q.page,
+        limit: q.limit,
       });
       sendWithETag(req, res, { success: true, ...result });
     }),
@@ -83,10 +88,11 @@ export function mountRsiWebsiteRoutes(router: Router, deps: RouteDependencies): 
   router.get(
     '/api/v1/comm-link-images',
     asyncHandler(async (req, res) => {
+      const q = CommLinkImageQuery.parse(req.query);
       const result = await rsiWebsiteService.getCommLinkImages({
-        search: getFilterString(req, 'query', 'search', 'q'),
-        page: getQueryNumber(req, 'page'),
-        limit: getQueryNumber(req, 'limit'),
+        search: getFilterString(req, 'query', 'search', 'q') ?? q.search ?? q.query ?? q.q,
+        page: q.page,
+        limit: q.limit,
       });
       sendWithETag(req, res, { success: true, ...result });
     }),
@@ -139,13 +145,14 @@ export function mountRsiWebsiteRoutes(router: Router, deps: RouteDependencies): 
   router.get(
     '/api/v1/starmap/locations',
     asyncHandler(async (req, res) => {
+      const q = StarmapLocationsQuery.parse(req.query);
       const result = await rsiWebsiteService.getStarmapLocations({
-        search: getFilterString(req, 'query', 'search', 'q'),
-        type: getFilterString(req, 'type'),
-        system: getFilterString(req, 'system', 'system_code'),
-        affiliation: getFilterString(req, 'affiliation', 'faction'),
-        page: getQueryNumber(req, 'page'),
-        limit: getQueryNumber(req, 'limit'),
+        search: getFilterString(req, 'query', 'search', 'q') ?? q.search ?? q.query ?? q.q,
+        type: getFilterString(req, 'type') ?? q.type,
+        system: getFilterString(req, 'system', 'system_code') ?? q.system ?? q.system_code,
+        affiliation: getFilterString(req, 'affiliation', 'faction') ?? q.affiliation ?? q.faction,
+        page: q.page,
+        limit: q.limit,
       });
       sendWithETag(req, res, { success: true, ...result });
     }),
@@ -163,10 +170,11 @@ export function mountRsiWebsiteRoutes(router: Router, deps: RouteDependencies): 
   router.get(
     '/api/v1/starmap/systems',
     asyncHandler(async (req, res) => {
+      const q = StarmapSystemsQuery.parse(req.query);
       const result = await rsiWebsiteService.getStarmapSystems({
-        search: getFilterString(req, 'query', 'search', 'q'),
-        page: getQueryNumber(req, 'page'),
-        limit: getQueryNumber(req, 'limit'),
+        search: getFilterString(req, 'query', 'search', 'q') ?? q.search ?? q.query ?? q.q,
+        page: q.page,
+        limit: q.limit,
       });
       sendWithETag(req, res, { success: true, ...result });
     }),

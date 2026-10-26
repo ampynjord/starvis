@@ -157,7 +157,7 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(['/api/v1', '/api/v2'], requireExternalApiAccess);
+app.use(['/api/v1', '/api/v2', '/api/universe'], requireExternalApiAccess);
 
 // ===== SWAGGER / OPENAPI =====
 const __dirname = path.dirname(fileURLToPath(import.meta.url));

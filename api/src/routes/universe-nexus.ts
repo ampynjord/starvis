@@ -7,12 +7,11 @@ export function mountUniverseNexusRoutes(router: Router, deps: RouteDependencies
   const nexusService = new UniverseNexusService(deps.prisma);
 
   /**
-   * GET /api/v2/universe/omni-search
-   * Fast multi-domain global search traversing ships, components, items, locations, commodities.
-   * Strips all placeholders, unreleased dev entities, and technical prefixes.
+   * GET /api/universe/omni-search
+   * Alias de compatibilité : /api/v2/universe/omni-search (même gestionnaire).
    */
   router.get(
-    '/api/v2/universe/omni-search',
+    ['/api/universe/omni-search', '/api/v2/universe/omni-search'],
     asyncHandler(async (req, res) => {
       const q = getQueryString(req, 'q') ?? getQueryString(req, 'search') ?? '';
       const env = getQueryString(req, 'env') ?? 'live';
@@ -29,11 +28,11 @@ export function mountUniverseNexusRoutes(router: Router, deps: RouteDependencies
   );
 
   /**
-   * GET /api/v2/universe/taxonomy
-   * Dynamic in-game taxonomy tree with live entity counts for categories and subcategories.
+   * GET /api/universe/taxonomy
+   * Alias de compatibilité : /api/v2/universe/taxonomy (même gestionnaire).
    */
   router.get(
-    '/api/v2/universe/taxonomy',
+    ['/api/universe/taxonomy', '/api/v2/universe/taxonomy'],
     asyncHandler(async (req, res) => {
       const env = getQueryString(req, 'env') ?? 'live';
       const taxonomy = await nexusService.getTaxonomy(env);
@@ -45,11 +44,11 @@ export function mountUniverseNexusRoutes(router: Router, deps: RouteDependencies
   );
 
   /**
-   * GET /api/v2/universe/explore
-   * Unified pagination & intelligent facets across the universe categories.
+   * GET /api/universe/explore
+   * Alias de compatibilité : /api/v2/universe/explore (même gestionnaire).
    */
   router.get(
-    '/api/v2/universe/explore',
+    ['/api/universe/explore', '/api/v2/universe/explore'],
     asyncHandler(async (req, res) => {
       const category = (getQueryString(req, 'category') as any) ?? 'all';
       const subCategory = getQueryString(req, 'sub_category') ?? getQueryString(req, 'subCategory');
@@ -85,11 +84,11 @@ export function mountUniverseNexusRoutes(router: Router, deps: RouteDependencies
   );
 
   /**
-   * GET /api/v2/universe/entities/:category/:id
-   * Complete 360° Pivot Nexus Sheet with relational graph connections.
+   * GET /api/universe/entities/:category/:id
+   * Alias de compatibilité : /api/v2/universe/entities/:category/:id (même gestionnaire).
    */
   router.get(
-    '/api/v2/universe/entities/:category/:id',
+    ['/api/universe/entities/:category/:id', '/api/v2/universe/entities/:category/:id'],
     asyncHandler(async (req, res) => {
       const category = req.params.category as any;
       const id = req.params.id;

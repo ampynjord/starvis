@@ -94,7 +94,7 @@ export default function LegalPage() {
       <Section title="About the project">
         <P>
           <span className="font-semibold text-slate-200">STARVIS</span> is an unofficial, independent,
-          non-commercial Open Data & Public API project for Star Citizen players and community developers. It provides
+          non-commercial Open Data and Public API project for Star Citizen players and community developers. It provides
           searchable game data, calculators, comparison tools, a public REST API and versioned JSON datasets.
         </P>
         <P>

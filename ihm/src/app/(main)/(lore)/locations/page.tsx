@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { SeoEntitySnapshot, SeoJsonLd } from '@/components/seo/SeoEntitySnapshot';
 import { collectionJsonLd, getLocationSeoLinks } from '@/lib/seo-snapshots';
-import UniverseExplorerPage from '@/views/UniverseExplorerPage';
+import { UniverseNexusView } from '@/views/UniverseNexusView';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   alternates: { canonical: '/locations' },
   openGraph: {
     title: 'Universe & Locations - STARVIS',
-    description: 'Interactive Star Citizen universe explorer with game-extracted location data.',
+    description: 'Star Citizen locations in the STARVIS Nexus: systems, planets, moons, stations and outposts.',
   },
 };
 
@@ -25,7 +25,7 @@ export default async function Page() {
     <>
       <SeoJsonLd value={collectionJsonLd('Star Citizen Universe Locations', '/locations', links)} />
       <Suspense>
-        <UniverseExplorerPage />
+        <UniverseNexusView initialCategory="locations" />
       </Suspense>
       <SeoEntitySnapshot
         title="Indexable Star Citizen universe locations"

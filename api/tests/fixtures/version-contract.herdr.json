@@ -1,0 +1,711 @@
+{
+  "baseline": {
+    "ref": "wip/herdr-agents",
+    "commit": "462e8dd64757afda8ecbef79214e95c2f1980169",
+    "subject": "docs(agents): table des modeles par difficulte et points d'arret",
+    "unversionedUniverseRoutes": 0
+  },
+  "probes": [
+    {
+      "id": "v1-ship-matrix",
+      "version": "v1",
+      "path": "/api/v1/ship-matrix",
+      "status": 200,
+      "envelope": ["count", "data", "meta", "status", "success"],
+      "fields": ["count", "data", "data[]", "meta", "meta.source", "status", "success"],
+      "body": {
+        "count": 0,
+        "data": [],
+        "meta": {
+          "source": "RSI Ship Matrix"
+        },
+        "status": "success",
+        "success": true
+      }
+    },
+    {
+      "id": "v1-ship-matrix-stats",
+      "version": "v1",
+      "path": "/api/v1/ship-matrix/stats",
+      "status": 200,
+      "envelope": ["data", "status", "success"],
+      "fields": ["data", "data.total", "status", "success"],
+      "body": {
+        "data": {
+          "total": 0
+        },
+        "status": "success",
+        "success": true
+      }
+    },
+    {
+      "id": "v1-ship-matrix-missing",
+      "version": "v1",
+      "path": "/api/v1/ship-matrix/invalid-id",
+      "status": 404,
+      "envelope": ["error", "status", "success"],
+      "fields": ["error", "status", "success"],
+      "body": {
+        "error": "Not found",
+        "status": "error",
+        "success": false
+      }
+    },
+    {
+      "id": "v1-ships",
+      "version": "v1",
+      "path": "/api/v1/ships",
+      "status": 200,
+      "envelope": ["data", "meta", "status", "success"],
+      "fields": [
+        "data",
+        "data[]",
+        "meta",
+        "meta.count",
+        "meta.limit",
+        "meta.page",
+        "meta.pages",
+        "meta.source",
+        "meta.total",
+        "status",
+        "success"
+      ],
+      "body": {
+        "data": [],
+        "meta": {
+          "count": 0,
+          "limit": 20,
+          "page": 1,
+          "pages": 0,
+          "source": "Game Data",
+          "total": 0
+        },
+        "status": "success",
+        "success": true
+      }
+    },
+    {
+      "id": "v1-ships-filters",
+      "version": "v1",
+      "path": "/api/v1/ships/filters",
+      "status": 200,
+      "envelope": ["status", "success"],
+      "fields": ["status", "success"],
+      "body": {
+        "status": "success",
+        "success": true
+      }
+    },
+    {
+      "id": "v1-ships-search-missing",
+      "version": "v1",
+      "path": "/api/v1/ships/search",
+      "status": 400,
+      "envelope": ["error", "status", "success"],
+      "fields": ["error", "status", "success"],
+      "body": {
+        "error": "Query 'search' must be at least 2 characters",
+        "status": "error",
+        "success": false
+      }
+    },
+    {
+      "id": "v1-ships-search",
+      "version": "v1",
+      "path": "/api/v1/ships/search?search=aurora",
+      "status": 200,
+      "envelope": ["count", "data", "status", "success"],
+      "fields": ["count", "data", "data[]", "status", "success"],
+      "body": {
+        "count": 0,
+        "data": [],
+        "status": "success",
+        "success": true
+      }
+    },
+    {
+      "id": "v1-ships-missing",
+      "version": "v1",
+      "path": "/api/v1/ships/00000000-0000-0000-0000-000000000000",
+      "status": 404,
+      "envelope": ["error", "status", "success"],
+      "fields": ["error", "status", "success"],
+      "body": {
+        "error": "Ship not found",
+        "status": "error",
+        "success": false
+      }
+    },
+    {
+      "id": "v1-components",
+      "version": "v1",
+      "path": "/api/v1/components",
+      "status": 200,
+      "envelope": ["count", "data", "limit", "meta", "page", "pages", "status", "success", "total"],
+      "fields": ["count", "data", "data[]", "limit", "meta", "meta.source", "page", "pages", "status", "success", "total"],
+      "body": {
+        "count": 0,
+        "data": [],
+        "limit": 20,
+        "meta": {
+          "source": "Game Data"
+        },
+        "page": 1,
+        "pages": 0,
+        "status": "success",
+        "success": true,
+        "total": 0
+      }
+    },
+    {
+      "id": "v1-components-missing",
+      "version": "v1",
+      "path": "/api/v1/components/missing-component",
+      "status": 404,
+      "envelope": ["error", "status", "success"],
+      "fields": ["error", "status", "success"],
+      "body": {
+        "error": "Component not found",
+        "status": "error",
+        "success": false
+      }
+    },
+    {
+      "id": "v1-items",
+      "version": "v1",
+      "path": "/api/v1/items",
+      "status": 200,
+      "envelope": ["data", "meta", "status", "success"],
+      "fields": [
+        "data",
+        "data[]",
+        "meta",
+        "meta.count",
+        "meta.limit",
+        "meta.page",
+        "meta.pages",
+        "meta.source",
+        "meta.total",
+        "status",
+        "success"
+      ],
+      "body": {
+        "data": [],
+        "meta": {
+          "count": 0,
+          "limit": 20,
+          "page": 1,
+          "pages": 0,
+          "source": "Game Data",
+          "total": 0
+        },
+        "status": "success",
+        "success": true
+      }
+    },
+    {
+      "id": "v1-commodities",
+      "version": "v1",
+      "path": "/api/v1/commodities",
+      "status": 200,
+      "envelope": ["count", "data", "limit", "meta", "page", "pages", "status", "success", "total"],
+      "fields": ["count", "data", "data[]", "limit", "meta", "meta.source", "page", "pages", "status", "success", "total"],
+      "body": {
+        "count": 0,
+        "data": [],
+        "limit": 20,
+        "meta": {
+          "source": "Game Data"
+        },
+        "page": 1,
+        "pages": 0,
+        "status": "success",
+        "success": true,
+        "total": 0
+      }
+    },
+    {
+      "id": "v1-shops",
+      "version": "v1",
+      "path": "/api/v1/shops",
+      "status": 200,
+      "envelope": ["data", "limit", "page", "pages", "status", "success", "total"],
+      "fields": ["data", "data[]", "limit", "page", "pages", "status", "success", "total"],
+      "body": {
+        "data": [],
+        "limit": 20,
+        "page": 1,
+        "pages": 0,
+        "status": "success",
+        "success": true,
+        "total": 0
+      }
+    },
+    {
+      "id": "v1-shops-bad-id",
+      "version": "v1",
+      "path": "/api/v1/shops/not-a-number",
+      "status": 400,
+      "envelope": ["error", "status", "success"],
+      "fields": ["error", "status", "success"],
+      "body": {
+        "error": "Invalid shop ID",
+        "status": "error",
+        "success": false
+      }
+    },
+    {
+      "id": "v1-locations",
+      "version": "v1",
+      "path": "/api/v1/locations",
+      "status": 200,
+      "envelope": ["count", "data", "limit", "meta", "page", "pages", "status", "success", "total"],
+      "fields": ["count", "data", "data[]", "limit", "meta", "page", "pages", "status", "success", "total"],
+      "body": {
+        "count": 0,
+        "data": [],
+        "limit": 20,
+        "meta": {},
+        "page": 1,
+        "pages": 0,
+        "status": "success",
+        "success": true,
+        "total": 0
+      }
+    },
+    {
+      "id": "v1-missions",
+      "version": "v1",
+      "path": "/api/v1/missions",
+      "status": 200,
+      "envelope": ["count", "data", "limit", "meta", "page", "pages", "status", "success", "total"],
+      "fields": ["count", "data", "data[]", "limit", "meta", "page", "pages", "status", "success", "total"],
+      "body": {
+        "count": 0,
+        "data": [],
+        "limit": 20,
+        "meta": {},
+        "page": 1,
+        "pages": 0,
+        "status": "success",
+        "success": true,
+        "total": 0
+      }
+    },
+    {
+      "id": "v1-missions-brokers",
+      "version": "v1",
+      "path": "/api/v1/missions/brokers",
+      "status": 200,
+      "envelope": ["count", "data", "limit", "page", "pages", "status", "success", "total"],
+      "fields": ["count", "data", "data[]", "limit", "page", "pages", "status", "success", "total"],
+      "body": {
+        "count": 0,
+        "data": [],
+        "limit": 50,
+        "page": 1,
+        "pages": 1,
+        "status": "success",
+        "success": true,
+        "total": 0
+      }
+    },
+    {
+      "id": "v1-factions",
+      "version": "v1",
+      "path": "/api/v1/factions",
+      "status": 200,
+      "envelope": ["count", "data", "status", "success"],
+      "fields": ["count", "data", "data[]", "status", "success"],
+      "body": {
+        "count": 0,
+        "data": [],
+        "status": "success",
+        "success": true
+      }
+    },
+    {
+      "id": "v1-mining-elements",
+      "version": "v1",
+      "path": "/api/v1/mining/elements",
+      "status": 200,
+      "envelope": ["count", "data", "status", "success"],
+      "fields": ["count", "data", "data[]", "status", "success"],
+      "body": {
+        "count": 0,
+        "data": [],
+        "status": "success",
+        "success": true
+      }
+    },
+    {
+      "id": "v1-crafting-categories",
+      "version": "v1",
+      "path": "/api/v1/crafting/categories",
+      "status": 200,
+      "envelope": ["data", "status", "success"],
+      "fields": ["data", "data[]", "status", "success"],
+      "body": {
+        "data": [],
+        "status": "success",
+        "success": true
+      }
+    },
+    {
+      "id": "v1-paints",
+      "version": "v1",
+      "path": "/api/v1/paints",
+      "status": 200,
+      "envelope": ["count", "data", "limit", "meta", "page", "pages", "status", "success", "total"],
+      "fields": ["count", "data", "data[]", "limit", "meta", "meta.source", "page", "pages", "status", "success", "total"],
+      "body": {
+        "count": 0,
+        "data": [],
+        "limit": 20,
+        "meta": {
+          "source": "Game Data"
+        },
+        "page": 1,
+        "pages": 0,
+        "status": "success",
+        "success": true,
+        "total": 0
+      }
+    },
+    {
+      "id": "v1-manufacturers",
+      "version": "v1",
+      "path": "/api/v1/manufacturers",
+      "status": 200,
+      "envelope": ["count", "data", "status", "success"],
+      "fields": ["count", "data", "data[]", "status", "success"],
+      "body": {
+        "count": 0,
+        "data": [],
+        "status": "success",
+        "success": true
+      }
+    },
+    {
+      "id": "v1-changelog",
+      "version": "v1",
+      "path": "/api/v1/changelog",
+      "status": 200,
+      "envelope": ["data", "limit", "page", "pages", "status", "success", "total"],
+      "fields": ["data", "data[]", "limit", "page", "pages", "status", "success", "total"],
+      "body": {
+        "data": [],
+        "limit": 20,
+        "page": 1,
+        "pages": 0,
+        "status": "success",
+        "success": true,
+        "total": 0
+      }
+    },
+    {
+      "id": "v1-changelog-summary",
+      "version": "v1",
+      "path": "/api/v1/changelog/summary",
+      "status": 200,
+      "envelope": ["data", "status", "success"],
+      "fields": ["data", "data[]", "status", "success"],
+      "body": {
+        "data": [],
+        "status": "success",
+        "success": true
+      }
+    },
+    {
+      "id": "v1-game-versions",
+      "version": "v1",
+      "path": "/api/v1/game-versions",
+      "status": 200,
+      "envelope": ["data", "status", "success", "total"],
+      "fields": ["data", "data[]", "status", "success", "total"],
+      "body": {
+        "data": [],
+        "status": "success",
+        "success": true,
+        "total": 0
+      }
+    },
+    {
+      "id": "v1-translations",
+      "version": "v1",
+      "path": "/api/v1/translations",
+      "status": 200,
+      "envelope": ["count", "data", "limit", "meta", "page", "pages", "status", "success", "total"],
+      "fields": ["count", "data", "data[]", "limit", "meta", "page", "pages", "status", "success", "total"],
+      "body": {
+        "count": 0,
+        "data": [],
+        "limit": 20,
+        "meta": {},
+        "page": 1,
+        "pages": 0,
+        "status": "success",
+        "success": true,
+        "total": 0
+      }
+    },
+    {
+      "id": "v1-trade-locations",
+      "version": "v1",
+      "path": "/api/v1/trade/locations",
+      "status": 200,
+      "envelope": ["data", "status", "success"],
+      "fields": ["data", "data[]", "status", "success"],
+      "body": {
+        "data": [],
+        "status": "success",
+        "success": true
+      }
+    },
+    {
+      "id": "v1-galactapedia",
+      "version": "v1",
+      "path": "/api/v1/galactapedia",
+      "status": 200,
+      "envelope": ["data", "limit", "page", "pages", "status", "success", "total"],
+      "fields": ["data", "data[]", "limit", "page", "pages", "status", "success", "total"],
+      "body": {
+        "data": [],
+        "limit": 20,
+        "page": 1,
+        "pages": 0,
+        "status": "success",
+        "success": true,
+        "total": 0
+      }
+    },
+    {
+      "id": "v1-comm-links",
+      "version": "v1",
+      "path": "/api/v1/comm-links",
+      "status": 200,
+      "envelope": ["data", "limit", "page", "pages", "status", "success", "total"],
+      "fields": ["data", "data[]", "limit", "page", "pages", "status", "success", "total"],
+      "body": {
+        "data": [],
+        "limit": 20,
+        "page": 1,
+        "pages": 0,
+        "status": "success",
+        "success": true,
+        "total": 0
+      }
+    },
+    {
+      "id": "v1-starmap-systems",
+      "version": "v1",
+      "path": "/api/v1/starmap/systems",
+      "status": 200,
+      "envelope": ["data", "limit", "page", "pages", "status", "success", "total"],
+      "fields": ["data", "data[]", "limit", "page", "pages", "status", "success", "total"],
+      "body": {
+        "data": [],
+        "limit": 20,
+        "page": 1,
+        "pages": 0,
+        "status": "success",
+        "success": true,
+        "total": 0
+      }
+    },
+    {
+      "id": "v1-starmap-locations",
+      "version": "v1",
+      "path": "/api/v1/starmap/locations",
+      "status": 200,
+      "envelope": ["data", "limit", "page", "pages", "status", "success", "total"],
+      "fields": ["data", "data[]", "limit", "page", "pages", "status", "success", "total"],
+      "body": {
+        "data": [],
+        "limit": 20,
+        "page": 1,
+        "pages": 0,
+        "status": "success",
+        "success": true,
+        "total": 0
+      }
+    },
+    {
+      "id": "v2-taxonomy",
+      "version": "v2",
+      "path": "/api/v2/universe/taxonomy?env=live",
+      "status": 200,
+      "envelope": ["data", "status", "success"],
+      "fields": [
+        "data",
+        "data[]",
+        "data[].icon",
+        "data[].id",
+        "data[].label_en",
+        "data[].label_fr",
+        "data[].subCategories",
+        "data[].subCategories[]",
+        "data[].total",
+        "status",
+        "success"
+      ],
+      "body": {
+        "data": [
+          {
+            "icon": "Rocket",
+            "id": "ships",
+            "label_en": "Fleet & Ships",
+            "label_fr": "Flotte & Vaisseaux",
+            "subCategories": [],
+            "total": 0
+          },
+          {
+            "icon": "Cpu",
+            "id": "vehicles",
+            "label_en": "Vehicle Components",
+            "label_fr": "Composants Véhicules",
+            "subCategories": [],
+            "total": 0
+          },
+          {
+            "icon": "Shield",
+            "id": "armor",
+            "label_en": "Armor",
+            "label_fr": "Armures",
+            "subCategories": [],
+            "total": 0
+          },
+          {
+            "icon": "Shirt",
+            "id": "clothing",
+            "label_en": "Clothing",
+            "label_fr": "Vêtements",
+            "subCategories": [],
+            "total": 0
+          },
+          {
+            "icon": "Crosshair",
+            "id": "weapons",
+            "label_en": "FPS Weapons",
+            "label_fr": "Armes FPS",
+            "subCategories": [],
+            "total": 0
+          },
+          {
+            "icon": "Wrench",
+            "id": "utility",
+            "label_en": "Utility",
+            "label_fr": "Utilitaires",
+            "subCategories": [],
+            "total": 0
+          },
+          {
+            "icon": "Disc",
+            "id": "ammo",
+            "label_en": "Ammo",
+            "label_fr": "Munitions",
+            "subCategories": [],
+            "total": 0
+          },
+          {
+            "icon": "Coffee",
+            "id": "sustenance",
+            "label_en": "Sustenance",
+            "label_fr": "Sustenance",
+            "subCategories": [],
+            "total": 0
+          },
+          {
+            "icon": "MapPin",
+            "id": "locations",
+            "label_en": "Locations & Starmap",
+            "label_fr": "Lieux & Starmap",
+            "subCategories": [],
+            "total": 0
+          },
+          {
+            "icon": "TrendingUp",
+            "id": "commodities",
+            "label_en": "Commodities & Cargo",
+            "label_fr": "Marchandises & Fret",
+            "subCategories": [],
+            "total": 0
+          }
+        ],
+        "status": "success",
+        "success": true
+      }
+    },
+    {
+      "id": "v2-omni-search",
+      "version": "v2",
+      "path": "/api/v2/universe/omni-search?q=aurora&env=live&lang=fr&limit=5",
+      "status": 200,
+      "envelope": ["count", "data", "status", "success"],
+      "fields": ["count", "data", "data[]", "status", "success"],
+      "body": {
+        "count": 0,
+        "data": [],
+        "status": "success",
+        "success": true
+      }
+    },
+    {
+      "id": "v2-explore",
+      "version": "v2",
+      "path": "/api/v2/universe/explore?category=ships&env=live&lang=fr",
+      "status": 200,
+      "envelope": ["data", "facets", "limit", "page", "pages", "status", "success", "total"],
+      "fields": [
+        "data",
+        "data[]",
+        "facets",
+        "facets.category",
+        "facets.subCategory",
+        "limit",
+        "page",
+        "pages",
+        "status",
+        "success",
+        "total"
+      ],
+      "body": {
+        "data": [],
+        "facets": {
+          "category": "ships",
+          "subCategory": "all"
+        },
+        "limit": 24,
+        "page": 1,
+        "pages": 1,
+        "status": "success",
+        "success": true,
+        "total": 0
+      }
+    },
+    {
+      "id": "v2-entity-missing",
+      "version": "v2",
+      "path": "/api/v2/universe/entities/ships/missing-ship",
+      "status": 404,
+      "envelope": ["error", "success"],
+      "fields": ["error", "success"],
+      "body": {
+        "error": "Entity not found in universe",
+        "success": false
+      }
+    },
+    {
+      "id": "v2-entity-bad-category",
+      "version": "v2",
+      "path": "/api/v2/universe/entities/not-a-category/x",
+      "status": 400,
+      "envelope": ["error", "success"],
+      "fields": ["error", "success"],
+      "body": {
+        "error": "Invalid category",
+        "success": false
+      }
+    }
+  ]
+}
