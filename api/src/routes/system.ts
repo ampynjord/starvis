@@ -1,9 +1,8 @@
 import type { Router } from 'express';
-import { ChangelogQuery, GameVersionsQuery } from '../schemas.js';
+import { ChangelogQuery, GameVersionsQuery, TranslationQuery } from '../schemas.js';
 import {
   asyncHandler,
   getQueryEnv,
-  getQueryNumber,
   getQueryString,
   makeGameDataGuard,
   mountEnvDataRoute,
@@ -176,12 +175,13 @@ export function mountSystemRoutes(router: Router, deps: RouteDependencies): void
     requireGameData,
     asyncHandler(async (req, res) => {
       const startedAt = Date.now();
+      const q = TranslationQuery.parse(req.query);
       const result = await gameDataService!.getTranslations({
-        env: getQueryEnv(req),
-        domain: getQueryString(req, 'domain'),
-        search: getQueryString(req, 'search'),
-        page: getQueryNumber(req, 'page') ?? 1,
-        limit: getQueryNumber(req, 'limit') ?? 50,
+        env: q.env,
+        domain: q.domain,
+        search: q.search,
+        page: q.page,
+        limit: q.limit,
       });
       sendPaginatedWithETag(req, res, result, startedAt);
     }),

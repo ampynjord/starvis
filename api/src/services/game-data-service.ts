@@ -19,6 +19,14 @@ import { LocationQueryService } from './location-query-service.js';
 import { MiningQueryService } from './mining-query-service.js';
 import { MissionService } from './mission-service.js';
 import { PaintQueryService } from './paint-query-service.js';
+import type {
+  PublicChangelogEntry,
+  PublicExtractionLogEntry,
+  PublicGameVersion,
+  PublicRsiRoadmapItem,
+  PublicTranslation,
+  PublicUnifiedSearchHit,
+} from './game-data/cross-cutting-types.js';
 import type { PaginatedResult, Row } from './shared.js';
 import { parseIncludes, toPostgres } from './shared.js';
 import { ShipQueryService } from './ship-query-service.js';
@@ -26,6 +34,14 @@ import { ShopService } from './shop-service.js';
 import { TradeService } from './trade-service.js';
 
 export type { PaginatedResult, Row };
+export type {
+  PublicChangelogEntry,
+  PublicExtractionLogEntry,
+  PublicGameVersion,
+  PublicRsiRoadmapItem,
+  PublicTranslation,
+  PublicUnifiedSearchHit,
+} from './game-data/cross-cutting-types.js';
 
 export type ObjectDetailType = 'ship' | 'component' | 'item' | 'commodity' | 'shop' | 'location';
 
@@ -98,19 +114,19 @@ export class GameDataService {
     limit = 10,
     env = 'live',
   ): Promise<{
-    ships: Row[];
-    components: Row[];
-    items: Row[];
-    commodities: Row[];
-    missions: Row[];
-    recipes: Row[];
-    locations: Row[];
+    ships: PublicUnifiedSearchHit[];
+    components: PublicUnifiedSearchHit[];
+    items: PublicUnifiedSearchHit[];
+    commodities: PublicUnifiedSearchHit[];
+    missions: PublicUnifiedSearchHit[];
+    recipes: PublicUnifiedSearchHit[];
+    locations: PublicUnifiedSearchHit[];
   }> {
     const cap = Math.min(limit, 20);
     const t = `%${q}%`;
     const [ships, components, items, commodities, missions, recipes, locations] = await Promise.all([
-      this.ships.searchShipsAutocomplete(q, cap, env),
-      this.getClient(env).$queryRawUnsafe<Row[]>(
+      this.ships.searchShipsAutocomplete(q, cap, env) as Promise<PublicUnifiedSearchHit[]>,
+      this.getClient(env).$queryRawUnsafe<PublicUnifiedSearchHit[]>(
         toPostgres(`SELECT c.uuid, c.class_name, c.name, c.type, c.sub_type, c.size, c.grade, c.manufacturer_code,
                 m.name as manufacturer_name
          FROM game.components c LEFT JOIN game.manufacturers m ON c.manufacturer_code = m.code
@@ -120,7 +136,7 @@ export class GameDataService {
         t,
         t,
       ),
-      this.getClient(env).$queryRawUnsafe<Row[]>(
+      this.getClient(env).$queryRawUnsafe<PublicUnifiedSearchHit[]>(
         toPostgres(`SELECT i.uuid, i.class_name, i.name, i.type, i.sub_type, i.manufacturer_code
          FROM game.items i WHERE i.env = ? AND (i.name ILIKE ? OR i.class_name ILIKE ?)
          ORDER BY i.name LIMIT ${cap}`),
@@ -128,7 +144,7 @@ export class GameDataService {
         t,
         t,
       ),
-      this.getClient(env).$queryRawUnsafe<Row[]>(
+      this.getClient(env).$queryRawUnsafe<PublicUnifiedSearchHit[]>(
         toPostgres(`SELECT co.uuid, co.class_name, co.name, co.type
          FROM game.commodities co WHERE co.env = ? AND (co.name ILIKE ? OR co.class_name ILIKE ?)
          ORDER BY co.name LIMIT ${cap}`),
@@ -136,7 +152,7 @@ export class GameDataService {
         t,
         t,
       ),
-      this.getClient(env).$queryRawUnsafe<Row[]>(
+      this.getClient(env).$queryRawUnsafe<PublicUnifiedSearchHit[]>(
         toPostgres(`SELECT ms.uuid, ms.class_name, ms.title as name, ms.mission_type as type
          FROM game.missions ms WHERE ms.env = ? AND (ms.title ILIKE ? OR ms.class_name ILIKE ?)
          ORDER BY ms.title LIMIT ${cap}`),
@@ -144,7 +160,7 @@ export class GameDataService {
         t,
         t,
       ),
-      this.getClient(env).$queryRawUnsafe<Row[]>(
+      this.getClient(env).$queryRawUnsafe<PublicUnifiedSearchHit[]>(
         toPostgres(`SELECT cr.uuid, cr.class_name, cr.name, cr.category
          FROM game.crafting_recipes cr WHERE cr.env = ? AND (cr.name ILIKE ? OR cr.class_name ILIKE ? OR cr.output_item_name ILIKE ?)
          ORDER BY cr.name LIMIT ${cap}`),
@@ -157,7 +173,7 @@ export class GameDataService {
       // dans 1091 : ils se cherchent par nom comme le reste. Ils manquaient a la
       // recherche unifiee, donc rien dans l'interface ne menait a leur fiche —
       // la carte stellaire, seule porte d'entree, n'en relie que 58.
-      this.getClient(env).$queryRawUnsafe<Row[]>(
+      this.getClient(env).$queryRawUnsafe<PublicUnifiedSearchHit[]>(
         toPostgres(`SELECT l.uuid, l.class_name, l.name, l.type, l.system_code
          FROM game.locations l WHERE l.env = ? AND (l.name ILIKE ? OR l.class_name ILIKE ?)
          ORDER BY l.name LIMIT ${cap}`),
@@ -303,7 +319,7 @@ export class GameDataService {
     entityType?: string;
     changeType?: string;
     markersOnly?: boolean;
-  }): Promise<{ data: Row[]; total: number }> {
+  }): Promise<{ data: PublicChangelogEntry[]; total: number }> {
     const env = params.env ?? 'live';
     const prisma = this.getClient(env);
     const where: string[] = ['e.game_env = ?'];
@@ -333,7 +349,7 @@ export class GameDataService {
 
     const limit = Math.min(1000, parseInt(params.limit || '50', 10));
     const offset = parseInt(params.offset || '0', 10);
-    const rows = await prisma.$queryRawUnsafe<Row[]>(
+    const rows = await prisma.$queryRawUnsafe<PublicChangelogEntry[]>(
       toPostgres(
         `SELECT c.*, e.game_version, e.game_env, e.extracted_at as extraction_date FROM meta.changelog c INNER JOIN meta.extraction_log e ON c.extraction_id = e.id${w} ORDER BY c.created_at DESC LIMIT ${Number(limit)} OFFSET ${Number(offset)}`,
       ),
@@ -388,15 +404,15 @@ export class GameDataService {
     return result;
   }
 
-  async getExtractionLog(): Promise<Row[]> {
-    const rows = await this.getClient('live').$queryRawUnsafe<Row[]>(
+  async getExtractionLog(): Promise<PublicExtractionLogEntry[]> {
+    const rows = await this.getClient('live').$queryRawUnsafe<PublicExtractionLogEntry[]>(
       'SELECT * FROM meta.extraction_log ORDER BY extracted_at DESC LIMIT 20',
     );
     return rows;
   }
 
-  async getLatestExtraction(env = 'live'): Promise<Row | null> {
-    const rows = await this.getClient('live').$queryRawUnsafe<Row[]>(
+  async getLatestExtraction(env = 'live'): Promise<PublicExtractionLogEntry | null> {
+    const rows = await this.getClient('live').$queryRawUnsafe<PublicExtractionLogEntry[]>(
       toPostgres('SELECT * FROM meta.extraction_log WHERE game_env = ? AND ships_count > 0 ORDER BY extracted_at DESC LIMIT 1'),
       env,
     );
@@ -489,7 +505,9 @@ export class GameDataService {
     };
   }
 
-  async getGameVersions(opts: { env?: string; limit?: number; offset?: number } = {}): Promise<{ data: Row[]; total: number }> {
+  async getGameVersions(
+    opts: { env?: string; limit?: number; offset?: number } = {},
+  ): Promise<{ data: PublicGameVersion[]; total: number }> {
     const prisma = this.getClient('live');
     const limit = Math.min(100, opts.limit || 20);
     const offset = Math.max(0, opts.offset || 0);
@@ -500,7 +518,7 @@ export class GameDataService {
       ...params,
     );
     const total = Number(countRows[0]?.total) || 0;
-    const rows = await prisma.$queryRawUnsafe<Row[]>(
+    const rows = await prisma.$queryRawUnsafe<PublicGameVersion[]>(
       toPostgres(`SELECT id, game_version, game_env, extracted_at,
              ships_count as ships, components_count as components,
              items_count as items, commodities_count as commodities,
@@ -583,7 +601,7 @@ export class GameDataService {
 
   async getTranslations(
     opts: { env?: string; domain?: string; search?: string; page?: number; limit?: number } = {},
-  ): Promise<PaginatedResult<Row>> {
+  ): Promise<PaginatedResult<PublicTranslation>> {
     const env = opts.env ?? 'live';
     const prisma = this.getClient(env);
     const page = Math.max(1, opts.page ?? 1);
@@ -615,18 +633,18 @@ export class GameDataService {
       ...params,
     );
 
-    const data = rows.map((r) => {
+    const data: PublicTranslation[] = rows.map((r) => {
       const parsed = typeof r.raw_json === 'string' ? JSON.parse(r.raw_json) : (r.raw_json as Record<string, unknown> | null);
       return {
-        uuid: r.uuid,
-        env: r.env,
+        uuid: String(r.uuid),
+        env: String(r.env),
         domain: r.domain,
-        class_name: r.class_name,
-        name_en: parsed?.name_en ?? null,
-        name_fr: r.name_fr ?? parsed?.name_fr ?? null,
-        description_en: parsed?.description_en ?? null,
-        description_fr: r.description_fr ?? parsed?.description_fr ?? null,
-        extracted_at: r.extracted_at,
+        class_name: r.class_name as string | null,
+        name_en: (parsed?.name_en as string | null) ?? null,
+        name_fr: (r.name_fr as string | null) ?? (parsed?.name_fr as string | null) ?? null,
+        description_en: (parsed?.description_en as string | null) ?? null,
+        description_fr: (r.description_fr as string | null) ?? (parsed?.description_fr as string | null) ?? null,
+        extracted_at: r.extracted_at as string | Date | null,
       };
     });
 
@@ -639,7 +657,7 @@ export class GameDataService {
     };
   }
 
-  async getTranslationById(id: string, env = 'live'): Promise<Row | null> {
+  async getTranslationById(id: string, env = 'live'): Promise<PublicTranslation | null> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
       toPostgres(
@@ -656,15 +674,15 @@ export class GameDataService {
     if (!r) return null;
     const parsed = typeof r.raw_json === 'string' ? JSON.parse(r.raw_json) : (r.raw_json as Record<string, unknown> | null);
     return {
-      uuid: r.uuid,
-      env: r.env,
+      uuid: String(r.uuid),
+      env: String(r.env),
       domain: r.domain,
-      class_name: r.class_name,
-      name_en: parsed?.name_en ?? null,
-      name_fr: r.name_fr ?? parsed?.name_fr ?? null,
-      description_en: parsed?.description_en ?? null,
-      description_fr: r.description_fr ?? parsed?.description_fr ?? null,
-      extracted_at: r.extracted_at,
+      class_name: r.class_name as string | null,
+      name_en: (parsed?.name_en as string | null) ?? null,
+      name_fr: (r.name_fr as string | null) ?? (parsed?.name_fr as string | null) ?? null,
+      description_en: (parsed?.description_en as string | null) ?? null,
+      description_fr: (r.description_fr as string | null) ?? (parsed?.description_fr as string | null) ?? null,
+      extracted_at: r.extracted_at as string | Date | null,
     };
   }
 
@@ -766,7 +784,7 @@ export class GameDataService {
     };
   }
 
-  async getRsiRoadmap(): Promise<Row[]> {
+  async getRsiRoadmap(): Promise<PublicRsiRoadmapItem[]> {
     const prisma = this.getClient('live');
     const rows = await prisma.$queryRawUnsafe<Row[]>(
       `SELECT class_name AS release_key, name AS release_name, raw_json, extracted_at

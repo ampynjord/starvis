@@ -232,6 +232,71 @@ export const CommodityQuery = z
   })
   .passthrough();
 
+/** Filtres de `/api/v1/galactapedia` — `letter` est servi mais absent d'OpenAPI historique. */
+export const GalactapediaQuery = z
+  .object({
+    search: qStr,
+    category: qStr,
+    letter: qStr,
+    page: qInt(1),
+    limit: qInt(20, 100),
+  })
+  .passthrough();
+
+export const CommLinkQuery = z
+  .object({
+    search: qStr,
+    category: qStr,
+    page: qInt(1),
+    limit: qInt(20, 100),
+  })
+  .passthrough();
+
+export const CommLinkImageQuery = z
+  .object({
+    search: qStr,
+    query: qStr,
+    q: qStr,
+    page: qInt(1),
+    limit: qInt(20, 100),
+  })
+  .passthrough();
+
+export const StarmapLocationsQuery = z
+  .object({
+    search: qStr,
+    query: qStr,
+    q: qStr,
+    type: qStr,
+    system: qStr,
+    system_code: qStr,
+    affiliation: qStr,
+    faction: qStr,
+    page: qInt(1),
+    limit: qInt(50, 200),
+  })
+  .passthrough();
+
+export const StarmapSystemsQuery = z
+  .object({
+    search: qStr,
+    query: qStr,
+    q: qStr,
+    page: qInt(1),
+    limit: qInt(20, 100),
+  })
+  .passthrough();
+
+export const TranslationQuery = z
+  .object({
+    env: qEnv,
+    domain: qStr,
+    search: qStr,
+    page: qInt(1),
+    limit: qInt(50, 200),
+  })
+  .passthrough();
+
 // ── Pure helpers ──────────────────────────────────────────
 
 /**

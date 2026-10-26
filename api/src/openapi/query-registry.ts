@@ -1,12 +1,18 @@
 import {
   ChangelogQuery,
+  CommLinkImageQuery,
+  CommLinkQuery,
   CommodityQuery,
   ComponentQuery,
+  GalactapediaQuery,
   GameVersionsQuery,
   ItemQuery,
   PaintQuery,
   SearchQuery,
   ShopQuery,
+  StarmapLocationsQuery,
+  StarmapSystemsQuery,
+  TranslationQuery,
 } from '../schemas.js';
 
 /**
@@ -36,4 +42,11 @@ export const QUERY_SCHEMA_REGISTRY = [
   { method: 'get', path: '/api/v1/changelog', schema: ChangelogQuery },
   { method: 'get', path: '/api/v1/changelog/summary', schema: ChangelogQuery },
   { method: 'get', path: '/api/v1/game-versions', schema: GameVersionsQuery },
+  { method: 'get', path: '/api/v1/galactapedia', schema: GalactapediaQuery },
+  { method: 'get', path: '/api/v1/comm-links', schema: CommLinkQuery },
+  { method: 'get', path: '/api/v1/comm-link-images', schema: CommLinkImageQuery },
+  { method: 'get', path: '/api/v1/comm-link-images/search', schema: CommLinkImageQuery },
+  { method: 'get', path: '/api/v1/starmap/locations', schema: StarmapLocationsQuery },
+  { method: 'get', path: '/api/v1/starmap/systems', schema: StarmapSystemsQuery },
+  { method: 'get', path: '/api/v1/translations', schema: TranslationQuery },
 ] as const;
