@@ -19,7 +19,7 @@
  * PUT  /admin/users/:id/role  — update a user's role
  */
 import type { Router } from 'express';
-import { requireJwt, requireJwtAdmin, requireJwtDeveloperOrAdmin } from '../middleware/index.js';
+import { denyApiToken, requireJwt, requireJwtAdmin, requireJwtDeveloperOrAdmin } from '../middleware/index.js';
 import { ApiTokenService } from '../services/api-token-service.js';
 import { AuthService } from '../services/auth-service.js';
 import { sendPasswordResetEmail, sendVerificationEmail } from '../services/email-service.js';
@@ -141,7 +141,7 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
   });
 
   // GET /auth/me
-  router.get('/auth/me', requireJwt, async (req, res) => {
+  router.get('/auth/me', requireJwt, denyApiToken, async (req, res) => {
     const payload = req.jwtPayload;
     const user = await authService.me(payload.sub);
     if (!user) return void res.status(404).json({ success: false, error: 'User not found' });
@@ -149,7 +149,7 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
   });
 
   // PUT /auth/me
-  router.put('/auth/me', requireJwt, async (req, res) => {
+  router.put('/auth/me', requireJwt, denyApiToken, async (req, res) => {
     const payload = req.jwtPayload;
     const { username, avatarUrl } = req.body ?? {};
     try {
@@ -164,7 +164,7 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
   });
 
   // DELETE /auth/me — delete own account
-  router.delete('/auth/me', requireJwt, async (req, res) => {
+  router.delete('/auth/me', requireJwt, denyApiToken, async (req, res) => {
     const payload = req.jwtPayload;
     try {
       await authService.deleteUser(payload.sub);
@@ -175,7 +175,7 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
     }
   });
 
-  router.get('/auth/developer-access-request', requireJwt, async (req, res) => {
+  router.get('/auth/developer-access-request', requireJwt, denyApiToken, async (req, res) => {
     const payload = req.jwtPayload;
     try {
       const request = await authService.getLatestApiAccessRequest(payload.sub);
@@ -185,7 +185,7 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
     }
   });
 
-  router.post('/auth/developer-access-request', requireJwt, async (req, res) => {
+  router.post('/auth/developer-access-request', requireJwt, denyApiToken, async (req, res) => {
     const payload = req.jwtPayload;
     const { motivation } = req.body ?? {};
     try {
@@ -207,7 +207,7 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
   });
 
   // ── API Token (external project access) ──────────────────────────────────
-  router.get('/auth/api-tokens', requireJwtDeveloperOrAdmin, async (req, res) => {
+  router.get('/auth/api-tokens', requireJwtDeveloperOrAdmin, denyApiToken, async (req, res) => {
     const payload = req.jwtPayload;
     const includeRevoked = String(req.query.includeRevoked ?? '') === 'true';
     const limit = Number.parseInt(String(req.query.limit ?? '100'), 10);
@@ -215,7 +215,7 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
     res.json({ success: true, data: tokens });
   });
 
-  router.post('/auth/api-token', requireJwtDeveloperOrAdmin, async (req, res) => {
+  router.post('/auth/api-token', requireJwtDeveloperOrAdmin, denyApiToken, async (req, res) => {
     const payload = req.jwtPayload;
     const { name, description } = req.body ?? {};
     const user = await authService.me(payload.sub);
@@ -235,7 +235,7 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
     });
   });
 
-  router.delete('/auth/api-tokens/:id', requireJwtDeveloperOrAdmin, async (req, res) => {
+  router.delete('/auth/api-tokens/:id', requireJwtDeveloperOrAdmin, denyApiToken, async (req, res) => {
     const tokenId = Number(req.params.id);
     if (!Number.isInteger(tokenId) || tokenId <= 0) {
       return void res.status(400).json({ success: false, error: 'Invalid token id' });
@@ -248,7 +248,7 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
   // ---- 2FA endpoints ─────────────────────────────────────────────────────────
 
   // POST /auth/2fa/setup
-  router.post('/auth/2fa/setup', requireJwt, async (req, res) => {
+  router.post('/auth/2fa/setup', requireJwt, denyApiToken, async (req, res) => {
     const payload = req.jwtPayload;
     try {
       const result = await authService.setup2FA(payload.sub);
@@ -259,7 +259,7 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
   });
 
   // POST /auth/2fa/enable
-  router.post('/auth/2fa/enable', requireJwt, async (req, res) => {
+  router.post('/auth/2fa/enable', requireJwt, denyApiToken, async (req, res) => {
     const payload = req.jwtPayload;
     const { code } = req.body ?? {};
     if (typeof code !== 'string' || code.length !== 6) {
@@ -277,7 +277,7 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
   });
 
   // POST /auth/2fa/disable
-  router.post('/auth/2fa/disable', requireJwt, async (req, res) => {
+  router.post('/auth/2fa/disable', requireJwt, denyApiToken, async (req, res) => {
     const payload = req.jwtPayload;
     const { code } = req.body ?? {};
     if (typeof code !== 'string' || code.length !== 6) {

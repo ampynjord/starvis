@@ -3,6 +3,7 @@
  */
 
 export {
+  denyApiToken,
   requireExternalApiAccess,
   requireInternalOrAdmin,
   requireJwt,

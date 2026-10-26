@@ -245,8 +245,21 @@ export async function requireJwtAdmin(req: Request, res: Response, next: NextFun
     }
     req.jwtPayload = { ...payload, role: currentRole };
     await applyApiTokenState(req, req.jwtPayload, token);
-    next();
   } catch {
-    res.status(401).json({ success: false, error: 'Invalid or expired token' });
+    return void res.status(401).json({ success: false, error: 'Invalid or expired token' });
   }
+  denyApiToken(req, res, next);
+}
+
+/**
+ * denyApiToken — keeps generated API tokens on the read-only /api/v1 surface.
+ * Mounted after an auth middleware on account (/auth/*) routes, and applied by
+ * requireJwtAdmin, so a leaked token can neither administer, mint new tokens
+ * nor change the account.
+ */
+export function denyApiToken(req: Request, res: Response, next: NextFunction) {
+  if (req.authMethod === 'api_token') {
+    return void res.status(403).json({ success: false, error: 'API tokens are not accepted on this route' });
+  }
+  next();
 }

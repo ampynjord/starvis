@@ -2,6 +2,7 @@
  * Auth hardening regressions (audit A4, points 1, 2, 4, 9).
  * Real auth middleware and routes; only the Prisma delegates are mocked.
  */
+import { createHash } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import express, { type Express } from 'express';
 import jwt from 'jsonwebtoken';
@@ -150,5 +151,40 @@ describe('point 2 — deleted users lose access immediately', () => {
     const admin = await request(app).get('/admin/users').set(bearer(token));
     const me = await request(app).get('/auth/me').set(bearer(token));
     expect([admin.status, me.status]).toEqual([401, 401]);
+  });
+});
+
+describe('point 4 — API tokens stay on the external API surface', () => {
+  function apiToken(id: number, role: string): string {
+    const jti = `jti-${id}-${apiTokens.length}`;
+    const token = sign({ ...claims(id, role), type: 'api_token', jti });
+    apiTokens.push({
+      id: apiTokens.length + 10,
+      jti,
+      userId: id,
+      name: 't',
+      tokenHash: createHash('sha256').update(token, 'utf8').digest('hex'),
+      revokedAt: null,
+      expiresAt: new Date(Date.now() + 3_600_000),
+    });
+    return token;
+  }
+
+  it('refuses an admin API token on /admin/*', async () => {
+    const res = await request(app).get('/admin/users').set(bearer(apiToken(1, 'admin')));
+    expect(res.status).toBe(403);
+  });
+
+  it('refuses an API token on /auth/* (cannot mint tokens, read or change the account)', async () => {
+    const token = apiToken(1, 'admin');
+    const mint = await request(app).post('/auth/api-token').set(bearer(token)).send({ name: 'child' });
+    const me = await request(app).get('/auth/me').set(bearer(token));
+    const del = await request(app).delete('/auth/me').set(bearer(token));
+    expect([mint.status, me.status, del.status]).toEqual([403, 403, 403]);
+  });
+
+  it('still lets a session mint tokens', async () => {
+    const res = await request(app).post('/auth/api-token').set(bearer(sign(claims(1, 'admin')))).send({ name: 'ok' });
+    expect(res.status).toBe(200);
   });
 });
