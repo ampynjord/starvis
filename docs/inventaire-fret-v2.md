@@ -1,8 +1,8 @@
-# Inventaire & fret — modèle unifié (proposition v2)
+# Inventaire & fret — modèle unifié
 
 > Proposition demandée le 26/10/2026 (feuille de route, chantier C). Elle
-> s'inscrit dans [refonte-v2.md](refonte-v2.md) — schéma d'abord, surface
-> `/api/v2` ensuite, `/api/v1` intacte — et n'est **pas encore implémentée** :
+> s'inscrit dans [le plan de refonte](refonte-v2.md) — schéma d'abord, surface
+> sans version ensuite, `/api/v1` intacte — et n'est **pas encore implémentée** :
 > elle attend un arbitrage sur le périmètre (§ 1) avant la première migration.
 
 ## 1. Périmètre — une décision à prendre d'abord
@@ -15,7 +15,7 @@
 | **Ce que le joueur possède** | « mon Cutlass a 12 SCU de laranite », « mon casier à Area18 » | compte joueur |
 
 La refonte a tranché le second : *« le social et le temps réel restent chez
-Stelliverse »* (§ 8 de [refonte-v2.md](refonte-v2.md)). Un inventaire personnel
+Stelliverse »* (§ 8 du [plan de refonte](refonte-v2.md)). Un inventaire personnel
 persistant ferait de Starvis un service à comptes utilisateurs et à données
 privées, ce qu'il n'est plus.
 
@@ -175,18 +175,18 @@ GROUP BY m.host_uuid, m.env;
 depuis `cargo_scu`, et l'audit compare les deux tant que l'ancien calcul existe.
 Un écart est un signal (grille manquée ou comptée deux fois), pas un bruit.
 
-## 4. La surface `/api/v2`
+## 4. La surface sans version
 
 Chaque route a un consommateur nommé, conformément à
 [surface-api.md](surface-api.md) § 3.
 
 | Route | Réponse | Consommateur |
 |---|---|---|
-| `GET /api/v2/ships/:uuid/storage?modules=slot:Classe` | contenants par port (grille, capacité, caisse max), totaux par `kind`, selon les modules choisis | fiche vaisseau (remplace l'iframe `sc-cargo.space`), comparateur |
-| `GET /api/v2/storage/containers?kind=&min_scu=&host_kind=` | catalogue filtrable | bibliothèque d'objets, tiers |
-| `GET /api/v2/storage/containers/:uuid` | un contenant et **où il est monté** | fiche objet (sac à dos, armure) |
-| `GET /api/v2/items/:uuid/storage` | capacité portée par un objet | fiche objet, Stelliverse (inventaire joueur) |
-| `POST /api/v2/storage/fit` | `{ ship, modules?, cargo: [{ commodity, scu }] }` → caisses par grille, reste, taux de remplissage | page commerce (route rentable *qui tient dans la soute*) |
+| `GET /api/ships/:uuid/storage?modules=slot:Classe` | contenants par port (grille, capacité, caisse max), totaux par `kind`, selon les modules choisis | fiche vaisseau (remplace l'iframe `sc-cargo.space`), comparateur |
+| `GET /api/storage/containers?kind=&min_scu=&host_kind=` | catalogue filtrable | bibliothèque d'objets, tiers |
+| `GET /api/storage/containers/:uuid` | un contenant et **où il est monté** | fiche objet (sac à dos, armure) |
+| `GET /api/items/:uuid/storage` | capacité portée par un objet | fiche objet, Stelliverse (inventaire joueur) |
+| `POST /api/storage/fit` | `{ ship, modules?, cargo: [{ commodity, scu }] }` → caisses par grille, reste, taux de remplissage | page commerce (route rentable *qui tient dans la soute*) |
 
 Le dernier point est ce que fait SC Trade Tools : il n'a de sens qu'une fois les
 grilles et les tailles de caisse extraites (§ 5, étape 4). Avant, il mentirait.
@@ -204,11 +204,11 @@ Chaque étape est déployable seule, production fonctionnelle.
 | 2 | Créer `storage_containers` + `storage_mounts`, alimentées **en plus** de `inventory_containers` ; extraire les grilles de soute (`SCItemCargoGridParams`, conteneurs ouverts des ports `cargo*`) | Le socle ; additif, rien ne casse |
 | 3 | Rattacher sacs à minerai, stockages tampon et modules (`module_slot`) | Prospector / Retaliator cessent d'afficher 0 SCU |
 | 4 | Extraire les tailles de caisse (entités `*CargoBox*` du P4K — **à localiser** : 0 objet aujourd'hui) | Préalable au calcul d'empotage |
-| 5 | Vue `ship_storage_summary`, `cargo_capacity` dérivé, audit d'écart | Compatibilité v1 prouvée avant de s'y fier |
-| 6 | `GET /api/v2/ships/:uuid/storage` + grille native dans la fiche vaisseau | Premier consommateur ; retire l'iframe tiers |
+| 5 | Vue `ship_storage_summary`, `cargo_capacity` dérivé, audit d'écart | Compatibilité `/api/v1` prouvée avant de s'y fier |
+| 6 | `GET /api/ships/:uuid/storage` + grille native dans la fiche vaisseau | Premier consommateur ; retire l'iframe tiers |
 | 7 | `storage/containers`, `items/:uuid/storage` | Bibliothèque, tiers |
-| 8 | `POST /api/v2/storage/fit` + page commerce | S'appuie sur 4 et 6 |
-| 9 | Retrait de `inventory_containers` | Quand plus aucune route v1 ne la lit |
+| 8 | `POST /api/storage/fit` + page commerce | S'appuie sur 4 et 6 |
+| 9 | Retrait de `inventory_containers` | Quand plus aucune route `/api/v1` ne la lit |
 
 À vérifier avant l'étape 2, sans le supposer : que les ascenseurs de fret et
 entrepôts de station soient décrits au DataForge avec une capacité. Si non,

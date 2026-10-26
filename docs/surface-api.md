@@ -1,6 +1,6 @@
 # Surface d'API — état mesuré et décision
 
-> Étape 4 de [refonte-v2.md](refonte-v2.md). La sortie du SQL brut vient **après**
+> Étape 4 du [plan de refonte](refonte-v2.md). La sortie du SQL brut vient **après**
 > cette décision : réécrire 195 requêtes pour en supprimer ensuite la moitié
 > serait du travail perdu.
 
