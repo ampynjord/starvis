@@ -275,12 +275,13 @@ renseignent.
 **C12 — Ce qui est extrait est exposé.** `game_insights`, tables de butin,
 réputation, munitions : 7 008 lignes extraites que rien ne sert.
 
-**C13 — L'API se réaligne sur le schéma, sous une nouvelle version.** Les
+**C13 — L'API se réaligne sur le schéma, sans préfixe de version.** Les
 ressources suivent les entités du nouveau modèle plutôt que les tables
-d'aujourd'hui. `/api/v2` porte la nouvelle surface ; **`/api/v1` reste servi**
-tant que les tiers n'ont pas migré — c'est l'engagement pris envers eux, et
-Stelliverse en dépend. La v1 devient une couche de compatibilité au-dessus du
-nouveau modèle, pas un second chemin vers la donnée.
+d'aujourd'hui. La surface Nexus vit sous **`/api/universe`** ; **`/api/v2`**
+en est l'alias de compatibilité (toujours servi) ; **`/api/v1` reste servi**
+tant que les tiers n'ont pas migré — c'est l'engagement pris envers eux.
+La v1 devient une couche de compatibilité au-dessus du nouveau modèle, pas un
+second chemin vers la donnée.
 
 **C14 — L'IHM est refaite.** Elle entre par l'intention et non par la table : on
 pose une question — où vendre ce minerai, quel vaisseau pour du minage solo, où
@@ -302,13 +303,13 @@ Chaque étape reste déployable, et la production fonctionnelle.
 | 12 | Hiérarchie et coordonnées des lieux (C9) | Socle du wiki spatial |
 | 13 | Identité canonique (C10) + provenance (C11) | Ce qui rend le croisement durable |
 | 14 | Exposer l'extrait non servi (C12) | Sans valeur tant que 9-13 ne sont pas faits |
-| 15 | Surface `/api/v2` alignée sur le schéma (C13) | Ne peut pas précéder le schéma qu'elle expose |
+| 15 | Surface `/api/universe` alignée sur le schéma (C13) ; `/api/v2` en alias | Ne peut pas précéder le schéma qu'elle expose |
 | 16 | IHM refaite par l'intention (C14) | S'appuie sur 15 |
 
 **Contrainte tenue tout du long** : `/api/v1` continue de répondre. La
-restructuration se fait sous `/api/v2` ; la v1 devient une couche de
-compatibilité au-dessus du nouveau modèle, jamais un second chemin vers la
-donnée.
+restructuration se fait sous `/api/universe` (alias `/api/v2`) ; la v1 devient
+une couche de compatibilité au-dessus du nouveau modèle, jamais un second
+chemin vers la donnée.
 
 *Pourquoi deux versions, et jusqu'à quand.* Trois intégrations tierces
 appellent réellement l'API — « Moteur organisationnel » (5 039 requêtes),

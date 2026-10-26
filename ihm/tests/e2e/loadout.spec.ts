@@ -252,27 +252,28 @@ const mole = shipBase(MOLE_UUID, 'MOLE', {
   cargo_capacity: 96,
 });
 
-const moleLoadout = Array.from({ length: 8 }, (_, i) => ({
-  id: 200 + i,
-  parent_id: null,
-  port_name: `hardpoint_mining_pod_${i + 1}`,
-  port_type: 'Other',
-  port_min_size: 1,
-  port_max_size: 1,
-  component_uuid: `mole-bag-${i + 1}`,
-  component_name: 'MOLE Ore Bag',
-  component_type: 'Cargo',
-  component_size: 1,
-  component_class_name: 'Cargo_ShipMining_Pod_Mole',
-  sub_type: null,
-  grade: null,
-  component_class: 'Industrial',
-  manufacturer_code: 'ARGO',
-  children: emptyChildren,
-})).concat([
+const moleLoadout = [
+  ...Array.from({ length: 8 }, (_, i) => ({
+    id: 200 + i,
+    parent_id: null as number | null,
+    port_name: `hardpoint_mining_pod_${i + 1}`,
+    port_type: 'Other',
+    port_min_size: 1,
+    port_max_size: 1,
+    component_uuid: `mole-bag-${i + 1}`,
+    component_name: 'MOLE Ore Bag',
+    component_type: 'Cargo',
+    component_size: 1,
+    component_class_name: 'Cargo_ShipMining_Pod_Mole',
+    sub_type: null as string | null,
+    grade: null as string | null,
+    component_class: 'Industrial' as string | null,
+    manufacturer_code: 'ARGO',
+    children: emptyChildren,
+  })),
   {
     id: 300,
-    parent_id: null,
+    parent_id: null as number | null,
     port_name: 'hardpoint_mining_arm_left',
     port_type: 'WeaponMining',
     port_min_size: 2,
@@ -282,13 +283,13 @@ const moleLoadout = Array.from({ length: 8 }, (_, i) => ({
     component_type: 'WeaponMining',
     component_size: 2,
     component_class_name: 'Mining_Laser_HELI',
-    sub_type: null,
-    grade: 'C',
-    component_class: 'Industrial',
+    sub_type: null as string | null,
+    grade: 'C' as string | null,
+    component_class: 'Industrial' as string | null,
     manufacturer_code: 'HELI',
     children: emptyChildren,
   },
-]);
+];
 
 async function installLoadoutFixtures(page: Page) {
   await page.route('**/api/auth/me', async (route) => {

@@ -5,10 +5,11 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /**
- * Le proxy vers `/api/v2`.
+ * Proxy de compatibilité vers l'alias `/api/v2` (Nexus).
  *
- * Même garde d'origine, même clé serveur, même transfert d'en-têtes que la v1 —
- * seul le préfixe amont change. Recopier le proxy les aurait laissés diverger.
+ * Le chemin canonique est `/api/universe` (`public/universe`). Même garde
+ * d'origine, même clé serveur, même transfert d'en-têtes — seul le préfixe
+ * amont change.
  */
 const forward = (req: NextRequest, context: { params: Promise<{ path?: string[] }> }) => proxyPublicApi(req, context, 'v2');
 

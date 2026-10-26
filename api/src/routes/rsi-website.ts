@@ -5,13 +5,7 @@
  * Query params are déclarés dans `schemas.ts` et le registre OpenAPI.
  */
 import type { Router } from 'express';
-import {
-  CommLinkImageQuery,
-  CommLinkQuery,
-  GalactapediaQuery,
-  StarmapLocationsQuery,
-  StarmapSystemsQuery,
-} from '../schemas.js';
+import { CommLinkImageQuery, CommLinkQuery, GalactapediaQuery, StarmapLocationsQuery, StarmapSystemsQuery } from '../schemas.js';
 import { asyncHandler, getFilterString, sendDataWithETag, sendWithETag } from './helpers.js';
 import type { RouteDependencies } from './types.js';
 

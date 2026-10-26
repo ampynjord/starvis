@@ -24,6 +24,7 @@ const nextConfig: NextConfig = {
   },
   async rewrites() {
     return [
+      { source: '/api/universe/:path*', destination: `${BACKEND_API_URL}/api/universe/:path*` },
       { source: '/api/v2/:path*', destination: `${BACKEND_API_URL}/api/v2/:path*` },
       { source: '/api-docs', destination: `${BACKEND_API_URL}/api-docs/` },
       { source: '/api-docs/:path*', destination: `${BACKEND_API_URL}/api-docs/:path*` },

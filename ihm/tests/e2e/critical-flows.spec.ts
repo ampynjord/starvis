@@ -156,7 +156,7 @@ async function installApiFixtures(page: Page) {
     return route.fulfill({ json: { success: true, data: [] } });
   });
 
-  await page.route('**/api/v2/universe/**', async (route) => {
+  await page.route('**/api/universe/**', async (route) => {
     const url = new URL(route.request().url());
     const path = url.pathname;
     if (path.includes('/omni-search')) {

@@ -3,7 +3,7 @@
   "info": {
     "title": "Starvis API",
     "version": "2.0.0",
-    "description": "Public Star Citizen Open Data Engine & REST API.\n\nData sources:\n- **P4K / DataForge game data** (ships, components, items, commodities, shops, missions, mission brokers, mining, crafting, locations, amenities, factions, reputations, loot, ammo, inventory containers)\n- **RSI Website** (ship matrix, galactapedia, comm-links, starmap)\n- **UEX Corp 2.0** (live economy prices, all terminal types, vehicle market data, refinery yields)\n- **Star Citizen Wiki & SC-FR** (community ship naming, bilingual EN/FR localization)\n\nStarvis exposes canonical correlation endpoints to link equivalent records across P4K, RSI and UEX without changing existing resource IDs.\n\n### Public Access & Optional Authentication\nThe `/api/v1` API and `/api-docs` OpenAPI documentation are **publicly accessible** (rate-limited by IP). Optional authentication is supported for higher rate limits and administrative endpoints:\n- **Bearer JWT** (`Authorization: Bearer <token>`): optional on `/api/v1`, required for `/auth/me` and `/admin`.\n- **API Key** (`X-API-Key` header): accepted for trusted server-to-server calls.\n\n### Pagination\nList endpoints generally support `page` and `limit` query parameters and return `{ data, total, page, limit, pages }`.\n\n### Game Environments & Patch History\nUse the `env` (or `version`) query parameter to select the active environment (`live` by default, `ptu`, `custom`) or any archived semantic patch version (e.g. `4.7.2`, `4.8.1`).\n\n### Bilingual Localization (`en` + `fr`)\nQuery `/api/v1/translations` or `/api/v1/translations/{id}` for bilingual English/French names and descriptions."
+    "description": "### Versioning (compatibilité)\n- **Canonique (Nexus)** : `/api/universe/*` — surface sans préfixe de version.\n- **`/api/v2/*`** : alias de compatibilité de la surface Nexus (déprécié, toujours servi).\n- **`/api/v1/*`** : couche de compatibilité **figée** pour les intégrations tierces existantes (ne pas changer l'enveloppe). Déprécié en tant que surface d'évolution : les nouveaux clients ciblent `/api/universe` pour le Nexus.\n\nPublic Star Citizen Open Data Engine & REST API.\n\nData sources:\n- **P4K / DataForge game data** (ships, components, items, commodities, shops, missions, mission brokers, mining, crafting, locations, amenities, factions, reputations, loot, ammo, inventory containers)\n- **RSI Website** (ship matrix, galactapedia, comm-links, starmap)\n- **UEX Corp 2.0** (live economy prices, all terminal types, vehicle market data, refinery yields)\n- **Star Citizen Wiki & SC-FR** (community ship naming, bilingual EN/FR localization)\n\nStarvis exposes canonical correlation endpoints to link equivalent records across P4K, RSI and UEX without changing existing resource IDs.\n\n### Public Access & Optional Authentication\nThe `/api/v1` API and `/api-docs` OpenAPI documentation are **publicly accessible** (rate-limited by IP). Optional authentication is supported for higher rate limits and administrative endpoints:\n- **Bearer JWT** (`Authorization: Bearer <token>`): optional on `/api/v1`, required for `/auth/me` and `/admin`.\n- **API Key** (`X-API-Key` header): accepted for trusted server-to-server calls.\n\n### Pagination\nList endpoints generally support `page` and `limit` query parameters and return `{ data, total, page, limit, pages }`.\n\n### Game Environments & Patch History\nUse the `env` (or `version`) query parameter to select the active environment (`live` by default, `ptu`, `custom`) or any archived semantic patch version (e.g. `4.7.2`, `4.8.1`).\n\n### Bilingual Localization (`en` + `fr`)\nQuery `/api/v1/translations` or `/api/v1/translations/{id}` for bilingual English/French names and descriptions."
   },
   "components": {
     "securitySchemes": {
@@ -14033,6 +14033,369 @@
       "get": {
         "tags": ["Universe Nexus"],
         "summary": "Omni-Search across all Star Citizen entities",
+        "operationId": "universeOmniSearchV2Compat",
+        "description": "Fast multi-domain global search traversing ships, components, items, locations and commodities. Strips all placeholders and dev prefixes. Alias de compatibilité : préférer `/api/universe/omni-search`.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Search query"
+          },
+          {
+            "name": "env",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "live"
+            },
+            "description": "Game environment"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 20
+            },
+            "description": "Maximum items to return"
+          },
+          {
+            "name": "lang",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["fr", "en"],
+              "default": "fr"
+            },
+            "description": "Output localization language"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Omni-search results with rich badges and in-game names",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "count": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "deprecated": true
+      }
+    },
+    "/api/v2/universe/taxonomy": {
+      "get": {
+        "tags": ["Universe Nexus"],
+        "summary": "Live universe taxonomy tree with real entity counts",
+        "operationId": "universeGetTaxonomyV2Compat",
+        "description": "Returns all official categories and subcategories with dynamic in-game item counts. Alias de compatibilité : préférer `/api/universe/taxonomy`.",
+        "parameters": [
+          {
+            "name": "env",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "live"
+            },
+            "description": "Game environment"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Taxonomy tree with categories, subcategories and counts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "deprecated": true
+      }
+    },
+    "/api/v2/universe/explore": {
+      "get": {
+        "tags": ["Universe Nexus"],
+        "summary": "Unified exploration across the universe",
+        "operationId": "universeExploreV2Compat",
+        "description": "Unified pagination and dynamic facets across universe entity categories. Alias de compatibilité : préférer `/api/universe/explore`.",
+        "parameters": [
+          {
+            "name": "category",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "all",
+                "ships",
+                "fleet",
+                "vehicles",
+                "components",
+                "armor",
+                "clothing",
+                "weapons",
+                "utility",
+                "ammo",
+                "sustenance",
+                "locations",
+                "commodities",
+                "items"
+              ],
+              "default": "all"
+            },
+            "description": "Category to explore"
+          },
+          {
+            "name": "sub_category",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Specific subcategory filter (e.g. helmets, quantum_drives, primary...)"
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Full-text filter"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            },
+            "description": "Page number"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 24
+            },
+            "description": "Page size"
+          },
+          {
+            "name": "env",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "live"
+            },
+            "description": "Game environment"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["all", "flight-ready", "in-concept", "lore"],
+              "default": "all"
+            },
+            "description": "Production status filter (flight-ready, in-concept, lore)"
+          },
+          {
+            "name": "manufacturer",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Manufacturer code filter"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Entity type filter"
+          },
+          {
+            "name": "system",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Star system filter"
+          },
+          {
+            "name": "lang",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["fr", "en"],
+              "default": "fr"
+            },
+            "description": "Output localization language"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated universe exploration with facets",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "page": {
+                      "type": "integer"
+                    },
+                    "limit": {
+                      "type": "integer"
+                    },
+                    "pages": {
+                      "type": "integer"
+                    },
+                    "facets": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "deprecated": true
+      }
+    },
+    "/api/v2/universe/entities/{category}/{id}": {
+      "get": {
+        "tags": ["Universe Nexus"],
+        "summary": "360° Pivot Nexus Sheet for an entity",
+        "operationId": "universeGetEntityNexusV2Compat",
+        "description": "Returns an entity with its complete connected universe graph (loadouts, shops, locations, compatible vessels, price spreads). Alias de compatibilité : préférer `/api/universe/entities/{category}/{id}`.",
+        "parameters": [
+          {
+            "name": "category",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ships",
+                "fleet",
+                "vehicles",
+                "components",
+                "armor",
+                "clothing",
+                "weapons",
+                "utility",
+                "ammo",
+                "sustenance",
+                "locations",
+                "commodities",
+                "items"
+              ]
+            },
+            "description": "Entity category"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "UUID or class name identifier"
+          },
+          {
+            "name": "env",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "live"
+            },
+            "description": "Game environment"
+          },
+          {
+            "name": "lang",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["fr", "en"],
+              "default": "fr"
+            },
+            "description": "Output localization language"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Complete 360° nexus entity with graph connections",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Entity not found"
+          }
+        },
+        "deprecated": true
+      }
+    },
+    "/api/universe/omni-search": {
+      "get": {
+        "tags": ["Universe Nexus"],
+        "summary": "Omni-Search across all Star Citizen entities",
         "operationId": "universeOmniSearch",
         "description": "Fast multi-domain global search traversing ships, components, items, locations and commodities. Strips all placeholders and dev prefixes.",
         "parameters": [
@@ -14101,7 +14464,7 @@
         }
       }
     },
-    "/api/v2/universe/taxonomy": {
+    "/api/universe/taxonomy": {
       "get": {
         "tags": ["Universe Nexus"],
         "summary": "Live universe taxonomy tree with real entity counts",
@@ -14143,7 +14506,7 @@
         }
       }
     },
-    "/api/v2/universe/explore": {
+    "/api/universe/explore": {
       "get": {
         "tags": ["Universe Nexus"],
         "summary": "Unified exploration across the universe",
@@ -14303,7 +14666,7 @@
         }
       }
     },
-    "/api/v2/universe/entities/{category}/{id}": {
+    "/api/universe/entities/{category}/{id}": {
       "get": {
         "tags": ["Universe Nexus"],
         "summary": "360° Pivot Nexus Sheet for an entity",
