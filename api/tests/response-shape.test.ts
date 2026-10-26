@@ -1,4 +1,4 @@
-import express, { type Express } from 'express';
+import express, { type Express, type Request, type Response } from 'express';
 import request from 'supertest';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { responseShapeMiddleware } from '../src/middleware/response-shape.js';
@@ -51,5 +51,35 @@ describe('responseShapeMiddleware', () => {
   it('laisse les tableaux intacts', async () => {
     const res = await request(app).get('/array');
     expect(res.body).toEqual([1, 2, 3]);
+  });
+});
+
+describe('excludesCompatibilityEnvelope', () => {
+  let shaped: Express;
+
+  beforeAll(() => {
+    shaped = express();
+    shaped.use(responseShapeMiddleware);
+    const raw = (_req: Request, res: Response) => void res.json({ name: 'Starvis' });
+    shaped.get('/api/v1/raw', raw);
+    shaped.get('/api/v2/raw', raw);
+    shaped.get('/api/universe/raw', raw);
+  });
+
+  it('complète encore /api/v1', async () => {
+    const res = await request(shaped).get('/api/v1/raw');
+    expect(res.body).toEqual({ name: 'Starvis', success: true, status: 'success' });
+  });
+
+  it('laisse /api/v2 tel quel', async () => {
+    const res = await request(shaped).get('/api/v2/raw');
+    expect(res.body).toEqual({ name: 'Starvis' });
+  });
+
+  it('laisse /api/universe identique à /api/v2', async () => {
+    const versioned = await request(shaped).get('/api/v2/raw');
+    const canonical = await request(shaped).get('/api/universe/raw');
+    expect(canonical.status).toBe(versioned.status);
+    expect(canonical.body).toEqual(versioned.body);
   });
 });

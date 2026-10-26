@@ -13,7 +13,8 @@ import type { NextFunction, Request, Response } from 'express';
  * chaque réponse avec le discriminant manquant, sans jamais déplacer ni écraser
  * quoi que ce soit : les deux lectures restent valides. `/api/v2` en est
  * exclue — elle porte l'enveloppe unique que ce dispositif ne pouvait pas
- * imposer à la v1 sans la casser.
+ * imposer à la v1 sans la casser. Le chemin canonique `/api/universe` est la
+ * même surface : il sort du dispositif pour rester identique à son alias.
  *
  * La valeur est dérivée du code HTTP, pas devinée depuis le corps : `/health/ready`
  * renvoie `{ status: 'not_ready' }` avec un 503 et doit bien être marqué en échec.
@@ -33,16 +34,20 @@ export function withStatusDiscriminators(body: unknown, ok: boolean): void {
 }
 
 /**
- * `/api/v2` sort du dispositif.
+ * `/api/v2` sort du dispositif, ainsi que son chemin canonique `/api/universe`.
  *
- * Elle porte une enveloppe unique ou le code HTTP suffit a dire l'issue :
- * ajouter `success` a cote y reintroduirait la redondance que la v2 supprime,
- * et autoriserait les deux a diverger.
+ * Le test de `/api/v2` reste `startsWith('/api/v2')`, inchangé. Seul le chemin
+ * sans version est ajouté : les réponses v1 et v2 ne bougent pas.
  */
 const V2_PREFIX = '/api/v2';
+const UNVERSIONED_NEXUS_PREFIX = '/api/universe';
+
+export function excludesCompatibilityEnvelope(path: string): boolean {
+  return path.startsWith(V2_PREFIX) || path.startsWith(UNVERSIONED_NEXUS_PREFIX);
+}
 
 export function responseShapeMiddleware(req: Request, res: Response, next: NextFunction): void {
-  if (req.path.startsWith(V2_PREFIX)) {
+  if (excludesCompatibilityEnvelope(req.path)) {
     next();
     return;
   }

@@ -3,7 +3,7 @@
   "info": {
     "title": "Starvis API",
     "version": "2.0.0",
-    "description": "Public Star Citizen Open Data Engine & REST API.\n\nData sources:\n- **P4K / DataForge game data** (ships, components, items, commodities, shops, missions, mission brokers, mining, crafting, locations, amenities, factions, reputations, loot, ammo, inventory containers)\n- **RSI Website** (ship matrix, galactapedia, comm-links, starmap)\n- **UEX Corp 2.0** (live economy prices, all terminal types, vehicle market data, refinery yields)\n- **Star Citizen Wiki & SC-FR** (community ship naming, bilingual EN/FR localization)\n\nStarvis exposes canonical correlation endpoints to link equivalent records across P4K, RSI and UEX without changing existing resource IDs.\n\n### Public Access & Optional Authentication\nThe `/api/v1` API and `/api-docs` OpenAPI documentation are **publicly accessible** (rate-limited by IP). Optional authentication is supported for higher rate limits and administrative endpoints:\n- **Bearer JWT** (`Authorization: Bearer <token>`): optional on `/api/v1`, required for `/auth/me` and `/admin`.\n- **API Key** (`X-API-Key` header): accepted for trusted server-to-server calls.\n\n### Pagination\nList endpoints generally support `page` and `limit` query parameters and return `{ data, total, page, limit, pages }`.\n\n### Game Environments & Patch History\nUse the `env` (or `version`) query parameter to select the active environment (`live` by default, `ptu`, `custom`) or any archived semantic patch version (e.g. `4.7.2`, `4.8.1`).\n\n### Bilingual Localization (`en` + `fr`)\nQuery `/api/v1/translations` or `/api/v1/translations/{id}` for bilingual English/French names and descriptions."
+    "description": "Public Star Citizen Open Data Engine & REST API.\n\nData sources:\n- **P4K / DataForge game data** (ships, components, items, commodities, shops, missions, mission brokers, mining, crafting, locations, amenities, factions, reputations, loot, ammo, inventory containers)\n- **RSI Website** (ship matrix, galactapedia, comm-links, starmap)\n- **UEX Corp 2.0** (live economy prices, all terminal types, vehicle market data, refinery yields)\n- **Star Citizen Wiki & SC-FR** (community ship naming, bilingual EN/FR localization)\n\nStarvis exposes canonical correlation endpoints to link equivalent records across P4K, RSI and UEX without changing existing resource IDs.\n\n### Public Access & Optional Authentication\nThe `/api/v1` API and `/api-docs` OpenAPI documentation are **publicly accessible** (rate-limited by IP). Optional authentication is supported for higher rate limits and administrative endpoints:\n- **Bearer JWT** (`Authorization: Bearer <token>`): optional on `/api/v1`, required for `/auth/me` and `/admin`.\n- **API Key** (`X-API-Key` header): accepted for trusted server-to-server calls.\n\n### Pagination\nList endpoints generally support `page` and `limit` query parameters and return `{ data, total, page, limit, pages }`.\n\n### Game Environments & Patch History\nUse the `env` (or `version`) query parameter to select the active environment (`live` by default, `ptu`, `custom`) or any archived semantic patch version (e.g. `4.7.2`, `4.8.1`).\n\n### Bilingual Localization (`en` + `fr`)\nQuery `/api/v1/translations` or `/api/v1/translations/{id}` for bilingual English/French names and descriptions.\n\n### Compatibility\n`/api/v1` and `/api/v2` stay served with unchanged responses and are marked deprecated. The canonical Nexus surface has no version prefix (`/api/universe/...`) and calls the same handlers as `/api/v2/universe/...`."
   },
   "components": {
     "securitySchemes": {
@@ -3571,7 +3571,9 @@
           "503": {
             "$ref": "#/components/responses/ServiceUnavailable"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/ships/filters": {
@@ -3596,7 +3598,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/ground-vehicles": {
@@ -3675,7 +3679,9 @@
           "503": {
             "$ref": "#/components/responses/ServiceUnavailable"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/ground-vehicles/filters": {
@@ -3692,7 +3698,9 @@
           "200": {
             "description": "Available filter values for ground vehicles"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/gravlev": {
@@ -3757,7 +3765,9 @@
           "503": {
             "$ref": "#/components/responses/ServiceUnavailable"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/gravlev/filters": {
@@ -3774,7 +3784,9 @@
           "200": {
             "description": "Available filter values for grav-lev vehicles"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/ships/search": {
@@ -3838,7 +3850,9 @@
           "400": {
             "description": "Search query too short"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/ships/random": {
@@ -3853,7 +3867,9 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/ships/manufacturers": {
@@ -3870,7 +3886,9 @@
           "200": {
             "description": "Manufacturer list with ship count"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/ships/{uuid}": {
@@ -3920,7 +3938,9 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/ships/{uuid}/loadout": {
@@ -3964,7 +3984,9 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/ships/{uuid}/modules": {
@@ -3989,7 +4011,9 @@
           "200": {
             "description": "Module list"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/ships/{uuid}/paints": {
@@ -4032,7 +4056,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/ships/{uuid}/compare/{uuid2}": {
@@ -4109,7 +4135,9 @@
           "404": {
             "description": "One or both ships not found"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/ship-modules": {
@@ -4158,7 +4186,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/ships/ranking": {
@@ -4190,7 +4220,9 @@
           "200": {
             "description": "Ranked ship list"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/components": {
@@ -4414,7 +4446,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/components/compatible": {
@@ -4465,7 +4499,9 @@
           "200": {
             "description": "Compatible component list"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/components/types": {
@@ -4482,7 +4518,9 @@
           "200": {
             "description": "Available component types"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/components/categories": {
@@ -4534,7 +4572,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/components/filters": {
@@ -4553,7 +4593,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/components/families": {
@@ -4571,7 +4613,9 @@
           "200": {
             "description": "Families that currently hold at least one component"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/components/families/{family}": {
@@ -4640,7 +4684,9 @@
           "404": {
             "description": "Unknown family"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/components/{uuid}": {
@@ -4688,7 +4734,9 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/components/{uuid}/buy-locations": {
@@ -4807,7 +4855,9 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/components/{uuid}/ships": {
@@ -4904,7 +4954,9 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/items": {
@@ -5083,7 +5135,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/items/types": {
@@ -5100,7 +5154,9 @@
           "200": {
             "description": "Available item types"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/items/filters": {
@@ -5124,7 +5180,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/items/navigation": {
@@ -5156,7 +5214,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/items/sub-types": {
@@ -5181,7 +5241,9 @@
           "200": {
             "description": "Sub-types for the requested type"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/items/manufacturers": {
@@ -5205,7 +5267,9 @@
           "200": {
             "description": "Manufacturers list"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/items/categories": {
@@ -5222,7 +5286,9 @@
           "200": {
             "description": "Category → count map"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/items/weapon-attachments/modifiers": {
@@ -5306,7 +5372,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/items/category/{slug}": {
@@ -5479,7 +5547,9 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/items/{uuid}": {
@@ -5527,7 +5597,9 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/commodities": {
@@ -5656,7 +5728,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/commodities/types": {
@@ -5673,7 +5747,9 @@
           "200": {
             "description": "Available commodity types"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/commodities/categories": {
@@ -5708,7 +5784,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/commodities/filters": {
@@ -5732,7 +5810,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/commodities/{uuid}": {
@@ -5772,7 +5852,9 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/paints": {
@@ -5847,7 +5929,9 @@
           "200": {
             "description": "Paginated paint list"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/paints/filters": {
@@ -5867,7 +5951,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/paints/groups": {
@@ -5913,7 +5999,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/shops": {
@@ -6023,7 +6111,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/shops/filters": {
@@ -6042,7 +6132,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/shops/{id}": {
@@ -6090,7 +6182,9 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/shops/{id}/inventory": {
@@ -6239,7 +6333,9 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/locations": {
@@ -6295,7 +6391,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/locations/filters": {
@@ -6314,7 +6412,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/locations/{uuid}": {
@@ -6355,7 +6455,9 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/locations/{uuid}/children": {
@@ -6399,7 +6501,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/locations/{uuid}/shops": {
@@ -6450,7 +6554,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/missions": {
@@ -6512,7 +6618,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/missions/filters": {
@@ -6531,7 +6639,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/missions/{uuid}": {
@@ -6573,7 +6683,9 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/loot/tables": {
@@ -6612,7 +6724,9 @@
           "200": {
             "description": "Paginated loot tables with their entry counts"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/loot/tables/{uuid}": {
@@ -6641,7 +6755,9 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/manufacturers": {
@@ -6685,7 +6801,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/manufacturers/{code}": {
@@ -6711,7 +6829,9 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/manufacturers/{code}/ships": {
@@ -6740,7 +6860,9 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/manufacturers/{code}/components": {
@@ -6769,7 +6891,9 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/manufacturers/{code}/items": {
@@ -6798,7 +6922,9 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/ship-matrix": {
@@ -6860,7 +6986,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/mining/elements": {
@@ -6890,7 +7018,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/mining/compositions": {
@@ -6923,7 +7053,9 @@
           "200": {
             "description": "Rock composition list with element parts"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/mining/compositions/{uuid}": {
@@ -6951,7 +7083,9 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/market/offers/{uuid}": {
@@ -6988,7 +7122,9 @@
           "200": {
             "description": "Offers, best buy and best sell for the entity"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/mining/elements/{uuid}": {
@@ -7016,7 +7152,9 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/mining/solver": {
@@ -7060,7 +7198,9 @@
           "200": {
             "description": "Ranked mining targets"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/mining/stats": {
@@ -7077,7 +7217,9 @@
           "200": {
             "description": "Counts of elements, compositions, and rocks"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/mining/lasers": {
@@ -7094,7 +7236,9 @@
           "200": {
             "description": "Mining laser and gadget components with stats"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/trade/routes": {
@@ -7190,7 +7334,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/trade/locations": {
@@ -7207,7 +7353,9 @@
           "200": {
             "description": "Shops that have commodity price records"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/trade/systems": {
@@ -7224,7 +7372,9 @@
           "200": {
             "description": "Distinct system names"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/trade/prices/{commodityUuid}": {
@@ -7425,7 +7575,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/trade/prices": {
@@ -7469,7 +7621,9 @@
           "400": {
             "description": "Bad request — missing or invalid parameters"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/trade/location/{shopId}/prices": {
@@ -7497,7 +7651,9 @@
           "400": {
             "description": "Bad request — missing or invalid parameters"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/crafting/recipes": {
@@ -7583,7 +7739,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/crafting/station-types": {
@@ -7600,7 +7758,9 @@
           "200": {
             "description": "Distinct station types with recipe counts"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/crafting/categories": {
@@ -7617,7 +7777,9 @@
           "200": {
             "description": "Crafting category list"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/crafting/resources": {
@@ -7634,7 +7796,9 @@
           "200": {
             "description": "Items used as crafting ingredients"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/crafting/resources/{itemName}/recipes": {
@@ -7662,7 +7826,9 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/crafting/recipes/{uuid}": {
@@ -7690,7 +7856,9 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/calculate/fps-damage": {
@@ -7766,7 +7934,9 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/calculate/mining-yield": {
@@ -7816,7 +7986,9 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/search": {
@@ -7881,7 +8053,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/game-versions": {
@@ -7947,7 +8121,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/game-versions/default": {
@@ -7977,7 +8153,9 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/galactapedia": {
@@ -8067,7 +8245,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/galactapedia/{id}": {
@@ -8108,7 +8288,9 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/comm-links/categories": {
@@ -8138,7 +8320,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/comm-links": {
@@ -8220,7 +8404,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/comm-links/{id}": {
@@ -8261,7 +8447,9 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/starmap/systems": {
@@ -8351,7 +8539,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/starmap/systems/{code}": {
@@ -8392,7 +8582,9 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/version": {
@@ -8404,7 +8596,9 @@
           "200": {
             "description": "Current game version string"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/stats/overview": {
@@ -8492,7 +8686,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/canonical/by-uuid/{uuid}": {
@@ -8521,7 +8717,9 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/changelog/summary": {
@@ -8598,7 +8796,9 @@
               "maxLength": 200
             }
           }
-        ]
+        ],
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/changelog": {
@@ -8674,7 +8874,9 @@
           "200": {
             "description": "Recent data changes (added/removed ships, components, etc.)"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/health": {
@@ -8790,7 +8992,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/locations/systems": {
@@ -8825,7 +9029,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/locations/all": {
@@ -8863,7 +9069,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/locations/tree": {
@@ -8905,7 +9113,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/missions/types": {
@@ -8940,7 +9150,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/missions/factions": {
@@ -8975,7 +9187,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/missions/systems": {
@@ -9010,7 +9224,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/missions/categories": {
@@ -9045,7 +9261,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/ship-matrix/stats": {
@@ -9072,7 +9290,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/ship-matrix/{id}": {
@@ -9113,7 +9333,9 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/loadout/calculate": {
@@ -9172,7 +9394,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/auth/register": {
@@ -10346,7 +10570,9 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       },
       "post": {
         "tags": ["Bug Reports"],
@@ -10441,7 +10667,9 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/auth/verify-email": {
@@ -10809,7 +11037,9 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/ships/{uuid}/hardpoints": {
@@ -10837,7 +11067,9 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/ships/{uuid}/similar": {
@@ -10875,7 +11107,9 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/ships/{uuid}/variants": {
@@ -10903,7 +11137,9 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/ships/{uuid}/model": {
@@ -10982,7 +11218,9 @@
           "404": {
             "description": "Ship not found or no 3D model available"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/ships/{uuid}/model/file": {
@@ -11041,7 +11279,9 @@
           "404": {
             "description": "Ship not found or no 3D model available"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/items/{uuid}/buy-locations": {
@@ -11193,7 +11433,9 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/ships/audit": {
@@ -11236,7 +11478,9 @@
             }
           }
         },
-        "operationId": "getPublicShipsAudit"
+        "operationId": "getPublicShipsAudit",
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/starmap/filters": {
@@ -11248,7 +11492,9 @@
             "description": "OK"
           }
         },
-        "operationId": "getPublicStarmapFilters"
+        "operationId": "getPublicStarmapFilters",
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/starmap/positions": {
@@ -11281,7 +11527,9 @@
             }
           }
         },
-        "operationId": "getPublicStarmapPositions"
+        "operationId": "getPublicStarmapPositions",
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/starmap/jump-points": {
@@ -11314,7 +11562,9 @@
             }
           }
         },
-        "operationId": "getPublicStarmapJumpPoints"
+        "operationId": "getPublicStarmapJumpPoints",
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/starmap/locations": {
@@ -11453,7 +11703,9 @@
             }
           }
         },
-        "operationId": "getPublicStarmapLocations"
+        "operationId": "getPublicStarmapLocations",
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/starmap/locations/{identifier}": {
@@ -11493,7 +11745,9 @@
             "description": "Not found"
           }
         },
-        "operationId": "getPublicStarmapLocationsIdentifier"
+        "operationId": "getPublicStarmapLocationsIdentifier",
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/factions": {
@@ -11532,7 +11786,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/factions/registry": {
@@ -11619,7 +11875,9 @@
             }
           }
         },
-        "operationId": "getPublicFactionsRegistry"
+        "operationId": "getPublicFactionsRegistry",
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/factions/reputation-standings": {
@@ -11706,7 +11964,9 @@
             }
           }
         },
-        "operationId": "getPublicFactionsReputationStandings"
+        "operationId": "getPublicFactionsReputationStandings",
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/factions/reputation-scopes": {
@@ -11793,7 +12053,9 @@
             }
           }
         },
-        "operationId": "getPublicFactionsReputationScopes"
+        "operationId": "getPublicFactionsReputationScopes",
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/factions/{faction}": {
@@ -11838,7 +12100,9 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/search/{query}": {
@@ -11881,7 +12145,9 @@
             "description": "Invalid search query"
           }
         },
-        "operationId": "getPublicSearchQuery"
+        "operationId": "getPublicSearchQuery",
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/system/sitemap-entries": {
@@ -11918,7 +12184,9 @@
             }
           }
         },
-        "operationId": "getSystemSitemapEntries"
+        "operationId": "getSystemSitemapEntries",
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/stats/latest": {
@@ -11963,7 +12231,9 @@
             }
           }
         },
-        "operationId": "getPublicStatsLatest"
+        "operationId": "getPublicStatsLatest",
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/game-versions/{version}/changelog": {
@@ -12009,7 +12279,9 @@
             "description": "OK"
           }
         },
-        "operationId": "getPublicGameVersionsVersionChangelog"
+        "operationId": "getPublicGameVersionsVersionChangelog",
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/game-versions/{version}/changelog/changes": {
@@ -12055,7 +12327,9 @@
             "description": "OK"
           }
         },
-        "operationId": "getPublicGameVersionsVersionChangelogChanges"
+        "operationId": "getPublicGameVersionsVersionChangelogChanges",
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/comm-link-images": {
@@ -12139,7 +12413,9 @@
             }
           }
         },
-        "operationId": "getPublicCommLinkImages"
+        "operationId": "getPublicCommLinkImages",
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/comm-link-images/search": {
@@ -12223,7 +12499,9 @@
             }
           }
         },
-        "operationId": "getPublicCommLinkImagesSearch"
+        "operationId": "getPublicCommLinkImagesSearch",
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/comm-link-images/random": {
@@ -12253,7 +12531,9 @@
             "description": "Not found"
           }
         },
-        "operationId": "getPublicCommLinkImagesRandom"
+        "operationId": "getPublicCommLinkImagesRandom",
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/comm-link-images/{id}": {
@@ -12293,7 +12573,9 @@
             "description": "Not found"
           }
         },
-        "operationId": "getPublicCommLinkImagesId"
+        "operationId": "getPublicCommLinkImagesId",
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/ammo/stats": {
@@ -12380,7 +12662,9 @@
             }
           }
         },
-        "operationId": "getPublicAmmoStats"
+        "operationId": "getPublicAmmoStats",
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/armor/inventory-containers": {
@@ -12467,7 +12751,9 @@
             }
           }
         },
-        "operationId": "getPublicArmorInventoryContainers"
+        "operationId": "getPublicArmorInventoryContainers",
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/utility/inventory-containers": {
@@ -12554,7 +12840,9 @@
             }
           }
         },
-        "operationId": "getPublicUtilityInventoryContainers"
+        "operationId": "getPublicUtilityInventoryContainers",
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/blueprints/rewards": {
@@ -12641,7 +12929,9 @@
             }
           }
         },
-        "operationId": "getPublicBlueprintsRewards"
+        "operationId": "getPublicBlueprintsRewards",
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/blueprints/loot-tables": {
@@ -12728,7 +13018,9 @@
             }
           }
         },
-        "operationId": "getPublicBlueprintsLootTables"
+        "operationId": "getPublicBlueprintsLootTables",
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/admin/api-supervision": {
@@ -13354,7 +13646,9 @@
             "$ref": "#/components/responses/NotFound"
           }
         },
-        "operationId": "getObjectDetail"
+        "operationId": "getObjectDetail",
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/auth/api-tokens": {
@@ -13626,7 +13920,9 @@
           "403": {
             "$ref": "#/components/responses/Forbidden"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/correlations/summary": {
@@ -13664,7 +13960,9 @@
           "403": {
             "$ref": "#/components/responses/Forbidden"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/correlations/{domain}": {
@@ -13739,7 +14037,9 @@
           "403": {
             "$ref": "#/components/responses/Forbidden"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/missions/brokers": {
@@ -13813,7 +14113,9 @@
           "200": {
             "description": "Paginated broker offers, best paid first"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/translations": {
@@ -13879,7 +14181,9 @@
           "200": {
             "description": "Paginated bilingual translations"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/translations/{id}": {
@@ -13913,7 +14217,9 @@
           "404": {
             "description": "Translation not found"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/refineries": {
@@ -13936,7 +14242,9 @@
           "200": {
             "description": "Refinery terminals and yield bonuses"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/datasets": {
@@ -13959,7 +14267,9 @@
           "200": {
             "description": "Available bulk JSON dataset packs and counts"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/datasets/{pack}": {
@@ -13993,7 +14303,9 @@
           "404": {
             "description": "Dataset pack not found"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/rsi/roadmap": {
@@ -14005,7 +14317,9 @@
           "200": {
             "description": "Official RSI Roadmap releases and deliverables"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/rsi/status": {
@@ -14017,7 +14331,9 @@
           "200": {
             "description": "Official RSI status snapshot"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v1/rsi/organizations/{symbol}": {
@@ -14042,7 +14358,9 @@
           "404": {
             "description": "Organization not found"
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v2/universe/omni-search": {
@@ -14114,7 +14432,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v2/universe/taxonomy": {
@@ -14156,7 +14476,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v2/universe/explore": {
@@ -14316,7 +14638,9 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
       }
     },
     "/api/v2/universe/entities/{category}/{id}": {
@@ -14324,6 +14648,367 @@
         "tags": ["Universe Nexus"],
         "summary": "360° Pivot Nexus Sheet for an entity",
         "operationId": "universeGetEntityNexus",
+        "description": "Returns an entity with its complete connected universe graph (loadouts, shops, locations, compatible vessels, price spreads).",
+        "parameters": [
+          {
+            "name": "category",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ships",
+                "fleet",
+                "vehicles",
+                "components",
+                "armor",
+                "clothing",
+                "weapons",
+                "utility",
+                "ammo",
+                "sustenance",
+                "locations",
+                "commodities",
+                "items"
+              ]
+            },
+            "description": "Entity category"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "UUID or class name identifier"
+          },
+          {
+            "name": "env",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "live"
+            },
+            "description": "Game environment"
+          },
+          {
+            "name": "lang",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["fr", "en"],
+              "default": "fr"
+            },
+            "description": "Output localization language"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Complete 360° nexus entity with graph connections",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Entity not found"
+          }
+        },
+        "deprecated": true,
+        "x-starvis-layer": "compatibility"
+      }
+    },
+    "/api/universe/omni-search": {
+      "get": {
+        "tags": ["Universe Nexus"],
+        "summary": "Omni-Search across all Star Citizen entities",
+        "operationId": "universeOmniSearchCanonical",
+        "description": "Fast multi-domain global search traversing ships, components, items, locations and commodities. Strips all placeholders and dev prefixes.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Search query"
+          },
+          {
+            "name": "env",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "live"
+            },
+            "description": "Game environment"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 20
+            },
+            "description": "Maximum items to return"
+          },
+          {
+            "name": "lang",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["fr", "en"],
+              "default": "fr"
+            },
+            "description": "Output localization language"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Omni-search results with rich badges and in-game names",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "count": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/universe/taxonomy": {
+      "get": {
+        "tags": ["Universe Nexus"],
+        "summary": "Live universe taxonomy tree with real entity counts",
+        "operationId": "universeGetTaxonomyCanonical",
+        "description": "Returns all official categories and subcategories with dynamic in-game item counts.",
+        "parameters": [
+          {
+            "name": "env",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "live"
+            },
+            "description": "Game environment"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Taxonomy tree with categories, subcategories and counts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/universe/explore": {
+      "get": {
+        "tags": ["Universe Nexus"],
+        "summary": "Unified exploration across the universe",
+        "operationId": "universeExploreCanonical",
+        "description": "Unified pagination and dynamic facets across universe entity categories.",
+        "parameters": [
+          {
+            "name": "category",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "all",
+                "ships",
+                "fleet",
+                "vehicles",
+                "components",
+                "armor",
+                "clothing",
+                "weapons",
+                "utility",
+                "ammo",
+                "sustenance",
+                "locations",
+                "commodities",
+                "items"
+              ],
+              "default": "all"
+            },
+            "description": "Category to explore"
+          },
+          {
+            "name": "sub_category",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Specific subcategory filter (e.g. helmets, quantum_drives, primary...)"
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Full-text filter"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            },
+            "description": "Page number"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 24
+            },
+            "description": "Page size"
+          },
+          {
+            "name": "env",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "live"
+            },
+            "description": "Game environment"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["all", "flight-ready", "in-concept", "lore"],
+              "default": "all"
+            },
+            "description": "Production status filter (flight-ready, in-concept, lore)"
+          },
+          {
+            "name": "manufacturer",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Manufacturer code filter"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Entity type filter"
+          },
+          {
+            "name": "system",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Star system filter"
+          },
+          {
+            "name": "lang",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["fr", "en"],
+              "default": "fr"
+            },
+            "description": "Output localization language"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated universe exploration with facets",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "page": {
+                      "type": "integer"
+                    },
+                    "limit": {
+                      "type": "integer"
+                    },
+                    "pages": {
+                      "type": "integer"
+                    },
+                    "facets": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/universe/entities/{category}/{id}": {
+      "get": {
+        "tags": ["Universe Nexus"],
+        "summary": "360° Pivot Nexus Sheet for an entity",
+        "operationId": "universeGetEntityNexusCanonical",
         "description": "Returns an entity with its complete connected universe graph (loadouts, shops, locations, compatible vessels, price spreads).",
         "parameters": [
           {

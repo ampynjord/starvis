@@ -1180,12 +1180,19 @@ describe('OpenAPI coverage', () => {
     const routeFiles = listRouteFiles(routeDir);
     const routes: Array<{ method: string; path: string; file: string }> = [];
     const routeRe = /router\.(get|post|put|patch|delete)\(\s*([`'"])(.*?)\2/gs;
+    const routeArrayRe = /router\.(get|post|put|patch|delete)\(\s*\[([^\]]*)\]/g;
+    const quotedRe = /[`'"]([^`'"]+)[`'"]/g;
     const envDataRouteRe = /mountEnvDataRoute\(\s*router\s*,\s*([`'"])(.*?)\1/gs;
 
     for (const file of routeFiles) {
       const text = readFileSync(file, 'utf8');
       for (const match of text.matchAll(routeRe)) {
         routes.push({ method: match[1], path: match[3], file });
+      }
+      for (const match of text.matchAll(routeArrayRe)) {
+        for (const quoted of match[2].matchAll(quotedRe)) {
+          routes.push({ method: match[1], path: quoted[1], file });
+        }
       }
       for (const match of text.matchAll(envDataRouteRe)) {
         routes.push({ method: 'get', path: match[2], file });
