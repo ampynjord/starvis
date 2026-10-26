@@ -10,6 +10,7 @@ import {
   ComponentQuery,
   ItemQuery,
   LoadoutBody,
+  ModuleSelectionQuery,
   qEnv,
   qInt,
   qStr,
@@ -292,6 +293,28 @@ describe('LoadoutBody', () => {
         swaps: [{ portName: '', componentUuid: 'xyz' }],
       }),
     ).toThrow(ZodError);
+  });
+});
+
+describe('ModuleSelectionQuery', () => {
+  it('defaults to no module selection', () => {
+    expect(ModuleSelectionQuery.parse({}).modules).toEqual([]);
+    expect(ModuleSelectionQuery.parse({ modules: '' }).modules).toEqual([]);
+  });
+
+  it('parses slot:class pairs', () => {
+    const { modules } = ModuleSelectionQuery.parse({
+      modules: 'hardpoint_front_module:AEGS_Retaliator_Module_Front_Bomber,hardpoint_rear_module:AEGS_Retaliator_Module_Rear_Cargo',
+    });
+    expect(modules).toEqual([
+      { slotName: 'hardpoint_front_module', moduleClassName: 'AEGS_Retaliator_Module_Front_Bomber' },
+      { slotName: 'hardpoint_rear_module', moduleClassName: 'AEGS_Retaliator_Module_Rear_Cargo' },
+    ]);
+  });
+
+  it('rejects malformed or injected tokens', () => {
+    expect(() => ModuleSelectionQuery.parse({ modules: 'hardpoint_front_module' })).toThrow(ZodError);
+    expect(() => ModuleSelectionQuery.parse({ modules: "slot:Class' OR 1=1" })).toThrow(ZodError);
   });
 });
 

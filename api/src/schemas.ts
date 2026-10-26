@@ -147,6 +147,33 @@ export const LoadoutBody = z.object({
     .default([]),
 });
 
+/** Nom de port ou de classe DataForge : lettres, chiffres et soulignés uniquement. */
+const MODULE_TOKEN_RE = /^[A-Za-z0-9_]{1,255}$/;
+
+/**
+ * `?modules=slot:Classe,slot:Classe` — modules choisis sur un vaisseau modulaire
+ * (Retaliator, Apollo, Aurora Mk2…). Chaque paire remplace le contenu du port
+ * `slot` par les ports du module `Classe` dans l'arbre du loadout par défaut.
+ */
+export const ModuleSelectionQuery = z.object({
+  modules: z
+    .preprocess(
+      (v) => {
+        const raw = Array.isArray(v) ? v.join(',') : v;
+        if (typeof raw !== 'string' || raw.trim() === '') return [];
+        return raw
+          .split(',')
+          .filter(Boolean)
+          .map((pair) => {
+            const [slotName = '', moduleClassName = ''] = pair.split(':');
+            return { slotName: slotName.trim(), moduleClassName: moduleClassName.trim() };
+          });
+      },
+      z.array(z.object({ slotName: z.string().regex(MODULE_TOKEN_RE), moduleClassName: z.string().regex(MODULE_TOKEN_RE) })).max(12),
+    )
+    .default([]),
+});
+
 export const SearchQuery = z.object({ env: qEnv, search: qStr, format: qStr }).passthrough();
 
 export const PaintQuery = z

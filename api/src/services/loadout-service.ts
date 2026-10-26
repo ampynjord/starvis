@@ -25,6 +25,93 @@ const SHIP_SELECT_WITH_DISPLAY =
 const SHIP_BY_UUID_SQL = `${SHIP_SELECT_WITH_DISPLAY} WHERE s.uuid = ? AND s.env = ?`;
 const SHIP_MATRIX_DIMENSIONS_SQL = 'SELECT length, beam, height FROM rsi.ship_matrix WHERE id = ?';
 
+/** Colonnes composant de l'arbre `/ships/:uuid/loadout` (alias attendus par l'IHM). */
+const LOADOUT_COMPONENT_COLUMNS = `c.name as component_name, c.type as component_type, c.sub_type,
+              c.size as component_size, c.grade, c.component_class, c.manufacturer_code,
+              c.weapon_dps, c.weapon_damage, c.weapon_fire_rate, c.weapon_range,
+              c.weapon_ammo_count, c.weapon_damage_type, c.weapon_speed,
+              c.weapon_burst_dps, c.weapon_sustained_dps, c.weapon_alpha_damage,
+              c.shield_hp, c.shield_regen, c.shield_regen_delay, c.shield_hardening, c.shield_faces,
+              c.qd_speed, c.qd_spool_time, c.qd_range, c.qd_fuel_rate, c.qd_cooldown,
+              c.power_output, c.power_draw, c.power_base, c.heat_generation, c.cooling_rate,
+              c.em_signature, c.ir_signature,
+              c.missile_damage, c.missile_signal_type,
+              c.thruster_max_thrust, c.thruster_type,
+              c.rack_count, c.rack_missile_size,
+              c.cm_ammo_count,
+              c.radar_range, c.radar_detection_lifetime, c.radar_tracking_signal`;
+
+export type ModuleSelection = { slotName: string; moduleClassName: string };
+
+/** Arbre de ports d'un module, tel que l'extracteur l'écrit dans `ship_modules.loadout_json`. */
+export type ModulePortEntry = {
+  portName: string;
+  portType?: string;
+  minSize?: number;
+  maxSize?: number;
+  componentClassName?: string | null;
+  children?: ModulePortEntry[];
+};
+
+export function collectModuleClassNames(ports: ModulePortEntry[]): string[] {
+  return ports.flatMap((p) => [...(p.componentClassName ? [p.componentClassName] : []), ...collectModuleClassNames(p.children ?? [])]);
+}
+
+/**
+ * Remplace le contenu du port `slotName` par les ports du module choisi, et
+ * inscrit le module sur le port lui-même.
+ *
+ * Certains vaisseaux n'exposent pas le port de module dans leur loadout de base
+ * (l'Aurora Mk2 n'y a que ses armes) : le port est alors créé à la racine.
+ * Modifie `loadout` en place ; les ids synthétiques sont négatifs, ils ne
+ * croisent jamais un id de la base.
+ */
+export function spliceModulePorts(
+  loadout: Row[],
+  selection: ModuleSelection,
+  ports: ModulePortEntry[],
+  nextId: { value: number },
+  makeRow: (port: ModulePortEntry, id: number, parentId: number) => Row,
+): void {
+  const { slotName, moduleClassName } = selection;
+  // Un même nom de port peut se répéter sous plusieurs parents : la racine prime.
+  let slotRow = loadout.find((r) => r.port_name === slotName && r.parent_id == null) ?? loadout.find((r) => r.port_name === slotName);
+  if (!slotRow) {
+    slotRow = { id: nextId.value--, port_name: slotName, port_type: 'Other', parent_id: null };
+    loadout.push(slotRow);
+  }
+  if (slotRow.component_class_name !== moduleClassName) {
+    slotRow.component_class_name = moduleClassName;
+    slotRow.component_uuid = null;
+    slotRow.component_name = null;
+  }
+  const slotId = Number(slotRow.id);
+
+  const toRemove = new Set<number>();
+  const queue = [slotId];
+  while (queue.length) {
+    const pid = queue.shift()!;
+    for (const r of loadout) {
+      if (r.parent_id != null && Number(r.parent_id) === pid && !toRemove.has(Number(r.id))) {
+        toRemove.add(Number(r.id));
+        queue.push(Number(r.id));
+      }
+    }
+  }
+  for (let i = loadout.length - 1; i >= 0; i--) {
+    if (toRemove.has(Number(loadout[i].id))) loadout.splice(i, 1);
+  }
+
+  const inject = (entries: ModulePortEntry[], parentId: number) => {
+    for (const port of entries) {
+      const id = nextId.value--;
+      loadout.push(makeRow(port, id, parentId));
+      if (port.children?.length) inject(port.children, id);
+    }
+  };
+  inject(ports, slotId);
+}
+
 /**
  * La clé d'un composant est `(uuid, env)`, pas `uuid` seul : le même composant
  * existe en LIVE et en PTU. Joindre sur le seul `uuid` ramenait donc les deux
@@ -657,31 +744,81 @@ export class LoadoutService {
 
   // ── Read loadout / modules / paints ─────────────────────
 
-  async getShipLoadout(shipUuid: string, env = 'live'): Promise<Row[]> {
+  async getShipLoadout(shipUuid: string, env = 'live', modules: ModuleSelection[] = []): Promise<Row[]> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
       toPostgres(`SELECT sl.id, sl.port_name, sl.port_type, sl.component_class_name, sl.component_uuid,
               sl.port_min_size, sl.port_max_size, sl.parent_id,
-              c.name as component_name, c.type as component_type, c.sub_type,
-              c.size as component_size, c.grade, c.component_class, c.manufacturer_code,
-              c.weapon_dps, c.weapon_damage, c.weapon_fire_rate, c.weapon_range,
-              c.weapon_ammo_count, c.weapon_damage_type, c.weapon_speed,
-              c.weapon_burst_dps, c.weapon_sustained_dps, c.weapon_alpha_damage,
-              c.shield_hp, c.shield_regen, c.shield_regen_delay, c.shield_hardening, c.shield_faces,
-              c.qd_speed, c.qd_spool_time, c.qd_range, c.qd_fuel_rate, c.qd_cooldown,
-              c.power_output, c.power_draw, c.power_base, c.heat_generation, c.cooling_rate,
-              c.em_signature, c.ir_signature,
-              c.missile_damage, c.missile_signal_type,
-              c.thruster_max_thrust, c.thruster_type,
-              c.rack_count, c.rack_missile_size,
-              c.cm_ammo_count,
-              c.radar_range, c.radar_detection_lifetime, c.radar_tracking_signal
+              ${LOADOUT_COMPONENT_COLUMNS}
        FROM game.ship_loadouts sl LEFT JOIN game.components c ON sl.component_uuid = c.uuid AND c.env = sl.env
        WHERE sl.ship_uuid = ? AND sl.env = ? ORDER BY sl.port_type, sl.port_name`),
       shipUuid,
       env,
     );
-    return rows as Row[];
+    if (!modules.length || !rows.length) return rows as Row[];
+
+    // Modules choisis : mêmes colonnes que le loadout de base, pour que l'IHM
+    // affiche la télémétrie des ports du module comme celle du reste du vaisseau.
+    const selections = await this.loadModuleSelections(shipUuid, env, modules);
+    const classNames = selections.flatMap((s) => collectModuleClassNames(s.ports));
+    const compByClassName = new Map<string, Row>();
+    if (classNames.length) {
+      const ph = classNames.map(() => '?').join(',');
+      const compRows = await prisma.$queryRawUnsafe<Row[]>(
+        toPostgres(`SELECT c.class_name AS module_component_class, c.uuid AS component_uuid, ${LOADOUT_COMPONENT_COLUMNS}
+           FROM game.components c WHERE c.class_name IN (${ph}) AND c.env = ?`),
+        ...classNames,
+        env,
+      );
+      for (const { module_component_class, ...comp } of compRows) compByClassName.set(String(module_component_class), comp);
+    }
+
+    const loadout = rows.map((row) => ({ ...row }) as Row);
+    const nextId = { value: -10000 };
+    for (const { selection, ports } of selections) {
+      spliceModulePorts(loadout, selection, ports, nextId, (port, id, parentId) => {
+        const comp = port.componentClassName ? compByClassName.get(port.componentClassName) : undefined;
+        return {
+          ...(comp ?? {}),
+          id,
+          port_name: port.portName,
+          port_type: port.portType ?? 'Other',
+          component_class_name: port.componentClassName ?? null,
+          component_uuid: comp?.component_uuid ?? null,
+          port_min_size: port.minSize ?? null,
+          port_max_size: port.maxSize ?? null,
+          parent_id: parentId,
+        };
+      });
+    }
+    return loadout;
+  }
+
+  /** Ports internes (`loadout_json`) des modules choisis, dans l'ordre de la sélection. */
+  private async loadModuleSelections(
+    shipUuid: string,
+    env: string,
+    modules: ModuleSelection[],
+  ): Promise<{ selection: ModuleSelection; ports: ModulePortEntry[] }[]> {
+    if (!modules.length) return [];
+    const prisma = this.getClient(env);
+    const ph = modules.map(() => '?').join(',');
+    const moduleRows = await prisma.$queryRawUnsafe<Row[]>(
+      toPostgres(`SELECT slot_name, module_class_name, loadout_json FROM game.ship_modules
+         WHERE ship_uuid = ? AND env = ? AND module_class_name IN (${ph})`),
+      shipUuid,
+      env,
+      ...modules.map((m) => m.moduleClassName),
+    );
+    const selections: { selection: ModuleSelection; ports: ModulePortEntry[] }[] = [];
+    for (const { slotName, moduleClassName } of modules) {
+      // Le module doit appartenir à ce port : un module avant ne se monte pas à l'arrière.
+      const row = moduleRows.find((r) => r.module_class_name === moduleClassName && r.slot_name === slotName);
+      if (!row?.loadout_json) continue;
+      const ports = typeof row.loadout_json === 'string' ? JSON.parse(row.loadout_json) : row.loadout_json;
+      if (Array.isArray(ports)) selections.push({ selection: { slotName, moduleClassName }, ports: ports as ModulePortEntry[] });
+    }
+    return selections;
   }
 
   async getShipModules(shipUuid: string, env = 'live'): Promise<Row[]> {
@@ -763,88 +900,38 @@ export class LoadoutService {
     const loadout: Row[] = loadoutRows.map((row) => ({ ...row }) as Row);
 
     // 3b. Apply module selections (replaces children of module slots with chosen module ports)
-    if (modules.length > 0) {
+    const selections = await this.loadModuleSelections(shipUuid, 'live', modules);
+    if (selections.length > 0) {
       const prisma = this.getClient('live');
-      const classPh = modules.map(() => '?').join(',');
-      const moduleDbRows = await prisma.$queryRawUnsafe<Row[]>(
-        toPostgres(`SELECT * FROM game.ship_modules WHERE ship_uuid = ? AND env = ? AND module_class_name IN (${classPh})`),
-        shipUuid,
-        'live',
-        ...modules.map((m) => m.moduleClassName),
-      );
-      const modulesByClassName = new Map<string, Row>(moduleDbRows.map((r) => [String(r.module_class_name), r]));
+      const classNames = selections.flatMap((s) => collectModuleClassNames(s.ports));
+      const compByClassName = new Map<string, Row>();
+      if (classNames.length > 0) {
+        const cph = classNames.map(() => '?').join(',');
+        const compRows = await prisma.$queryRawUnsafe<Row[]>(
+          toPostgres(`SELECT * FROM game.components WHERE class_name IN (${cph}) AND env = ?`),
+          ...classNames,
+          'live',
+        );
+        for (const c of compRows) compByClassName.set(String(c.class_name), c);
+      }
 
-      type PortEntry = { portName: string; portType?: string; componentClassName?: string | null; children?: PortEntry[] };
-      let nextSyntheticId = -10000;
-
-      for (const { slotName, moduleClassName } of modules) {
-        const slotRow = loadout.find((r) => r.port_name === slotName);
-        if (!slotRow) continue;
-        const moduleDbRow = modulesByClassName.get(moduleClassName);
-        if (!moduleDbRow?.loadout_json) continue;
-
-        const modulePorts: PortEntry[] = JSON.parse(String(moduleDbRow.loadout_json));
-
-        // Collect all component class names from the module ports (recursive)
-        const classNames: string[] = [];
-        const collectClassNames = (ports: PortEntry[]) => {
-          for (const p of ports) {
-            if (p.componentClassName) classNames.push(p.componentClassName);
-            if (p.children?.length) collectClassNames(p.children);
-          }
-        };
-        collectClassNames(modulePorts);
-
-        // Look up components by class_name
-        const compByClassName = new Map<string, Row>();
-        if (classNames.length > 0) {
-          const cph = classNames.map(() => '?').join(',');
-          const compRows = await prisma.$queryRawUnsafe<Row[]>(
-            toPostgres(`SELECT * FROM game.components WHERE class_name IN (${cph}) AND env = ?`),
-            ...classNames,
-            'live',
-          );
-          for (const c of compRows) compByClassName.set(String(c.class_name), c);
-        }
-
-        // Remove all existing descendants of this slot from loadout
-        const slotId = Number(slotRow.id);
-        const toRemove = new Set<number>();
-        const descQueue = [slotId];
-        while (descQueue.length) {
-          const pid = descQueue.shift()!;
-          for (const r of loadout) {
-            if (Number(r.parent_id) === pid) {
-              toRemove.add(Number(r.id));
-              descQueue.push(Number(r.id));
-            }
-          }
-        }
-        for (let i = loadout.length - 1; i >= 0; i--) {
-          if (toRemove.has(Number(loadout[i].id))) loadout.splice(i, 1);
-        }
-
-        // Inject synthetic rows for the selected module's ports
-        const injectPorts = (ports: PortEntry[], parentId: number) => {
-          for (const p of ports) {
-            const myId = nextSyntheticId--;
-            const comp = p.componentClassName ? compByClassName.get(p.componentClassName) : null;
-            loadout.push({
-              id: myId,
-              port_name: p.portName,
-              port_type: p.portType ?? 'Other',
-              port_min_size: null,
-              port_max_size: null,
-              parent_id: parentId,
-              component_uuid: comp?.uuid ?? null,
-              component_class_name: p.componentClassName ?? null,
-              port_editable: 0,
-              ...(comp ?? {}),
-            });
-            if (p.children?.length) injectPorts(p.children, myId);
-          }
-        };
-        injectPorts(modulePorts, slotId);
+      const nextId = { value: -10000 };
+      for (const { selection, ports } of selections) {
+        spliceModulePorts(loadout, selection, ports, nextId, (port, id, parentId) => {
+          const comp = port.componentClassName ? compByClassName.get(port.componentClassName) : null;
+          return {
+            id,
+            port_name: port.portName,
+            port_type: port.portType ?? 'Other',
+            port_min_size: null,
+            port_max_size: null,
+            parent_id: parentId,
+            component_uuid: comp?.uuid ?? null,
+            component_class_name: port.componentClassName ?? null,
+            port_editable: 0,
+            ...(comp ?? {}),
+          };
+        });
       }
     }
 

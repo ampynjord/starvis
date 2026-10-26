@@ -24,12 +24,16 @@ import {
   Search,
   ExternalLink,
   Layers as LayersIcon,
+  Loader2,
+  RotateCcw,
 } from 'lucide-react';
 import type { LoadoutNode as ApiLoadoutNode, ShipModule } from '@/types/api';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { fSize } from '@/utils/formatters';
 import {
   buildLoadoutTree,
+  humanizeModuleName,
+  humanizeModuleSlot,
   type GroupedLoadoutSection,
   type LoadoutNode,
 } from '@/lib/loadout-formatter';
@@ -39,6 +43,10 @@ interface ShipLoadoutProps {
   activeModules?: ShipModule[];
   moduleSlots?: ShipModule[][];
   onModuleChange?: (slotName: string, className: string) => void;
+  /** Revient à l'équipement d'usine sur tous les ports de module. */
+  onResetModules?: () => void;
+  /** Vrai pendant le recalcul de l'arbre après un changement de module. */
+  isRecomputing?: boolean;
 }
 
 // ─────────────────────────────────────────────
@@ -129,7 +137,7 @@ const TAB_LABELS: Record<string, { fr: string; en: string }> = {
   specialized: { fr: 'Spécialisé', en: 'Specialized' },
   avionics_blades: { fr: 'Avionique & Blades', en: 'Avionics & Blades' },
   fuel: { fr: 'Carburant & Intakes', en: 'Fuel & Intakes' },
-  modules: { fr: 'Baies Modulaires', en: 'Modular Bays' },
+  modules: { fr: 'Modules', en: 'Modules' },
   paints: { fr: 'Peintures', en: 'Liveries' },
 };
 
@@ -245,17 +253,19 @@ function ErkulNodeRow({
     (node.component_class_name || '').toLowerCase().includes('tractor');
 
   const isEmp =
-    (node.component_type || '').toLowerCase().includes('emp') ||
-    (node.component_class_name || '').toLowerCase().includes('emp');
+    (node.component_type || '').toLowerCase() === 'emp' ||
+    /(?:^|_)emp(?:_|$)/.test((node.component_class_name || '').toLowerCase());
 
   const isQed =
     (node.component_type || '').toLowerCase().includes('interdiction') ||
     (node.component_class_name || '').toLowerCase().includes('qed');
 
   const isPod =
-    (node.port_name || '').toLowerCase().includes('pod') ||
-    (node.component_class_name || '').toLowerCase().includes('pod') ||
-    (node.component_class_name || '').toLowerCase().includes('bag');
+    /mining_pod|stored_pod/.test((node.port_name || '').toLowerCase()) ||
+    (node.component_class_name || '').toLowerCase().includes('shipmining_pod');
+
+  // Port provided by an interchangeable module (shown outside the Modules tab)
+  const moduleOrigin = node.moduleSlot && node.sourceModule && node.port_name !== node.moduleSlot ? node.sourceModule : null;
 
   const dmgStyle = node.weapon_damage_type ? DAMAGE_TYPE_STYLE[node.weapon_damage_type.toLowerCase()] : null;
   const trackStyle = node.component_sub_type ? TRACKING_TYPE_STYLE[node.component_sub_type.toLowerCase()] : null;
@@ -375,7 +385,15 @@ function ErkulNodeRow({
             )}
             {isPod && (
               <span className="px-1.5 py-0.5 rounded text-[9px] font-mono-sc bg-yellow-950/80 text-yellow-300 border border-yellow-800/60 font-bold">
-                {isFr ? 'Sac Amovible' : 'Saddlebag'}
+                {isFr ? 'Sac à minerai' : 'Ore Bag'}
+              </span>
+            )}
+            {moduleOrigin && depth === 0 && (
+              <span
+                className="px-1.5 py-0.5 rounded text-[9px] font-mono-sc bg-purple-950/80 text-purple-300 border border-purple-700/60 font-bold"
+                title={isFr ? 'Fourni par un module interchangeable' : 'Provided by an interchangeable module'}
+              >
+                {isFr ? 'Module' : 'Module'} · {moduleOrigin}
               </span>
             )}
             {node.thruster_type && (
@@ -569,6 +587,18 @@ function ErkulNodeRow({
 // Dynamic Tab Badge Helper
 // ─────────────────────────────────────────────
 
+/** A missile / torpedo / bomb actually loaded — not an empty rack waiting for one. */
+function isOrdnanceLeaf(n: LoadoutNode): boolean {
+  const type = (n.component_type || '').toLowerCase();
+  if (type === 'missilerack' || (n.component_class_name || '').toUpperCase().startsWith('MRCK')) return false;
+  return (
+    (n.port_type || '').toLowerCase().includes('missile') ||
+    type.includes('missile') ||
+    type.includes('torpedo') ||
+    type.includes('bomb')
+  );
+}
+
 function getSectionBadge(sec: GroupedLoadoutSection, isFr: boolean): string | undefined {
   if (sec.key === 'fixed_weapons' || sec.key === 'turrets' || sec.key === 'pds') {
     let dps = 0;
@@ -583,7 +613,7 @@ function getSectionBadge(sec: GroupedLoadoutSection, isFr: boolean): string | un
   if (sec.key === 'ordnance') {
     let count = 0;
     const addCount = (n: LoadoutNode) => {
-      if (n.children.length === 0) {
+      if (n.children.length === 0 && isOrdnanceLeaf(n)) {
         count += n.count || 1;
       }
       n.children.forEach(addCount);
@@ -654,6 +684,8 @@ export function ShipLoadout({
   activeModules = [],
   moduleSlots = [],
   onModuleChange,
+  onResetModules,
+  isRecomputing = false,
 }: ShipLoadoutProps) {
   const { language } = useLanguage();
   const isFr = language === 'fr';
@@ -661,10 +693,42 @@ export function ShipLoadout({
   const [activeTab, setActiveTab] = useState<string>('fixed_weapons');
   const [filterSearch, setFilterSearch] = useState('');
 
-  // Process Erkul hierarchical tree
+  // Process Erkul hierarchical tree — module ports are spread into their natural categories
   const groupedSections: GroupedLoadoutSection[] = useMemo(() => {
-    return buildLoadoutTree(nodes as any, language);
-  }, [nodes, language]);
+    return buildLoadoutTree(nodes as any, language, {
+      moduleSlots: activeModules.map((m) => ({
+        slotName: m.slot_name,
+        label: humanizeModuleName(m.module_class_name, language, m.module_tier),
+      })),
+    });
+  }, [nodes, language, activeModules]);
+
+  const modulesSection = groupedSections.find((s) => s.key === 'modules');
+
+  // What each module brings to the ship, per slot (torpedo launcher, shield, missile racks…)
+  const moduleContributions = useMemo(() => {
+    const bySlot = new Map<string, Array<{ node: LoadoutNode; sectionKey: string; count: number }>>();
+    for (const sec of groupedSections) {
+      if (sec.key === 'modules') continue;
+      for (const node of sec.nodes) {
+        if (!node.moduleSlot) continue;
+        const list = bySlot.get(node.moduleSlot) ?? [];
+        // 8 identical racks read better as one "8x" chip
+        const same = list.find(
+          (c) =>
+            c.sectionKey === sec.key &&
+            c.node.component_name === node.component_name &&
+            c.node.component_size === node.component_size,
+        );
+        if (same) same.count += node.count || 1;
+        else list.push({ node, sectionKey: sec.key, count: node.count || 1 });
+        bySlot.set(node.moduleSlot, list);
+      }
+    }
+    return bySlot;
+  }, [groupedSections]);
+
+  const hasCustomModules = activeModules.some((m) => !m.is_default);
 
   // Aggregate stats overview banner (Erkul telemetry top bar)
   const shipTotals = useMemo(() => {
@@ -690,15 +754,8 @@ export function ShipLoadout({
 
       if (node.children && node.children.length > 0) {
         node.children.forEach(traverse);
-      } else {
-        // leaf missile count
-        if (
-          (node.port_type || '').toLowerCase().includes('missile') ||
-          (node.component_type || '').toLowerCase().includes('missile') ||
-          (node.component_type || '').toLowerCase().includes('torpedo')
-        ) {
-          totalMissiles += node.count || 1;
-        }
+      } else if (isOrdnanceLeaf(node)) {
+        totalMissiles += node.count || 1;
       }
     };
 
@@ -728,32 +785,37 @@ export function ShipLoadout({
       count: number;
       icon: React.ElementType;
       badge?: string;
-    }> = groupedSections.map((sec) => {
-      const Icon = SECTION_ICONS[sec.iconName] || LayersIcon;
-      const labelDef = TAB_LABELS[sec.key];
-      const label = labelDef ? (isFr ? labelDef.fr : labelDef.en) : sec.title;
-      const badge = getSectionBadge(sec, isFr);
+    }> = groupedSections
+      .filter((sec) => sec.key !== 'modules')
+      .map((sec) => {
+        const Icon = SECTION_ICONS[sec.iconName] || LayersIcon;
+        const labelDef = TAB_LABELS[sec.key];
+        const label = labelDef ? (isFr ? labelDef.fr : labelDef.en) : sec.title;
+        const badge = getSectionBadge(sec, isFr);
 
-      return {
-        id: sec.key,
-        label,
-        count: sec.nodes.length,
-        icon: Icon,
-        badge,
-      };
-    });
+        return {
+          id: sec.key,
+          label,
+          count: sec.nodes.length,
+          icon: Icon,
+          badge,
+        };
+      });
 
-    if (activeModules.length > 0) {
+    // Modules: the API rows (with alternatives to pick from) win over the bare tree hosts
+    const moduleCount = activeModules.length || modulesSection?.nodes.length || 0;
+    if (moduleCount > 0) {
       list.push({
         id: 'modules',
-        label: isFr ? 'Baies Modulaires' : 'Modular Bays',
-        count: activeModules.length,
+        label: isFr ? TAB_LABELS.modules.fr : TAB_LABELS.modules.en,
+        count: moduleCount,
         icon: LayersIcon,
+        badge: hasCustomModules ? (isFr ? 'perso.' : 'custom') : undefined,
       });
     }
 
     return list;
-  }, [groupedSections, activeModules, isFr]);
+  }, [groupedSections, activeModules, modulesSection, hasCustomModules, isFr]);
 
   // Auto-switch to first non-empty tab if activeTab is not found
   const effectiveTab = useMemo(() => {
@@ -935,11 +997,35 @@ export function ShipLoadout({
       {/* ── Active Section Tree Cards ── */}
       {effectiveTab !== 'modules' ? (
         displayedNodes.length > 0 ? (
-          <div className="space-y-3">
-            {displayedNodes.map((node) => (
-              <ErkulNodeRow key={node.id} node={node} />
-            ))}
-          </div>
+          activeSection?.subgroups && activeSection.subgroups.length > 0 ? (
+            /* Specialized: one block per specialty (mining, salvage, tractor, tactical…) */
+            <div className="space-y-5">
+              {activeSection.subgroups.map((group) => {
+                const visible = group.nodes.filter((n) => displayedNodes.includes(n));
+                if (visible.length === 0) return null;
+                return (
+                  <div key={group.tag} className="space-y-2.5">
+                    <h4 className="flex items-center gap-2 text-[10px] font-mono-sc uppercase tracking-wider text-amber-300/90">
+                      <Wrench size={11} className="text-amber-400" />
+                      {group.title}
+                      <span className="text-slate-500">({visible.length})</span>
+                    </h4>
+                    <div className="space-y-3">
+                      {visible.map((node) => (
+                        <ErkulNodeRow key={node.id} node={node} />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {displayedNodes.map((node) => (
+                <ErkulNodeRow key={node.id} node={node} />
+              ))}
+            </div>
+          )
         ) : (
           <div className="p-8 text-center rounded-xl border border-dashed border-slate-800 bg-slate-950/30">
             <p className="text-xs font-mono-sc text-slate-500">
@@ -953,47 +1039,115 @@ export function ShipLoadout({
             </p>
           </div>
         )
-      ) : (
-        /* Modular Ship bays (Retaliator, Apollo, Galaxy...) */
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {activeModules.map((mod, i) => {
-            const options = moduleSlots.find((slot) => slot[0]?.slot_name === mod.slot_name) ?? [];
-            return (
-              <div
-                key={i}
-                className="p-3.5 rounded-xl border border-purple-900/40 bg-purple-950/10 hover:border-purple-700/50 transition-all space-y-2.5"
+      ) : activeModules.length > 0 ? (
+        /* Interchangeable modules (Retaliator, Apollo, Aurora Mk2, Cyclone…) */
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono-sc text-slate-400">
+            <span className="flex items-center gap-1.5">
+              {isRecomputing && <Loader2 size={12} className="animate-spin text-purple-400" />}
+              {isFr
+                ? 'Changer un module recalcule tout l’arbre : ses armes, racks et boucliers rejoignent leurs onglets.'
+                : 'Swapping a module recomputes the whole tree: its weapons, racks and shields join their own tabs.'}
+            </span>
+            {hasCustomModules && onResetModules && (
+              <button
+                type="button"
+                onClick={onResetModules}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded border border-slate-700 hover:border-purple-500/60 text-slate-300 hover:text-white transition-colors"
               >
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-mono-sc uppercase text-purple-400 font-bold">
-                    {mod.slot_name}
-                  </span>
-                  <span className="px-1.5 py-0.5 rounded text-[9px] font-mono-sc bg-purple-900/60 text-purple-200 border border-purple-700/60 font-semibold">
-                    {isFr ? 'Modulaire' : 'Modular'}
-                  </span>
-                </div>
+                <RotateCcw size={11} />
+                {isFr ? 'Configuration d’usine' : 'Factory configuration'}
+              </button>
+            )}
+          </div>
 
-                <div className="flex items-center justify-between gap-2">
-                  <h4 className="text-sm font-rajdhani font-bold text-white truncate">
-                    {mod.module_name || mod.module_class_name}
-                  </h4>
-
-                  {options.length > 1 && onModuleChange && (
-                    <select
-                      value={mod.module_class_name}
-                      onChange={(e) => onModuleChange(mod.slot_name, e.target.value)}
-                      className="bg-slate-900 border border-purple-800/60 text-xs font-mono-sc text-purple-300 rounded px-2 py-1 focus:outline-none focus:border-cyan-500"
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {activeModules.map((mod) => {
+              const options = moduleSlots.find((slot) => slot[0]?.slot_name === mod.slot_name) ?? [];
+              const contributions = moduleContributions.get(mod.slot_name) ?? [];
+              const moduleLabel = humanizeModuleName(mod.module_class_name, language, mod.module_tier);
+              return (
+                <div
+                  key={mod.slot_name}
+                  className="p-3.5 rounded-xl border border-purple-900/40 bg-purple-950/10 hover:border-purple-700/50 transition-all space-y-2.5"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-mono-sc uppercase text-purple-400 font-bold" title={mod.slot_name}>
+                      {humanizeModuleSlot(mod.slot_name, language, mod.slot_type)}
+                    </span>
+                    <span
+                      className={`px-1.5 py-0.5 rounded text-[9px] font-mono-sc border font-semibold ${
+                        mod.is_default
+                          ? 'bg-slate-900/80 text-slate-300 border-slate-700/60'
+                          : 'bg-purple-900/60 text-purple-200 border-purple-700/60'
+                      }`}
                     >
-                      {options.map((opt) => (
-                        <option key={opt.module_class_name} value={opt.module_class_name}>
-                          {opt.module_name || opt.module_class_name}
-                        </option>
+                      {mod.is_default ? (isFr ? 'D’usine' : 'Factory') : isFr ? 'Personnalisé' : 'Custom'}
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <h4 className="text-sm font-rajdhani font-bold text-white" title={mod.module_class_name}>
+                      {moduleLabel}
+                    </h4>
+
+                    {options.length > 1 && onModuleChange && (
+                      <select
+                        aria-label={isFr ? 'Choisir le module' : 'Choose module'}
+                        value={mod.module_class_name}
+                        onChange={(e) => onModuleChange(mod.slot_name, e.target.value)}
+                        className="w-full bg-slate-900 border border-purple-800/60 text-xs font-mono-sc text-purple-300 rounded px-2 py-1 focus:outline-none focus:border-cyan-500"
+                      >
+                        {options.map((opt) => (
+                          <option key={opt.module_class_name} value={opt.module_class_name}>
+                            {humanizeModuleName(opt.module_class_name, language, opt.module_tier)}
+                            {opt.is_default ? (isFr ? ' (usine)' : ' (factory)') : ''}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+
+                  {/* What the module brings, with a jump to the tab where it now lives */}
+                  {contributions.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5 pt-1 border-t border-purple-900/30">
+                      {contributions.map(({ node, sectionKey, count }) => (
+                        <button
+                          key={node.id}
+                          type="button"
+                          onClick={() => {
+                            setActiveTab(sectionKey);
+                            setFilterSearch('');
+                          }}
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-950/70 border border-slate-800 hover:border-purple-500/50 text-[10px] font-mono-sc text-slate-300 hover:text-white transition-colors"
+                        >
+                          <SizeBadge size={node.component_size} lang={language} />
+                          {count > 1 ? `${count}x ` : ''}
+                          {node.component_name || node.humanPortName}
+                          <span className="text-slate-500">
+                            → {isFr ? TAB_LABELS[sectionKey]?.fr : TAB_LABELS[sectionKey]?.en}
+                          </span>
+                        </button>
                       ))}
-                    </select>
+                    </div>
+                  ) : (
+                    <p className="text-[10px] font-mono-sc text-slate-500 pt-1 border-t border-purple-900/30">
+                      {isFr
+                        ? 'Aucun équipement monté — module de fret ou d’aménagement intérieur.'
+                        : 'No mounted equipment — cargo or interior fit-out module.'}
+                    </p>
                   )}
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        /* Module hosts found in the tree, without alternatives in the database */
+        <div className="space-y-3">
+          {(modulesSection?.nodes ?? []).map((node) => (
+            <ErkulNodeRow key={node.id} node={node} />
+          ))}
         </div>
       )}
     </div>

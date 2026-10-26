@@ -5,7 +5,7 @@
  * Uses mock Row data (no DB required).
  */
 import { describe, expect, it } from 'vitest';
-import { LoadoutService } from '../src/services/loadout-service.js';
+import { collectModuleClassNames, LoadoutService, type ModulePortEntry, spliceModulePorts } from '../src/services/loadout-service.js';
 import type { Row } from '../src/services/shared.js';
 
 // ── Helpers ──────────────────────────────────────────────
@@ -472,5 +472,60 @@ describe('jointures sur game.components', () => {
     for (const join of joins) {
       expect(join, `jointure sans contrainte d'env : ${join.trim()}`).toMatch(/c\.env\s*=\s*sl\.env/);
     }
+  });
+});
+
+describe('spliceModulePorts', () => {
+  const base = (): Row[] => [
+    { id: 1, port_name: 'hardpoint_front_module', parent_id: null, component_class_name: 'AEGS_Retaliator_Module_Front_Base' },
+    { id: 2, port_name: 'hardpoint_module_oc', parent_id: 1, component_class_name: 'AEGS_Retaliator_OC_Front_Base' },
+    { id: 3, port_name: 'hardpoint_front_bay_door', parent_id: 1 },
+    { id: 4, port_name: 'hardpoint_shield_generator', parent_id: null },
+  ];
+  const ports: ModulePortEntry[] = [
+    {
+      portName: 'hardpoint_torpedo_launcher_fore',
+      portType: 'MissileRack',
+      componentClassName: 'MRCK_S09_AEGS_Retaliator_Fore',
+      children: [{ portName: 'missile_01_attach', portType: 'MissileRack', componentClassName: 'MISL_S09_CS_FSKI_Argos' }],
+    },
+  ];
+  const makeRow = (port: ModulePortEntry, id: number, parentId: number): Row => ({
+    id,
+    port_name: port.portName,
+    parent_id: parentId,
+    component_class_name: port.componentClassName ?? null,
+  });
+
+  const bomber = { slotName: 'hardpoint_front_module', moduleClassName: 'AEGS_Retaliator_Module_Front_Bomber' };
+
+  it('replaces the module slot content with the chosen module ports', () => {
+    const loadout = base();
+    spliceModulePorts(loadout, bomber, ports, { value: -10000 }, makeRow);
+
+    expect(loadout.map((r) => r.port_name)).toEqual([
+      'hardpoint_front_module',
+      'hardpoint_shield_generator',
+      'hardpoint_torpedo_launcher_fore',
+      'missile_01_attach',
+    ]);
+    expect(loadout[0].component_class_name).toBe('AEGS_Retaliator_Module_Front_Bomber');
+    const launcher = loadout.find((r) => r.port_name === 'hardpoint_torpedo_launcher_fore')!;
+    expect(launcher.parent_id).toBe(1);
+    expect(loadout.find((r) => r.port_name === 'missile_01_attach')!.parent_id).toBe(launcher.id);
+    expect(Number(launcher.id)).toBeLessThan(0);
+  });
+
+  it('creates the module slot at the root when the base loadout lacks it (Aurora Mk2)', () => {
+    const loadout = base().filter((r) => r.id === 4);
+    spliceModulePorts(loadout, bomber, ports, { value: -10000 }, makeRow);
+
+    const host = loadout.find((r) => r.port_name === 'hardpoint_front_module')!;
+    expect(host).toMatchObject({ parent_id: null, component_class_name: 'AEGS_Retaliator_Module_Front_Bomber' });
+    expect(loadout.find((r) => r.port_name === 'hardpoint_torpedo_launcher_fore')!.parent_id).toBe(host.id);
+  });
+
+  it('collects component class names recursively', () => {
+    expect(collectModuleClassNames(ports)).toEqual(['MRCK_S09_AEGS_Retaliator_Fore', 'MISL_S09_CS_FSKI_Argos']);
   });
 });

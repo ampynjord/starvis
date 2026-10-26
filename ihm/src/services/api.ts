@@ -345,7 +345,16 @@ export const api = {
     search: (search: string, limit = 8, env?: string) => get<ShipListItem[]>('/ships/search', { search, limit, env }),
     random: (env?: string) => get<Ship>('/ships/random', { env }),
     get: (uuid: string, env?: string) => get<Ship>(`/ships/${uuid}`, { env }),
-    loadout: (uuid: string, env?: string) => get<LoadoutNode[]>(`/ships/${uuid}/loadout`, { env }),
+    /** `modules` : port de module → classe du module choisi (seuls les écarts à l'équipement d'usine). */
+    loadout: (uuid: string, env?: string, modules?: Record<string, string>) =>
+      get<LoadoutNode[]>(`/ships/${uuid}/loadout`, {
+        env,
+        modules: modules
+          ? Object.entries(modules)
+              .map(([slotName, className]) => `${slotName}:${className}`)
+              .join(',')
+          : undefined,
+      }),
     paints: (uuid: string, env?: string) => get<ShipPaint[]>(`/ships/${uuid}/paints`, { env }),
     similar: (uuid: string, limit = 6, env?: string) => get<ShipListItem[]>(`/ships/${uuid}/similar`, { limit, env }),
     modules: (uuid: string, env?: string) => get<ShipModule[]>(`/ships/${uuid}/modules`, { env }),

@@ -3,7 +3,7 @@ import { createWriteStream, existsSync, mkdirSync, readFileSync, unlinkSync, wri
 import { request as httpsRequest } from 'node:https';
 import { join } from 'node:path';
 import type { Router } from 'express';
-import { SearchQuery, ShipQuery } from '../schemas.js';
+import { ModuleSelectionQuery, SearchQuery, ShipQuery } from '../schemas.js';
 import { parseIncludes } from '../services/shared.js';
 import { CTM_CACHE_DIR } from '../utils/config.js';
 import { ctmToGlb, ctmToObj } from '../utils/ctm-converter.js';
@@ -258,9 +258,10 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
     requireGameData,
     asyncHandler(async (req, res) => {
       const env = String(req.query.env ?? 'live');
+      const { modules } = ModuleSelectionQuery.parse(req.query);
       const uuid = await resolveShipUuid(req.params.uuid, env);
       if (!uuid) return void res.status(404).json({ success: false, error: 'Ship not found' });
-      const loadout = await gameDataService!.loadouts.getShipLoadout(uuid, env);
+      const loadout = await gameDataService!.loadouts.getShipLoadout(uuid, env, modules);
       if (!loadout.length) return void res.status(404).json({ success: false, error: 'No loadout found' });
       // Build recursive hierarchical tree (supports turret→gimbal→weapon 3+ levels)
       // Deduplicate by port_name per parent to handle duplicate DB rows from extractor.

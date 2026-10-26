@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { buildLoadoutTree, determineDetailedGroup, determineGroup, humanizePortName, type RawLoadoutSlot } from '@/lib/loadout-formatter';
+import {
+  buildLoadoutTree,
+  determineDetailedGroup,
+  determineGroup,
+  determineSpecialtyTag,
+  humanizeModuleName,
+  humanizePortName,
+  type RawLoadoutSlot,
+} from '@/lib/loadout-formatter';
 
 describe('humanizePortName', () => {
   it('humanizes technical hardpoint weapon identifiers', () => {
@@ -233,5 +241,178 @@ describe('buildLoadoutTree', () => {
     expect(cmSection!.iconName).toBe('sparkles');
     expect(cmSection!.nodes.length).toBe(2);
     expect(cmSection!.nodes[0].cm_ammo_count).toBe(48);
+  });
+});
+
+describe('modular ships', () => {
+  const retaliatorBomber: RawLoadoutSlot[] = [
+    {
+      id: 1,
+      parent_id: null,
+      port_name: 'hardpoint_front_module',
+      port_type: 'Other',
+      component_class_name: 'AEGS_Retaliator_Module_Front_Bomber',
+    },
+    { id: 2, parent_id: 1, port_name: 'hardpoint_module_oc', port_type: 'Other', component_class_name: 'AEGS_Retaliator_OC_Front_Bomber' },
+    {
+      id: 3,
+      parent_id: 1,
+      port_name: 'hardpoint_torpedo_launcher_fore',
+      port_type: 'MissileRack',
+      component_class_name: 'MRCK_S09_AEGS_Retaliator_Fore',
+      component_type: 'MissileRack',
+      component_name: 'Retaliator Torpedo Launcher',
+    },
+    {
+      id: 4,
+      parent_id: 3,
+      port_name: 'missile_01_attach',
+      port_type: 'MissileRack',
+      component_class_name: 'MISL_S09',
+      component_type: 'Missile',
+      component_name: 'Argos IX',
+    },
+    {
+      id: 5,
+      parent_id: null,
+      port_name: 'hardpoint_shield_left',
+      port_type: 'Shield',
+      component_class_name: 'SHLD_X',
+      component_name: 'FullStop',
+    },
+  ];
+
+  it('moves module ports to their natural category and lists the module itself under modules', () => {
+    const tree = buildLoadoutTree(retaliatorBomber, 'fr', {
+      moduleSlots: [{ slotName: 'hardpoint_front_module', label: 'Torpilles (Bomber)' }],
+    });
+
+    const modules = tree.find((s) => s.key === 'modules');
+    expect(modules?.nodes).toHaveLength(1);
+    expect(modules!.nodes[0]).toMatchObject({ humanPortName: 'Module avant', component_name: 'Torpilles (Bomber)', children: [] });
+
+    const ordnance = tree.find((s) => s.key === 'ordnance');
+    expect(ordnance?.nodes).toHaveLength(1);
+    expect(ordnance!.nodes[0]).toMatchObject({
+      component_name: 'Retaliator Torpedo Launcher',
+      moduleSlot: 'hardpoint_front_module',
+      sourceModule: 'Torpilles (Bomber)',
+    });
+    expect(ordnance!.nodes[0].children[0].component_name).toBe('Argos IX');
+
+    // The module occlusion helper never shows up anywhere
+    const all = tree.flatMap((s) => s.nodes);
+    expect(all.some((n) => n.port_name === 'hardpoint_module_oc')).toBe(false);
+  });
+
+  it('recognises well-known module ports even without module metadata', () => {
+    const tree = buildLoadoutTree(retaliatorBomber, 'en');
+    expect(tree.find((s) => s.key === 'modules')!.nodes[0].component_name).toBe('Torpedo (Bomber)');
+  });
+
+  it('humanizes module class names', () => {
+    expect(humanizeModuleName('AEGS_Retaliator_Module_Rear_Cargo', 'fr')).toBe('Fret');
+    expect(humanizeModuleName('RSI_Apollo_Module_Left_Tier_2', 'en', 2)).toBe('Medical Bay T2');
+    expect(humanizeModuleName('RSI_Aurora_Mk2_Module_Missile', 'en')).toBe('Missile Launcher');
+    expect(humanizeModuleName('DRAK_Caterpillar_CargoGrid_Module', 'fr')).toBe('Fret');
+  });
+});
+
+describe('interior fixtures & transparent containers', () => {
+  it('drops fixture subtrees and hoists components out of anonymous containers', () => {
+    const slots: RawLoadoutSlot[] = [
+      // Fire extinguisher cabinet: its "weapon" must not reach the pilot weapons tab
+      {
+        id: 1,
+        parent_id: null,
+        port_name: 'hardpoint_extinguisher_bridge',
+        port_type: 'Other',
+        component_class_name: 'Gadget_Cabinet_kegr_fire_extinguisher_NG',
+      },
+      {
+        id: 2,
+        parent_id: 1,
+        port_name: 'cabinet_attach_loc',
+        port_type: 'Other',
+        component_class_name: 'kegr_fire_extinguisher_01',
+        component_type: 'WeaponGun',
+      },
+      {
+        id: 3,
+        parent_id: null,
+        port_name: 'hardpoint_dashboard_pilot',
+        port_type: 'Other',
+        component_class_name: 'MISC_Hull_C_Dashboard_Pilot',
+      },
+      { id: 4, parent_id: null, port_name: 'hardpoint_armor', port_type: 'Other', component_class_name: 'ARMR_MISC_Hull_C' },
+      // Hull C rear interior block holding real components
+      { id: 5, parent_id: null, port_name: 'hardpoint_body_int_rear', port_type: 'Other', component_class_name: 'MISC_Hull_C_Int_Rear' },
+      {
+        id: 6,
+        parent_id: 5,
+        port_name: 'hardpoint_rear_cooler_01',
+        port_type: 'Cooler',
+        component_class_name: 'COOL_AEGS_S03_Blizzard_SCItem',
+        component_name: 'Blizzard',
+      },
+      // Empty placeholder
+      { id: 7, parent_id: null, port_name: 'hardpoint_avionics01', port_type: 'Other', component_class_name: null },
+    ];
+    const tree = buildLoadoutTree(slots, 'en');
+
+    expect(tree.map((s) => s.key)).toEqual(['coolers']);
+    expect(tree[0].nodes[0].component_name).toBe('Blizzard');
+  });
+});
+
+describe('specialized equipment', () => {
+  it('tags specialties', () => {
+    expect(determineSpecialtyTag({ port_name: 'hardpoint_mining_pod_1', component_class_name: 'Cargo_ShipMining_Pod_Mole' })).toBe(
+      'mining',
+    );
+    expect(determineSpecialtyTag({ port_name: 'hardpoint_remote_turret_salvage_left', port_type: 'Turret' })).toBe('salvage');
+    expect(determineSpecialtyTag({ port_name: 'hardpoint_turret_tractor_beam_top_front', port_type: 'Turret' })).toBe('tractor');
+    expect(determineSpecialtyTag({ port_name: 'hardpoint_weapon_emp', component_type: 'EMP' })).toBe('tactical');
+    expect(determineSpecialtyTag({ port_name: 'hardpoint_interdiction_device', component_type: 'QuantumInterdictionGenerator' })).toBe(
+      'tactical',
+    );
+    expect(determineSpecialtyTag({ port_name: 'hardpoint_misc', component_class_name: 'Something_Temp' })).toBe('utility');
+  });
+
+  it('labels tactical tools instead of swallowing them as weapons or quantum drives', () => {
+    expect(humanizePortName('hardpoint_weapon_emp', 'EMP', 'fr')).toBe('Générateur EMP');
+    expect(humanizePortName('hardpoint_quantum_interdiction_generator', 'QuantumInterdictionGenerator', 'en')).toBe(
+      'Quantum Interdiction Generator (QED)',
+    );
+    expect(humanizePortName('hardpoint_countermeasure_left', 'Countermeasure', 'en', 'RSI_Apollo_CML_Noise_Small')).toBe(
+      'Noise Launcher (Left)',
+    );
+  });
+
+  it('groups specialized tools by specialty and compacts identical ore bags', () => {
+    const slots: RawLoadoutSlot[] = [
+      ...[1, 2, 3, 4].map((n) => ({
+        id: n,
+        parent_id: null,
+        port_name: `hardpoint_mining_pod_${n}`,
+        port_type: 'Other',
+        component_class_name: 'Cargo_ShipMining_Pod_Prospector',
+      })),
+      {
+        id: 10,
+        parent_id: null,
+        port_name: 'hardpoint_weapon_emp',
+        port_type: 'WeaponGun',
+        component_type: 'EMP',
+        component_class_name: 'AEGS_EMP_Device_S4',
+        component_name: 'REP-8',
+      },
+    ];
+    const specialized = buildLoadoutTree(slots, 'en').find((s) => s.key === 'specialized')!;
+
+    expect(specialized.subgroups!.map((g) => g.tag)).toEqual(['mining', 'tactical']);
+    const bags = specialized.subgroups![0].nodes;
+    expect(bags).toHaveLength(1);
+    expect(bags[0]).toMatchObject({ count: 4, humanPortName: 'Ore Bag', component_name: 'Removable Ore Bag' });
   });
 });

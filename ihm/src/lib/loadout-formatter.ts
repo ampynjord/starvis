@@ -119,8 +119,31 @@ export interface LoadoutNode {
   thruster_type?: string | null;
   cm_ammo_count?: number | null;
   categoryTag?: string;
+  /** Spécialité fine des équipements du groupe `specialized`. */
+  specialtyTag?: SpecialtyTag;
+  /** Port du module modulaire dont provient ce nœud (ex. `hardpoint_front_module`). */
+  moduleSlot?: string | null;
+  /** Libellé du module installé dans ce port (ex. « Torpilles (Bomber) »). */
+  sourceModule?: string | null;
   count?: number;
   children: LoadoutNode[];
+}
+
+export type SpecialtyTag = 'mining' | 'salvage' | 'tractor' | 'tactical' | 'docking' | 'utility';
+
+export interface SpecialtySubgroup {
+  tag: SpecialtyTag;
+  title: string;
+  nodes: LoadoutNode[];
+}
+
+export interface LoadoutTreeOptions {
+  /**
+   * Ports de modules connus (table `ship_modules`) et libellé du module installé.
+   * Leurs ports internes sont reclassés dans leurs catégories naturelles
+   * (le lance-torpilles d'un Retaliator Bomber rejoint les munitions).
+   */
+  moduleSlots?: Array<{ slotName: string; label?: string | null }>;
 }
 
 export interface GroupedLoadoutSection {
@@ -147,6 +170,8 @@ export interface GroupedLoadoutSection {
     | 'palette';
   nodes: LoadoutNode[];
   badge?: string;
+  /** Sous-groupes par spécialité (onglet Spécialisé uniquement). */
+  subgroups?: SpecialtySubgroup[];
 }
 
 const POSITION_WORDS_FR: Record<string, string> = {
@@ -198,6 +223,25 @@ const POSITION_WORDS_EN: Record<string, string> = {
 };
 
 /**
+ * Aménagements intérieurs sans intérêt pour un loadout : tableaux de bord, consoles,
+ * écrans, batteries, blindage, extincteurs, entretoises de soute, ascenseurs, HUD…
+ *
+ * Contrairement au reste du bruit, tout leur sous-arbre est écarté : l'armoire à
+ * extincteur du Hull C contient une « arme » (l'extincteur) qui, remontée à la
+ * racine, polluerait les armes pilote.
+ */
+const INTERIOR_FIXTURE_PORT_RX =
+  /(?:^|_)(?:dashboard|engineeringscreen|engineering_screen|eng_console|console|cockpit_flair|ping|gravity_generator|gravgen|battery|armou?r|extinguisher|strut|centralwalkway|walkway|elevator|lift|ramp|target_selector|hud|projector|landingsystem|dummy|mission_cargo|cargo_addon|docking_floor|module_oc|flair|personal_storage|controls_screen|control_compacter|weapons_locker)(?:_|\d|$)/;
+const INTERIOR_FIXTURE_CLASS_RX =
+  /^armr_|^softlock_|^gadget_cabinet|^personalstorage_|_screen(?:_|$)|_lighting$|^projector_hud|_dashboard|_scitem_engineer_/;
+
+export function isInteriorFixturePort(portName?: string | null, componentClassName?: string | null): boolean {
+  const p = (portName || '').toLowerCase();
+  const c = (componentClassName || '').toLowerCase();
+  return INTERIOR_FIXTURE_PORT_RX.test(p) || INTERIOR_FIXTURE_CLASS_RX.test(c);
+}
+
+/**
  * Filter true noise ports (doors, seats, screens, fuses, lights) while strictly preserving
  * functional components, thrusters, fuel tanks, docking collars, and specialized tools.
  */
@@ -205,6 +249,8 @@ export function isNoisyPort(portName?: string | null, componentClassName?: strin
   const p = (portName || '').toLowerCase();
   const c = (componentClassName || '').toLowerCase();
   const n = (componentName || '').toLowerCase();
+
+  if (isInteriorFixturePort(portName, componentClassName)) return true;
 
   // Internal engine controllers (except flight computer which is a valid component)
   if ((p.includes('controller_') || c.includes('controller_')) && !p.includes('controller_flight') && !c.includes('controller_flight')) {
@@ -383,22 +429,43 @@ export function humanizeComponentName(
   if (cClass.startsWith('INTK') || pName.includes('fuel_intake'))
     return isFr ? 'Collecteur d’admission d’hydrogène' : 'Hydrogen Fuel Intake';
 
-  // 5. Mining & Extraction Pods
-  if (cClass.includes('MINING_POD') || pName.includes('mining_pod'))
-    return isFr ? 'Sac d’extraction minier amovible (32 SCU)' : 'Removable Mining Saddlebag (32 SCU)';
+  // 5. Mining & Extraction Pods — la capacité dépend du vaisseau (et n'est pas
+  // extraite) : on ne l'affiche pas plutôt que d'afficher un chiffre faux.
   if (cClass.includes('COLLAPSED') || pName.includes('stored_pod'))
-    return isFr ? 'Sac d’extraction replié de rechange' : 'Collapsed Spare Saddlebag';
+    return isFr ? 'Sac à minerai replié (rechange)' : 'Collapsed Spare Ore Bag';
+  if (cClass.includes('MINING_POD') || pName.includes('mining_pod')) return isFr ? 'Sac à minerai amovible' : 'Removable Ore Bag';
   if (cClass.includes('MINING_ARM') || pName.includes('mining_arm')) return isFr ? 'Bras articulé de minage' : 'Mining Boom Arm';
   if (cClass.includes('SALVAGE_ARM') || pName.includes('salvage_arm'))
     return isFr ? 'Bras articulé de recyclage' : 'Salvage Articulated Arm';
+
+  // 5b. Salvage internals: buffer storage, disintegration beam, head modifiers
+  if (cClass.startsWith('SALVAGEINTERNALSTORAGE') || pName.includes('internal_storage'))
+    return isFr ? 'Stockage tampon de recyclage' : 'Salvage Buffer Storage';
+  if (cClass.startsWith('SALVAGEFILLERSTATION')) return isFr ? 'Station de remplissage RMC' : 'RMC Filler Station';
+  if (cClass.startsWith('FUELPOD')) return isFr ? 'Réservoir de ravitaillement (Fuel Pod)' : 'Refuelling Fuel Pod';
+  if (cClass.includes('DISINTEGRATION') || pName.includes('disintegration'))
+    return isFr ? 'Faisceau de désintégration' : 'Disintegration Beam';
+  const salvageModifier = cClass.match(/^SALVAGE_MODIFIER_([A-Z]+)(?:_[A-Z]+)*?_(SMALL|MEDIUM|LARGE)/);
+  if (salvageModifier) {
+    const kind = salvageModifier[1];
+    const sizeLabel = { SMALL: 'S', MEDIUM: 'M', LARGE: 'L' }[salvageModifier[2]] ?? '';
+    const kindFr: Record<string, string> = { SCRAPER: 'raclage', TRACTOR: 'tracteur' };
+    const kindEn: Record<string, string> = { SCRAPER: 'Scraper', TRACTOR: 'Tractor' };
+    return isFr
+      ? `Module de recyclage — ${kindFr[kind] ?? kind.toLowerCase()} (${sizeLabel})`
+      : `Salvage Module — ${kindEn[kind] ?? kind} (${sizeLabel})`;
+  }
 
   // 6. Flight Computers & Blades
   if (cClass.includes('CONTROLLER_FLIGHT') || pName.includes('controller_flight'))
     return isFr ? 'Ordinateur de vol principal' : 'Main Flight Computer';
   if (cClass.includes('BLADE') || pName.includes('blade')) return isFr ? 'Lame d’avionique de vol (Blade)' : 'Avionics Flight Blade';
 
-  // 7. Docking Collars
-  if (pName.includes('docking_collar') || cClass.includes('DOCKINGTUBE')) return isFr ? 'Baie d’amarrage parasite' : 'Snub Docking Bay';
+  // 7. Refuelling ports & docking collars (the fuel ports are DockingTube items too)
+  if (cClass.includes('FUEL_PORT') || cClass.includes('REFUELING_PORT') || pName.includes('fuel_port') || pName.includes('fuelport'))
+    return isFr ? 'Port de ravitaillement' : 'Refuelling Port';
+  if (pName.includes('docking_collar') || cClass.includes('DOCKINGTUBE') || cClass.includes('DOCKING_COLLAR'))
+    return isFr ? 'Collier d’amarrage' : 'Docking Collar';
 
   const sanitizedClass = cClass
     .replace(/_GS\b/g, '')
@@ -410,12 +477,13 @@ export function humanizeComponentName(
 /**
  * Transforms technical hardpoint identifiers into clean human-readable labels.
  */
-export function humanizePortName(portName: string, portType: string, lang: SupportedLanguage): string {
+export function humanizePortName(portName: string, portType: string, lang: SupportedLanguage, componentClassName?: string | null): string {
   if (!portName) return portType || '';
 
   const isFr = lang === 'fr';
   const lowerName = portName.toLowerCase();
   const lowerType = (portType || '').toLowerCase();
+  const lowerClass = (componentClassName || '').toLowerCase();
 
   // Child slots should not expose cryptic class names
   if (/^hardpoint_class_\d+/i.test(portName)) {
@@ -424,6 +492,60 @@ export function humanizePortName(portName: string, portType: string, lang: Suppo
   if (/^missile_\d+_attach/i.test(portName)) {
     const num = portName.match(/\d+/)?.[0] ?? '1';
     return isFr ? `Emplacement missile #${parseInt(num, 10)}` : `Missile Slot #${parseInt(num, 10)}`;
+  }
+
+  // Tactical, industrial & salvage tools — tested before the generic weapon / quantum
+  // labels, which would otherwise swallow them ("hardpoint_weapon_emp", "…quantum_interdiction…").
+  if (lowerType.includes('interdiction') || lowerName.includes('interdiction')) {
+    return isFr ? 'Générateur d’interdiction quantique (QED)' : 'Quantum Interdiction Generator (QED)';
+  }
+  if (lowerType === 'emp' || /(?:^|_)emp(?:_|$)/.test(lowerName)) {
+    return isFr ? 'Générateur EMP' : 'EMP Generator';
+  }
+  if (lowerType.includes('tractorbeam')) {
+    return isFr ? 'Rayon tracteur' : 'Tractor Beam';
+  }
+  if (lowerType.includes('salvagehead') || lowerName.includes('weapon_salvage')) {
+    return isFr ? 'Tête de recyclage' : 'Salvage Head';
+  }
+  if (lowerName.includes('salvage_subitem')) {
+    const num = lowerName.match(/(\d+)$/)?.[1];
+    const suffix = num ? ` #${parseInt(num, 10)}` : '';
+    return isFr ? `Emplacement de module de recyclage${suffix}` : `Salvage Module Slot${suffix}`;
+  }
+  if (lowerType.includes('miningmodifier')) {
+    return isFr ? 'Sous-module de minage' : 'Mining Sub-Module';
+  }
+  if (lowerType.includes('mininglaser') || lowerName.includes('weapon_mining')) {
+    return isFr ? 'Tête laser de minage' : 'Mining Laser Head';
+  }
+  if (lowerName.includes('internal_storage')) {
+    return isFr ? 'Stockage tampon' : 'Buffer Storage';
+  }
+  if (lowerName.includes('disintegration')) {
+    return isFr ? 'Zone de désintégration' : 'Disintegration Intake';
+  }
+  if (lowerName.includes('refill_station') || lowerName.includes('filler_station')) {
+    return isFr ? 'Station de remplissage' : 'Filler Station';
+  }
+  if (lowerName.includes('tractorbeamarm')) {
+    return isFr ? 'Bras de remorquage' : 'Towing Arm';
+  }
+  if (lowerClass.includes('towingbeam')) {
+    return isFr ? 'Faisceau de remorquage' : 'Towing Beam';
+  }
+  if (lowerName.includes('fuel_pod')) {
+    return isFr ? 'Fuel Pod de ravitaillement' : 'Refuelling Pod';
+  }
+  if (lowerName.includes('avionics') || lowerClass.startsWith('comp_')) {
+    return isFr ? 'Module d’avionique' : 'Avionics Module';
+  }
+  if (lowerName.includes('claw')) {
+    return isFr ? 'Bras de recyclage' : 'Salvage Claw';
+  }
+  if (lowerClass.includes('shipmining_pod') && !lowerName.includes('pod')) {
+    const side = lowerName.includes('front') ? (isFr ? 'avant' : 'Front') : lowerName.includes('rear') ? (isFr ? 'arrière' : 'Rear') : '';
+    return isFr ? `Sac à minerai amovible${side ? ` (${side})` : ''}` : `Removable Ore Bag${side ? ` (${side})` : ''}`;
   }
 
   // Specialized systems detection
@@ -443,14 +565,24 @@ export function humanizePortName(portName: string, portType: string, lang: Suppo
     const side = lowerName.includes('left') ? (isFr ? 'gauche' : 'Left') : isFr ? 'droit' : 'Right';
     return isFr ? `Bras de recyclage (${side})` : `Salvage Arm (${side})`;
   }
-  if (lowerName.includes('mining_pod') || lowerName.includes('stored_pod')) {
+  if (lowerName.includes('stored_pod')) {
     const num = lowerName.match(/\d+/)?.[0] ?? '1';
-    return isFr ? `Sac d’extraction amovible #${num}` : `Removable Saddlebag #${num}`;
+    return isFr ? `Sac à minerai replié #${num}` : `Stowed Ore Bag #${num}`;
   }
-  if (lowerName.includes('quantum_fuel_tank')) {
+  if (lowerName.includes('mining_pod')) {
+    const num = lowerName.match(/\d+/)?.[0] ?? '1';
+    return isFr ? `Sac à minerai #${num}` : `Ore Bag #${num}`;
+  }
+  if (lowerName.includes('quantum_fuel') || lowerClass.startsWith('qtnk')) {
     return isFr ? 'Réservoir quantique (QT)' : 'Quantum Fuel Tank (QT)';
   }
-  if (lowerName.includes('fuel_tank')) {
+  if (lowerName.includes('fuel_port') || lowerName.includes('fuelport')) {
+    return isFr ? 'Port de ravitaillement' : 'Refuelling Port';
+  }
+  if (lowerName.includes('docking_collar') || lowerName.includes('dockingcollar')) {
+    return isFr ? 'Collier d’amarrage' : 'Docking Collar';
+  }
+  if (lowerName.includes('fuel_tank') || lowerName.includes('fueltank')) {
     const side = lowerName.includes('left') ? (isFr ? 'gauche' : 'Left') : lowerName.includes('right') ? (isFr ? 'droit' : 'Right') : '';
     return isFr ? `Réservoir d’hydrogène (H2)${side ? ` (${side})` : ''}` : `Hydrogen Fuel Tank (H2)${side ? ` (${side})` : ''}`;
   }
@@ -491,8 +623,12 @@ export function humanizePortName(portName: string, portType: string, lang: Suppo
     baseLabel = isFr ? 'Moteur quantique' : 'Quantum Drive';
   } else if (lowerType === 'weapongun' || lowerName.includes('weapon') || lowerName.includes('gun')) {
     baseLabel = isFr ? 'Point d’arme' : 'Weapon Hardpoint';
-  } else if (lowerType === 'turret' || lowerName.includes('turret')) {
+  } else if (lowerType.includes('turret') || lowerName.includes('turret')) {
+    // TurretUnmanned / TurretBase : tourelle téléopérée (le mot « remote » n'est pas toujours dans le port)
     baseLabel = isFr ? 'Tourelle' : 'Turret';
+    if (lowerType === 'turretunmanned' && !lowerName.includes('remote')) {
+      baseLabel = isFr ? 'Tourelle téléopérée' : 'Remote Turret';
+    }
   } else if (lowerType === 'gimbal' || lowerName.includes('gimbal')) {
     baseLabel = isFr ? 'Support articulé' : 'Gimbal Mount';
   } else if (lowerType === 'missilerack' || lowerName.includes('missile')) {
@@ -520,13 +656,28 @@ export function humanizePortName(portName: string, portType: string, lang: Suppo
     lowerName.includes('flare') ||
     lowerName.includes('chaff')
   ) {
-    if (lowerName.includes('decoy') || lowerName.includes('flare') || lowerName.includes('1') || lowerName.includes('left')) {
+    // The installed launcher tells the truth; the port side is only a fallback (Apollo: noise on the left)
+    const classSaysNoise = /noise|chaff/.test(lowerClass);
+    const classSaysDecoy = /decoy|flare/.test(lowerClass);
+    if (
+      classSaysDecoy ||
+      (!classSaysNoise &&
+        (lowerName.includes('decoy') || lowerName.includes('flare') || lowerName.includes('1') || lowerName.includes('left')))
+    ) {
       baseLabel = isFr ? 'Lanceur de leurres (Decoy)' : 'Decoy Launcher';
-    } else if (lowerName.includes('noise') || lowerName.includes('chaff') || lowerName.includes('2') || lowerName.includes('right')) {
+    } else if (
+      classSaysNoise ||
+      lowerName.includes('noise') ||
+      lowerName.includes('chaff') ||
+      lowerName.includes('2') ||
+      lowerName.includes('right')
+    ) {
       baseLabel = isFr ? 'Lanceur de brouillage (Noise)' : 'Noise Launcher';
     } else {
       baseLabel = isFr ? 'Point de contre-mesures' : 'Countermeasure Hardpoint';
     }
+  } else if (!lowerType || lowerType === 'other') {
+    baseLabel = isFr ? 'Emplacement' : 'Mount';
   } else {
     baseLabel = portType || cleaned;
   }
@@ -554,17 +705,30 @@ export function humanizePortName(portName: string, portType: string, lang: Suppo
   return finalName;
 }
 
-/**
- * Fine-grained slot categorization into the exact categories specified by the user.
- */
-export function determineDetailedGroup(slot: {
+type GroupableSlot = {
   port_name?: string | null;
   port_type?: string | null;
   component_type?: string | null;
   component_sub_type?: string | null;
   component_class_name?: string | null;
   component_name?: string | null;
-}): LoadoutGroupKey {
+};
+
+/** EMP au sens strict : « temp », « hemp »… ne doivent pas déclencher la catégorie tactique. */
+const EMP_TOKEN_RX = /(?:^|[^a-z])emp(?:[^a-z]|$)/;
+
+/**
+ * Fine-grained slot categorization into the exact categories specified by the user.
+ */
+export function determineDetailedGroup(slot: GroupableSlot): LoadoutGroupKey {
+  return matchDetailedGroup(slot) ?? 'specialized';
+}
+
+/**
+ * Same as {@link determineDetailedGroup}, but returns `null` when nothing identifies the slot
+ * (instead of the `specialized` fallback) — used to spot transparent containers.
+ */
+function matchDetailedGroup(slot: GroupableSlot): LoadoutGroupKey | null {
   const pName = (slot.port_name || '').toLowerCase();
   const pType = (slot.port_type || '').toLowerCase();
   const cType = (slot.component_type || '').toLowerCase();
@@ -590,6 +754,7 @@ export function determineDetailedGroup(slot: {
     pName.includes('merlin') ||
     pName.includes('archimedes') ||
     pName.includes('docking_collar') ||
+    pName.includes('dockingcollar') ||
     pName.includes('dock_merlin') ||
     pName.includes('itemport_vehicle') ||
     pName.includes('vehicle_attach') ||
@@ -603,6 +768,19 @@ export function determineDetailedGroup(slot: {
     cClass.includes('lynx')
   ) {
     return 'docked_vehicles';
+  }
+
+  // 2b. Fuel before quantum / specialized: QT tanks sit on QuantumDrive ports, and the
+  // Starfarer refuelling pods would otherwise land with the generic « pod » tools below
+  if (
+    pName.includes('fuel_pod') ||
+    cClass.startsWith('fuelpod') ||
+    cClass.startsWith('qtnk') ||
+    cClass.startsWith('htnk') ||
+    pName.includes('fuel_port') ||
+    pName.includes('fuelport')
+  ) {
+    return 'fuel';
   }
 
   // 3. Specialized / Industrial / Tactical (Tractor Beam, Mining, Salvage, EMP, Interdiction, Pods)
@@ -619,10 +797,10 @@ export function determineDetailedGroup(slot: {
     cType.includes('salvage') ||
     pName.includes('salvage') ||
     cClass.includes('salvage') ||
-    pType.includes('emp') ||
-    cType.includes('emp') ||
-    pName.includes('emp') ||
-    cClass.includes('emp') ||
+    pType === 'emp' ||
+    cType === 'emp' ||
+    EMP_TOKEN_RX.test(pName) ||
+    EMP_TOKEN_RX.test(cClass) ||
     pType.includes('interdiction') ||
     cType.includes('quantuminterdiction') ||
     cType.includes('interdiction') ||
@@ -770,13 +948,97 @@ export function determineDetailedGroup(slot: {
     pName.includes('controller_flight') ||
     pName.includes('computer') ||
     pName.includes('blade') ||
+    pName.includes('avionics') ||
     cClass.includes('blade') ||
+    cClass.startsWith('comp_') ||
     cClass.includes('controller_flight')
   ) {
     return 'avionics_blades';
   }
 
-  return 'specialized';
+  return null;
+}
+
+/**
+ * Spécialité d'un équipement du groupe `specialized` : minage, recyclage, tracteur,
+ * tactique (EMP / interdiction quantique), amarrage, ou autre.
+ */
+export function determineSpecialtyTag(slot: GroupableSlot): SpecialtyTag {
+  const haystack = [slot.port_name, slot.port_type, slot.component_type, slot.component_sub_type, slot.component_class_name]
+    .map((v) => (v || '').toLowerCase())
+    .join(' ');
+
+  if (/salvage|disintegration|scraper/.test(haystack)) return 'salvage';
+  if (/mining|shipmining|saddlebag|ore_?bag/.test(haystack)) return 'mining';
+  if (/tractor/.test(haystack)) return 'tractor';
+  if (EMP_TOKEN_RX.test(haystack) || /interdiction|qed|snare|jammer|qdmp/.test(haystack)) return 'tactical';
+  if (/dock|collar|vehicle_attach/.test(haystack)) return 'docking';
+  return 'utility';
+}
+
+const SPECIALTY_ORDER: SpecialtyTag[] = ['mining', 'salvage', 'tractor', 'tactical', 'docking', 'utility'];
+
+function specialtyTitle(tag: SpecialtyTag, isFr: boolean): string {
+  switch (tag) {
+    case 'mining':
+      return isFr ? 'Minage — têtes laser, bras & sacs à minerai' : 'Mining — Laser Heads, Arms & Ore Bags';
+    case 'salvage':
+      return isFr ? 'Recyclage — têtes, désintégration & stockage tampon' : 'Salvage — Heads, Disintegration & Buffer';
+    case 'tractor':
+      return isFr ? 'Rayons tracteurs & manutention de fret' : 'Tractor Beams & Cargo Handling';
+    case 'tactical':
+      return isFr ? 'Tactique — EMP & interdiction quantique' : 'Tactical — EMP & Quantum Interdiction';
+    case 'docking':
+      return isFr ? 'Amarrage' : 'Docking';
+    default:
+      return isFr ? 'Autres systèmes' : 'Other Systems';
+  }
+}
+
+/** Ports racine de modules interchangeables (Retaliator, Apollo, Aurora Mk2, Cyclone…). */
+const MODULE_HOST_PORT_RX =
+  /^hardpoint_(?:(?:front|rear)_)?module$|^hardpoint_modular_room_|^hardpoint_module_bay$|^hardpoint_module_attach$/i;
+
+/** Libellé lisible d'un port de module : « Module avant », « Baie gauche »… */
+export function humanizeModuleSlot(slotName: string, lang: SupportedLanguage, slotType?: string | null): string {
+  const isFr = lang === 'fr';
+  const s = `${slotType || ''} ${slotName}`.toLowerCase();
+  if (/front/.test(s)) return isFr ? 'Module avant' : 'Front Module';
+  if (/rear/.test(s)) return isFr ? 'Module arrière' : 'Rear Module';
+  if (/left/.test(s)) return isFr ? 'Baie modulaire gauche' : 'Left Modular Bay';
+  if (/right/.test(s)) return isFr ? 'Baie modulaire droite' : 'Right Modular Bay';
+  if (/cargo/.test(s)) return isFr ? 'Module de fret' : 'Cargo Module';
+  if (/bay/.test(s)) return isFr ? 'Baie modulaire' : 'Modular Bay';
+  return isFr ? 'Module' : 'Module';
+}
+
+/**
+ * Libellé d'un module à partir de sa classe DataForge :
+ * `AEGS_Retaliator_Module_Front_Bomber` → « Torpilles (Bomber) »,
+ * `RSI_Apollo_Module_Left_Tier_2` → « Baie médicale T2 ».
+ */
+export function humanizeModuleName(moduleClassName: string, lang: SupportedLanguage, moduleTier?: number | null): string {
+  const isFr = lang === 'fr';
+  const variant = (moduleClassName.split(/_Module_?/i)[1] || moduleClassName)
+    .replace(/^(?:Front|Rear|Left|Right)_/i, '')
+    .replace(/_/g, ' ')
+    .trim();
+  const v = variant.toLowerCase();
+  const tier = moduleTier ?? Number(v.match(/tier\s*(\d+)/)?.[1] ?? Number.NaN);
+
+  if (/apollo/i.test(moduleClassName) && Number.isFinite(tier)) return isFr ? `Baie médicale T${tier}` : `Medical Bay T${tier}`;
+  if (Number.isFinite(tier)) return `Tier ${tier}`;
+  if (v === 'base') return isFr ? 'Standard (vide)' : 'Standard (empty)';
+  if (v === 'bomber' || v.includes('torpedo')) return isFr ? 'Torpilles (Bomber)' : 'Torpedo (Bomber)';
+  if (v.includes('missile')) return isFr ? 'Lance-missiles' : 'Missile Launcher';
+  if (v.includes('cargo')) return isFr ? 'Fret' : 'Cargo';
+  if (v.includes('habitation') || v.includes('living') || v.includes('crew')) return isFr ? 'Quartiers d’équipage' : 'Crew Quarters';
+  if (v.includes('medical') || v.includes('med')) return isFr ? 'Baie médicale' : 'Medical Bay';
+  if (v.includes('antiair')) return isFr ? 'Défense antiaérienne' : 'Anti-Air';
+  if (v.includes('turret')) return isFr ? 'Tourelle' : 'Turret';
+  if (v.includes('racing')) return isFr ? 'Course' : 'Racing';
+  if (v.includes('recon')) return isFr ? 'Reconnaissance' : 'Recon';
+  return variant || moduleClassName;
 }
 
 /**
@@ -895,7 +1157,11 @@ export function resolveDockedShipUuid(slot: {
   return null;
 }
 
-export function buildLoadoutTree(slots: RawLoadoutSlot[], lang: SupportedLanguage): GroupedLoadoutSection[] {
+export function buildLoadoutTree(
+  slots: RawLoadoutSlot[],
+  lang: SupportedLanguage,
+  options: LoadoutTreeOptions = {},
+): GroupedLoadoutSection[] {
   const isFr = lang === 'fr';
 
   const flat = flattenSlots(slots);
@@ -903,6 +1169,7 @@ export function buildLoadoutTree(slots: RawLoadoutSlot[], lang: SupportedLanguag
   // 1. Trace parasite/docked vehicle slots and find all their descendants
   const childrenMap = new Map<number, number[]>();
   const dockedVehicleIds = new Set<number>();
+  const fixtureIds = new Set<number>();
 
   for (const s of flat) {
     const id = s.id != null ? Number(s.id) : null;
@@ -915,9 +1182,12 @@ export function buildLoadoutTree(slots: RawLoadoutSlot[], lang: SupportedLanguag
     if (id != null && isDockedVehicleSlot(s)) {
       dockedVehicleIds.add(id);
     }
+    if (id != null && isInteriorFixturePort(s.port_name, s.component_class_name)) {
+      fixtureIds.add(id);
+    }
   }
 
-  // Find all descendants of docked vehicle slots to completely exclude them
+  // Find all descendants of docked vehicle slots (and interior fixtures) to completely exclude them
   const parasiteDescendantIds = new Set<number>();
   function markDescendants(parentId: number) {
     const children = childrenMap.get(parentId) || [];
@@ -928,6 +1198,9 @@ export function buildLoadoutTree(slots: RawLoadoutSlot[], lang: SupportedLanguag
   }
   for (const dockedId of dockedVehicleIds) {
     markDescendants(dockedId);
+  }
+  for (const fixtureId of fixtureIds) {
+    markDescendants(fixtureId);
   }
 
   const nodeMap = new Map<number, LoadoutNode>();
@@ -944,10 +1217,16 @@ export function buildLoadoutTree(slots: RawLoadoutSlot[], lang: SupportedLanguag
     if (isNoisyPort(s.port_name, s.component_class_name, s.component_name)) {
       continue;
     }
+    // Empty generic mounts (no component, no children): placeholders with nothing to show
+    const rawPortType = (s.port_type || '').toLowerCase();
+    const isEmpty = !s.component_class_name && !s.component_name && !s.component_type;
+    if (isEmpty && (!rawPortType || rawPortType === 'other') && !childrenMap.get(id)?.length) {
+      continue;
+    }
 
     const parentId = s.parent_id != null ? Number(s.parent_id) : null;
     const isDocked = dockedVehicleIds.has(id);
-    const humanPort = humanizePortName(s.port_name || '', s.component_type || s.port_type || '', lang);
+    const humanPort = humanizePortName(s.port_name || '', s.component_type || s.port_type || '', lang, s.component_class_name);
     const resolvedCompName = humanizeComponentName(s, lang);
     const dockedUuid = isDocked ? resolveDockedShipUuid(s) : null;
 
@@ -1000,7 +1279,7 @@ export function buildLoadoutTree(slots: RawLoadoutSlot[], lang: SupportedLanguag
   }
 
   // Link children to parents
-  const rootNodes: LoadoutNode[] = [];
+  const linkedRoots: LoadoutNode[] = [];
   for (const node of allNodes) {
     if (dockedVehicleIds.has(node.id)) {
       node.children = [];
@@ -1012,8 +1291,55 @@ export function buildLoadoutTree(slots: RawLoadoutSlot[], lang: SupportedLanguag
         parent.children.push(node);
       }
     } else {
-      rootNodes.push(node);
+      linkedRoots.push(node);
     }
+  }
+
+  // Modules & transparent containers: their functional ports join their natural category
+  // (Hardpoint ➔ Module ➔ Lance-torpilles devient une entrée « Munitions » marquée du module),
+  // while the module itself gets a card in the « Modules » tab.
+  const knownModuleSlots = new Map((options.moduleSlots ?? []).map((m) => [m.slotName, m.label ?? null]));
+  const moduleHosts: LoadoutNode[] = [];
+  const rootNodes: LoadoutNode[] = [];
+  const queue = [...linkedRoots];
+  while (queue.length) {
+    const root = queue.shift()!;
+    const isModuleHost = root.moduleSlot == null && (knownModuleSlots.has(root.port_name) || MODULE_HOST_PORT_RX.test(root.port_name));
+
+    if (isModuleHost) {
+      const label =
+        knownModuleSlots.get(root.port_name) ?? (root.component_class_name ? humanizeModuleName(root.component_class_name, lang) : null);
+      root.humanPortName = humanizeModuleSlot(root.port_name, lang);
+      root.sourceModule = label;
+      root.moduleSlot = root.port_name;
+      if (label) root.component_name = label;
+      for (const child of root.children) {
+        child.parentId = null;
+        child.moduleSlot = root.port_name;
+        child.sourceModule = label;
+        queue.push(child);
+      }
+      root.children = [];
+      moduleHosts.push(root);
+      continue;
+    }
+
+    const isTransparentContainer =
+      root.children.length > 0 &&
+      !dockedVehicleIds.has(root.id) &&
+      (!root.port_type || root.port_type.toLowerCase() === 'other') &&
+      matchDetailedGroup(root) == null;
+    if (isTransparentContainer) {
+      for (const child of root.children) {
+        child.parentId = null;
+        child.moduleSlot ??= root.moduleSlot;
+        child.sourceModule ??= root.sourceModule;
+        queue.push(child);
+      }
+      continue;
+    }
+
+    rootNodes.push(root);
   }
 
   // Compact identical leaf children under the same mount (e.g. 4x Tempest II Missile)
@@ -1073,11 +1399,14 @@ export function buildLoadoutTree(slots: RawLoadoutSlot[], lang: SupportedLanguag
     { key: 'docked_vehicles', title: isFr ? 'Véhicules Arrimés & Parasites' : 'Docked & Parasite Vehicles', iconName: 'anchor' },
     {
       key: 'specialized',
-      title: isFr ? 'Équipements Spécialisés (Minage, Salvage, EMP, Pods)' : 'Specialized Equipment (Mining, Salvage, EMP, Pods)',
+      title: isFr
+        ? 'Équipements Spécialisés (Minage, Salvage, Tracteur, Tactique)'
+        : 'Specialized Equipment (Mining, Salvage, Tractor, Tactical)',
       iconName: 'wrench',
     },
     { key: 'avionics_blades', title: isFr ? 'Ordinateurs de Bord & Blades' : 'Computers & Flight Blades', iconName: 'cpu' },
     { key: 'fuel', title: isFr ? 'Réservoirs de Carburant (QT / H2) & Intakes' : 'Fuel Tanks (QT / H2) & Intakes', iconName: 'fuel' },
+    { key: 'modules', title: isFr ? 'Modules Interchangeables' : 'Interchangeable Modules', iconName: 'layers' },
   ];
 
   const grouped = new Map<LoadoutGroupKey, LoadoutNode[]>();
@@ -1090,27 +1419,73 @@ export function buildLoadoutTree(slots: RawLoadoutSlot[], lang: SupportedLanguag
     const list = grouped.get(detailedKey) || grouped.get('specialized')!;
     list.push(root);
   }
+  grouped.get('modules')!.push(...moduleHosts);
+
+  // Specialized: one entry per identical tool (8 ore bags → "8x Sac à minerai"), tagged by specialty
+  const specialized = compactIdenticalRoots(grouped.get('specialized')!);
+  for (const node of specialized) node.specialtyTag = determineSpecialtyTag(node);
+  grouped.set('specialized', specialized);
 
   const result: GroupedLoadoutSection[] = [];
   for (const def of sectionDefs) {
     const items = grouped.get(def.key) || [];
     if (items.length > 0) {
-      items.sort((a, b) => {
-        const sizeA = Number(a.component_size ?? 0);
-        const sizeB = Number(b.component_size ?? 0);
-        if (sizeB !== sizeA) return sizeB - sizeA;
-        return a.humanPortName.localeCompare(b.humanPortName);
-      });
-      result.push({
+      if (def.key !== 'modules') {
+        items.sort((a, b) => {
+          if (def.key === 'specialized') {
+            const tagDelta = SPECIALTY_ORDER.indexOf(a.specialtyTag ?? 'utility') - SPECIALTY_ORDER.indexOf(b.specialtyTag ?? 'utility');
+            if (tagDelta !== 0) return tagDelta;
+          }
+          const sizeA = Number(a.component_size ?? 0);
+          const sizeB = Number(b.component_size ?? 0);
+          if (sizeB !== sizeA) return sizeB - sizeA;
+          return a.humanPortName.localeCompare(b.humanPortName);
+        });
+      }
+      const section: GroupedLoadoutSection = {
         key: def.key,
         title: `${def.title} (${items.length})`,
         iconName: def.iconName,
         nodes: items,
-      });
+      };
+      if (def.key === 'specialized') {
+        section.subgroups = SPECIALTY_ORDER.map((tag) => ({
+          tag,
+          title: specialtyTitle(tag, isFr),
+          nodes: items.filter((n) => (n.specialtyTag ?? 'utility') === tag),
+        })).filter((g) => g.nodes.length > 0);
+      }
+      result.push(section);
     }
   }
 
   return result;
+}
+
+/** Merge identical leaf roots (same component, no children) into one counted entry. */
+function compactIdenticalRoots(nodes: LoadoutNode[]): LoadoutNode[] {
+  const compacted: LoadoutNode[] = [];
+  const seen = new Map<string, LoadoutNode>();
+  for (const node of nodes) {
+    if (node.children.length > 0 || !node.component_class_name) {
+      compacted.push(node);
+      continue;
+    }
+    const key = `${node.component_class_name}|${node.moduleSlot ?? ''}`;
+    const existing = seen.get(key);
+    if (existing) {
+      existing.count = (existing.count || 1) + 1;
+      // Positions differ (#1, #2, front / rear…): keep only the common label
+      existing.humanPortName = existing.humanPortName.replace(/\s*#\d+$/, '');
+      if (existing.humanPortName !== node.humanPortName.replace(/\s*#\d+$/, '')) {
+        existing.humanPortName = existing.humanPortName.replace(/\s*\([^)]*\)$/, '');
+      }
+    } else {
+      seen.set(key, node);
+      compacted.push(node);
+    }
+  }
+  return compacted;
 }
 
 /**

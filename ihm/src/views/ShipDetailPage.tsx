@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { formatDecimal } from '@/lib/format';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft, ChevronLeft, ChevronRight, Clock, Coins,
   Crosshair, ExternalLink, Layers, Package, Palette, Rocket, Ruler, Users, Zap,
@@ -350,11 +350,6 @@ export default function ShipDetailPage({ initialShip }: { initialShip?: Ship | n
     enabled: !!uuid,
     initialData: seedShip,
   });
-  const { data: loadout } = useQuery({
-    queryKey: ['ships.loadout', uuid, env],
-    queryFn: () => api.ships.loadout(uuid!, env),
-    enabled: !!uuid,
-  });
   const { data: paints } = useQuery({
     queryKey: ['ships.paints', uuid, env],
     queryFn: () => api.ships.paints(uuid!, env),
@@ -404,6 +399,22 @@ export default function ShipDetailPage({ initialShip }: { initialShip?: Ship | n
     }),
     [moduleSlots, effectiveSelection],
   );
+  // Seuls les modules différents de l'équipement d'usine partent à l'API : le
+  // loadout par défaut reste ainsi une seule requête, partagée et mise en cache.
+  const moduleOverrides = useMemo(() => {
+    const overrides: Record<string, string> = {};
+    for (const [slotName, className] of Object.entries(selectedModules)) {
+      if (defaultSelected[slotName] !== className) overrides[slotName] = className;
+    }
+    return overrides;
+  }, [selectedModules, defaultSelected]);
+  const { data: loadout, isFetching: isLoadoutFetching } = useQuery({
+    queryKey: ['ships.loadout', uuid, env, moduleOverrides],
+    queryFn: () => api.ships.loadout(uuid!, env, moduleOverrides),
+    enabled: !!uuid,
+    // Garder l'arbre affiché pendant le recalcul d'un changement de module
+    placeholderData: keepPreviousData,
+  });
   const buyLocations = shipObjectDetail?.related?.buy_locations ?? [];
   const bestPurchase = useMemo(
     () => {
@@ -633,9 +644,11 @@ export default function ShipDetailPage({ initialShip }: { initialShip?: Ship | n
                 nodes={loadout}
                 activeModules={activeModules}
                 moduleSlots={moduleSlots}
+                isRecomputing={isLoadoutFetching && Object.keys(moduleOverrides).length > 0}
                 onModuleChange={(slotName, className) =>
                   setSelectedModules((prev) => ({ ...prev, [slotName]: className }))
                 }
+                onResetModules={() => setSelectedModules({})}
               />
             </ScifiPanel>
           )}
