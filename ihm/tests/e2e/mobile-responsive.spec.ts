@@ -343,15 +343,11 @@ test.describe('@mobile responsive shell', () => {
     { path: '/loot', heading: /^Loot Tables$/i },
     { path: '/changelog', heading: /^Changelog$/i },
     { path: '/missions', heading: /^(Missions|Mission Database)$/i },
-    { path: '/starmap', text: /Galactic Map|Loading RSI starmap objects|No RSI starmap objects/i },
+    { path: '/locations', heading: /STARVIS/i },
   ]) {
     test(`${target.path} remains usable on phone viewport`, async ({ page }) => {
       await gotoApp(page, target.path);
-      if ('heading' in target) {
-        await expect(page.getByRole('heading', { name: target.heading }).first()).toBeVisible();
-      } else {
-        await expect(page.getByText(target.text).first()).toBeVisible({ timeout: 15_000 });
-      }
+      await expect(page.getByRole('heading', { name: target.heading }).first()).toBeVisible();
       await expect(page.getByRole('button', { name: /search/i })).toBeVisible();
       await expect(page.getByLabel(/(Open menu|Ouvrir menu)/i)).toBeVisible();
       await expectNoShellHorizontalOverflow(page);

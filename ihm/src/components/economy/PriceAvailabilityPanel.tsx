@@ -102,7 +102,7 @@ export function PriceAvailabilityPanel({
           <div key={`${row.shop_id}-${row.terminal ?? ''}-${index}`} className="sci-panel px-3 py-2">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <Link href={`/starmap?shop=${row.shop_id}`} className="text-sm text-slate-300 hover:text-cyan-300 transition-colors truncate block">
+                <Link href="/?category=locations" className="text-sm text-slate-300 hover:text-cyan-300 transition-colors truncate block">
                   {row.shop_name}
                 </Link>
                 <p className="text-xs text-slate-600 truncate">{locationLabel(row)}</p>

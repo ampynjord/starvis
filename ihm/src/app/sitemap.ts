@@ -31,7 +31,6 @@ const STATIC_ROUTES: {
   { path: '/commodities', priority: 0.9, changefreq: 'daily' },
   { path: '/manufacturers', priority: 0.85, changefreq: 'monthly' },
   { path: '/locations', priority: 0.85, changefreq: 'weekly' },
-  { path: '/starmap', priority: 0.85, changefreq: 'weekly' },
   { path: '/shops', priority: 0.8, changefreq: 'monthly' },
   { path: '/vehicles', priority: 0.85, changefreq: 'weekly' },
   { path: '/paints', priority: 0.75, changefreq: 'weekly' },

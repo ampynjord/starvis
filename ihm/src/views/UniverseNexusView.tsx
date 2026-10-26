@@ -23,6 +23,7 @@ import {
   Coffee,
   Cpu,
 } from 'lucide-react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEnv } from '@/contexts/EnvContext';
 import { useEntityNexus } from '@/contexts/NexusContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -30,6 +31,25 @@ import { fetchUniverseExplore, fetchUniverseTaxonomy } from '@/services/universe
 import { localizeCatalogLabel } from '@/lib/catalog-labels';
 import type { TaxonomyCategory, UniverseOmniResult } from '@/types/universe';
 import { fNumber } from '@/utils/formatters';
+
+const NEXUS_CATEGORY_IDS = new Set([
+  'all',
+  'ships',
+  'vehicles',
+  'armor',
+  'clothing',
+  'weapons',
+  'utility',
+  'ammo',
+  'sustenance',
+  'locations',
+  'commodities',
+]);
+
+function resolveCategory(raw: string | null | undefined, fallback = 'all'): string {
+  if (raw && NEXUS_CATEGORY_IDS.has(raw)) return raw;
+  return fallback;
+}
 
 function getBadgeClass(color?: string): string {
   switch (color) {
@@ -82,10 +102,18 @@ function renderCategoryIcon(category: string, size = 40) {
   }
 }
 
-export function UniverseNexusView() {
+type UniverseNexusViewProps = {
+  /** Prefer this category when the URL has none (e.g. `/locations`). */
+  initialCategory?: string;
+};
+
+export function UniverseNexusView({ initialCategory }: UniverseNexusViewProps = {}) {
   const { env } = useEnv();
   const { openNexus } = useEntityNexus();
   const { language, t } = useLanguage();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   const categories = [
     { id: 'all', label: t('cat_all'), icon: Sparkles, color: 'text-cyan-400' },
@@ -101,7 +129,9 @@ export function UniverseNexusView() {
     { id: 'commodities', label: t('cat_commodities'), icon: TrendingUp, color: 'text-rose-400' },
   ];
 
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedCategory, setSelectedCategory] = useState<string>(() =>
+    resolveCategory(searchParams.get('category'), resolveCategory(initialCategory)),
+  );
   const [selectedSubCategory, setSelectedSubCategory] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'flight-ready' | 'in-concept' | 'lore'>('all');
   const [search, setSearch] = useState('');
@@ -111,6 +141,23 @@ export function UniverseNexusView() {
   useEffect(() => {
     document.title = t('doc_title');
   }, [language, t]);
+
+  useEffect(() => {
+    const fromUrl = resolveCategory(searchParams.get('category'), resolveCategory(initialCategory));
+    setSelectedCategory((prev) => (prev === fromUrl ? prev : fromUrl));
+  }, [searchParams, initialCategory]);
+
+  useEffect(() => {
+    if (pathname !== '/' && pathname !== '/explore') return;
+    const current = searchParams.get('category');
+    const next = selectedCategory === 'all' ? null : selectedCategory;
+    if ((current ?? null) === next) return;
+    const params = new URLSearchParams(searchParams.toString());
+    if (next) params.set('category', next);
+    else params.delete('category');
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }, [selectedCategory, pathname, router, searchParams]);
 
   // Live Taxonomy Query
   const { data: taxonomy } = useQuery({
