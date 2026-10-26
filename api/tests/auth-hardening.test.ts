@@ -109,17 +109,23 @@ const bearer = (token: string) => ({ Authorization: `Bearer ${token}` });
 
 describe('point 1 — purpose-bound tokens are not sessions', () => {
   it.each(['2fa_pending', 'rsi_hangar_sync'])('rejects a %s token on GET /auth/me', async (type) => {
-    const res = await request(app).get('/auth/me').set(bearer(sign({ sub: 1, type })));
+    const res = await request(app)
+      .get('/auth/me')
+      .set(bearer(sign({ sub: 1, type })));
     expect(res.status).toBe(401);
   });
 
   it.each(['2fa_pending', 'rsi_hangar_sync'])('rejects a %s token on GET /admin/users', async (type) => {
-    const res = await request(app).get('/admin/users').set(bearer(sign({ sub: 1, type })));
+    const res = await request(app)
+      .get('/admin/users')
+      .set(bearer(sign({ sub: 1, type })));
     expect(res.status).toBe(401);
   });
 
   it('still accepts a plain session token', async () => {
-    const res = await request(app).get('/auth/me').set(bearer(sign(claims(2, 'user'))));
+    const res = await request(app)
+      .get('/auth/me')
+      .set(bearer(sign(claims(2, 'user'))));
     expect(res.status).toBe(200);
   });
 
@@ -171,7 +177,9 @@ describe('point 4 — API tokens stay on the external API surface', () => {
   }
 
   it('refuses an admin API token on /admin/*', async () => {
-    const res = await request(app).get('/admin/users').set(bearer(apiToken(1, 'admin')));
+    const res = await request(app)
+      .get('/admin/users')
+      .set(bearer(apiToken(1, 'admin')));
     expect(res.status).toBe(403);
   });
 
@@ -184,7 +192,10 @@ describe('point 4 — API tokens stay on the external API surface', () => {
   });
 
   it('still lets a session mint tokens', async () => {
-    const res = await request(app).post('/auth/api-token').set(bearer(sign(claims(1, 'admin')))).send({ name: 'ok' });
+    const res = await request(app)
+      .post('/auth/api-token')
+      .set(bearer(sign(claims(1, 'admin'))))
+      .send({ name: 'ok' });
     expect(res.status).toBe(200);
   });
 });
