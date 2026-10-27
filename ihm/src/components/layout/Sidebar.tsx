@@ -1,27 +1,20 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
-  Activity,
-  Bug,
   CalendarClock,
   Code2,
   Info,
   Orbit,
   Scale,
   Scroll,
-  Shield,
-  User,
   X,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEnv } from '@/contexts/EnvContext';
-import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import type { TranslationKey } from '@/lib/i18n';
-import { ADMIN_ROLE, hasDeveloperAccess } from '@/lib/app-constants';
 
 type DrawerLink = {
   to: string;
@@ -70,14 +63,7 @@ function DrawerItem({ to, icon: Icon, labelKey, exact, onNavigate }: DrawerLink 
 
 export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { env, setEnv } = useEnv();
-  const { user } = useAuth();
   const { language, setLanguage, t } = useLanguage();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
   return (
     <aside
       className={[
@@ -147,50 +133,9 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
         {DRAWER_LINKS.map((item) => (
           <DrawerItem key={item.to} {...item} onNavigate={onClose} />
         ))}
-
-        {mounted && user?.role === ADMIN_ROLE && (
-          <div className="space-y-1 pt-3">
-            <p className="px-2 pb-1 text-[9px] font-orbitron tracking-widest text-slate-500 uppercase select-none">
-              {t('menu_admin')}
-            </p>
-            <DrawerItem to="/admin" icon={Shield} labelKey="menu_users" exact onNavigate={onClose} />
-            <DrawerItem to="/admin/bug-reports" icon={Bug} labelKey="menu_bugs" onNavigate={onClose} />
-            <DrawerItem to="/admin/monitoring" icon={Activity} labelKey="menu_monitoring" onNavigate={onClose} />
-          </div>
-        )}
       </nav>
 
       <div className="px-4 py-3 border-t border-slate-800/80 space-y-2.5 bg-slate-900/30">
-        {mounted && user ? (
-          <Link href="/profile" className="flex items-center gap-2 group">
-            <div className="w-6 h-6 rounded-full bg-cyan-950 border border-cyan-800/50 flex items-center justify-center shrink-0 overflow-hidden">
-              {user.avatarUrl ? (
-                <img src={user.avatarUrl} alt={user.username} className="w-full h-full object-cover" />
-              ) : (
-                <User size={11} className="text-cyan-500" />
-              )}
-            </div>
-            <span className="font-mono-sc text-xs text-slate-400 group-hover:text-slate-200 transition-colors truncate flex-1">
-              {user.username}
-            </span>
-            {hasDeveloperAccess(user.role) && (
-              <span
-                className={`text-[8px] font-orbitron tracking-widest px-1 py-0.5 rounded-sm border uppercase shrink-0 ${
-                  user.role === ADMIN_ROLE
-                    ? 'text-cyan-500 bg-cyan-950/40 border-cyan-800/50'
-                    : 'text-violet-400 bg-violet-950/40 border-violet-800/50'
-                }`}
-              >
-                {user.role === ADMIN_ROLE ? 'admin' : 'dev'}
-              </span>
-            )}
-          </Link>
-        ) : (
-          <Link href="/login" className="flex items-center gap-2 text-xs text-slate-400 hover:text-white transition-colors">
-            <User size={12} />
-            <span className="font-mono-sc">{t('sign_in')}</span>
-          </Link>
-        )}
         <p className="text-[9px] text-slate-600 leading-tight">{t('disclaimer')}</p>
       </div>
     </aside>

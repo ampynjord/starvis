@@ -1,6 +1,5 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { AUTH_COOKIE_NAME } from '@/lib/server-config';
 
 // Exact public paths (no login required)
 const PUBLIC_PATHS = new Set([
@@ -97,14 +96,6 @@ export function proxy(req: NextRequest) {
 
   if (PUBLIC_PATHS.has(pathname)) return NextResponse.next();
   if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) return NextResponse.next();
-
-  // JWT signature is validated by the API; this proxy only handles UX redirection.
-  const token = req.cookies.get(AUTH_COOKIE_NAME)?.value;
-  if (!token) {
-    const loginUrl = new URL('/login', req.url);
-    loginUrl.searchParams.set('redirect', pathname);
-    return NextResponse.redirect(loginUrl);
-  }
 
   return NextResponse.next();
 }

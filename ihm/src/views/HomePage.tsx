@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -7,7 +7,6 @@ import Image from 'next/image';
 import {
   ArrowRight,
   BookOpen,
-  Bug,
   ChevronRight,
   Code2,
   Clock,
@@ -30,7 +29,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
-import { useAuth } from '@/contexts/AuthContext';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { PageShell } from '@/components/ui/PageShell';
@@ -38,7 +36,7 @@ import { NAV_GROUPS } from '@/components/layout/navigation';
 import { fDate, fNumber } from '@/utils/formatters';
 import type { ChangelogEntry, StatsOverview } from '@/types/api';
 
-// ── Config ────────────────────────────────────────────────────────────────────
+// â”€â”€ Config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 type SectionDef = {
   id: string;
@@ -89,7 +87,7 @@ const HOME_SECTION_META: Record<string, Omit<SectionDef, 'label' | 'links'>> = {
 const SECTIONS: SectionDef[] = NAV_GROUPS.filter((group) => group.id in HOME_SECTION_META).map((group) => ({
   ...HOME_SECTION_META[group.id],
   label: group.label,
-  links: group.items.filter((item) => !item.auth).map((item) => ({
+  links: group.items.map((item) => ({
     label: item.label,
     to: item.to,
   })),
@@ -154,7 +152,7 @@ function entityHref(type: string, uuid: string): string | null {
   return null;
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
+// â”€â”€ Sub-components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function SectionCard({ section, stats, delay }: { section: SectionDef; stats: StatsOverview | undefined; delay: number }) {
   const count = section.statKey ? stats?.[section.statKey] : null;
@@ -226,11 +224,10 @@ function ChangelogRow({ entry }: { entry: ChangelogEntry }) {
   );
 }
 
-// ── Main ──────────────────────────────────────────────────────────────────────
+// â”€â”€ Main â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function HomePage() {
   const { env } = useEnv();
-  const { user } = useAuth();
   const router = useRouter();
   const [heroSearch, setHeroSearch] = useState('');
   const handleHeroSearch = (e: React.FormEvent) => {
@@ -272,7 +269,7 @@ export default function HomePage() {
   return (
     <PageShell>
 
-      {/* ── Early access banner ───────────────────────────────────────── */}
+      {/* â”€â”€ Early access banner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div className="flex items-start gap-3 rounded-sm border border-amber-800/50 bg-amber-950/20 px-4 py-3">
         <TriangleAlert size={15} className="text-amber-500 mt-0.5 shrink-0" />
         <div className="flex-1 min-w-0">
@@ -284,18 +281,9 @@ export default function HomePage() {
             Your bug reports are invaluable to improve the platform.
           </p>
         </div>
-        {user && (
-          <Link
-            href="/report-bug"
-            className="sci-btn-ghost py-1.5 px-3 text-[10px] gap-1.5 whitespace-nowrap shrink-0"
-          >
-            <Bug size={11} />
-            Report a bug
-          </Link>
-        )}
       </div>
 
-      {/* ── Hero ─────────────────────────────────────────────────────── */}
+      {/* â”€â”€ Hero â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div className="sci-panel relative overflow-hidden">
         <div className="absolute inset-0 bg-linear-to-br from-cyan-950/20 via-transparent to-violet-950/10 pointer-events-none" />
         <div className="absolute top-0 left-0 right-0 h-px bg-linear-to-r from-transparent via-cyan-500/40 to-transparent" />
@@ -336,7 +324,7 @@ export default function HomePage() {
                 name="q"
                 value={heroSearch}
                 onChange={(e) => setHeroSearch(e.target.value)}
-                placeholder="Search ships, components, items…"
+                placeholder="Search ships, components, itemsâ€¦"
                 className="w-full bg-slate-900/80 border border-slate-700 rounded-sm pl-10 pr-11 py-2.5 text-sm font-rajdhani text-slate-300 placeholder-slate-600 focus:outline-none focus:border-cyan-600 focus:bg-slate-900 transition-colors"
               />
               <button
@@ -403,14 +391,14 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* ── Section cards ─────────────────────────────────────────────── */}
+      {/* â”€â”€ Section cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {SECTIONS.map((section, i) => (
           <SectionCard key={section.id} section={section} stats={stats} delay={i * 0.08} />
         ))}
       </div>
 
-      {/* ── Spotlight + Changelog ─────────────────────────────────────── */}
+      {/* â”€â”€ Spotlight + Changelog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
 
         {/* Ship spotlight */}
@@ -488,7 +476,7 @@ export default function HomePage() {
                     { label: 'Total HP',    val: randomShip.total_hp != null ? fNumber(randomShip.total_hp) : null, unit: '' },
                     { label: 'Mass',        val: randomShip.mass != null ? fNumber(randomShip.mass) : null, unit: 'kg' },
                     { label: 'Min Crew',    val: randomShip.min_crew != null ? String(randomShip.min_crew) : null, unit: '' },
-                    { label: 'H₂ Fuel',    val: randomShip.hydrogen_fuel_capacity != null ? fNumber(randomShip.hydrogen_fuel_capacity) : null, unit: 'L' },
+                    { label: 'Hâ‚‚ Fuel',    val: randomShip.hydrogen_fuel_capacity != null ? fNumber(randomShip.hydrogen_fuel_capacity) : null, unit: 'L' },
                     { label: 'QT Fuel',     val: randomShip.quantum_fuel_capacity != null ? fNumber(randomShip.quantum_fuel_capacity) : null, unit: 'L' },
                     { label: 'Boost Fwd',   val: randomShip.boost_speed_forward != null ? fNumber(randomShip.boost_speed_forward) : null, unit: 'm/s' },
                     { label: 'Shield Regen',val: randomShip.shield_regen != null ? fNumber(randomShip.shield_regen) : null, unit: 'hp/s' },
@@ -541,7 +529,7 @@ export default function HomePage() {
                 </div>
               </div>
             ) : (
-              <div className="flex-1 p-4"><LoadingGrid rows={3} cols={3} message="LOADING…" /></div>
+              <div className="flex-1 p-4"><LoadingGrid rows={3} cols={3} message="LOADINGâ€¦" /></div>
             )}
           </div>
         </motion.div>

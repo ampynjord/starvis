@@ -2,7 +2,6 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
-import { AuthProvider } from '@/contexts/AuthContext';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { StaleBuildRecovery } from '@/components/ui/StaleBuildRecovery';
 import { EnvProvider } from '@/contexts/EnvContext';
@@ -28,7 +27,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <LanguageProvider>
         <EnvProvider>
           <QueryClientProvider client={queryClient}>
-            <AuthProvider>{children}</AuthProvider>
+            {children}
           </QueryClientProvider>
         </EnvProvider>
       </LanguageProvider>

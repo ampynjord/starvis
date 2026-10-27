@@ -1,278 +1,53 @@
-'use client';
-
-import {
-  BookOpen,
-  Bot,
-  BrainCircuit,
-  Check,
-  Copy,
-  Database,
-  ExternalLink,
-  Key,
-  Lock,
-  Radar,
-  RefreshCw,
-  Send,
-  ShieldCheck,
-  Terminal,
-  Trash2,
-  UserRound,
-  X,
-} from 'lucide-react';
+﻿import { BookOpen, Bot, BrainCircuit, Database, ExternalLink, Key, Radar, Terminal, UsersRound } from 'lucide-react';
+import type { Metadata } from 'next';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { EarlyAccessNotice } from '@/components/ui/EarlyAccessNotice';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PageShell } from '@/components/ui/PageShell';
-import { EarlyAccessNotice } from '@/components/ui/EarlyAccessNotice';
-import { useAuth } from '@/contexts/AuthContext';
-import { ADMIN_ROLE, DEVELOPER_ROLE, hasDeveloperAccess } from '@/lib/app-constants';
+import { PUBLIC_SITE_URL } from '@/lib/server-config';
 
-type Notice = { type: 'success' | 'error'; text: string } | null;
-type ApiAccessRequest = {
-  id: number;
-  motivation: string;
-  status: 'pending' | 'approved' | 'rejected' | string;
-  adminNote: string | null;
-  reviewedAt: string | null;
-  createdAt: string;
+export const metadata: Metadata = {
+  title: 'Public API - STARVIS',
+  description:
+    'The Starvis REST API: Star Citizen ships, components, items, economy, missions, locations and lore, readable anonymously or with a project token.',
 };
-type ApiTokenSummary = {
-  id: number;
-  name: string;
-  description: string | null;
-  roleSnapshot: string;
-  expiresAt: string;
-  revokedAt: string | null;
-  lastUsedAt: string | null;
-  lastUsedIp: string | null;
-  lastUserAgent: string | null;
-  usageCount: number;
-  createdAt: string;
-};
+
+const API_BASE_URL = `${PUBLIC_SITE_URL}/api/v1`;
+
+const API_USE_CASES = [
+  { icon: Bot, title: 'Bots and overlays', text: 'Power Discord commands, widgets, companion tools or public utilities with normalized Starvis data.' },
+  { icon: Database, title: 'Data products', text: 'Query ships, loadouts, economy, items, missions, lore and changelog data without rebuilding an extractor.' },
+  { icon: Radar, title: 'Dashboards and audits', text: 'Feed fleet tools, quality audits or monitoring from the same data the wiki shows.' },
+  { icon: BrainCircuit, title: 'AI workflows', text: 'Ground your own assistant in extracted game data rather than guesses.' },
+];
 
 function Section({ title, icon: Icon, children }: { title: string; icon: React.ElementType; children: React.ReactNode }) {
   return (
-    <section className="sci-panel min-w-0 max-w-full overflow-hidden p-5 space-y-4">
+    <section className="sci-panel p-5 space-y-4">
       <div className="flex items-center gap-2 border-b border-slate-800/60 pb-3">
         <Icon size={14} className="text-cyan-400 shrink-0" />
         <h2 className="font-orbitron text-[10px] font-bold tracking-widest uppercase text-slate-400">{title}</h2>
       </div>
-      <div className="min-w-0 max-w-full">{children}</div>
+      {children}
     </section>
   );
 }
 
 function CodeBlock({ children }: { children: string }) {
   return (
-    <pre className="max-w-full overflow-x-auto rounded-sm border border-slate-800 bg-slate-950 px-4 py-3 text-[11px] font-mono text-slate-300 whitespace-pre">
+    <pre className="overflow-x-auto rounded-sm border border-slate-800 bg-slate-950 px-4 py-3 text-[11px] font-mono text-slate-300 whitespace-pre">
       {children}
     </pre>
   );
 }
 
-function StatusRow({ ok, label }: { ok: boolean; label: string }) {
-  const Icon = ok ? Check : X;
-  return (
-    <div className="flex items-center justify-between gap-3 border-b border-slate-900/80 py-2 last:border-b-0">
-      <span className="text-xs font-mono-sc text-slate-500">{label}</span>
-      <span className={`inline-flex items-center gap-1.5 text-xs font-mono-sc ${ok ? 'text-emerald-400' : 'text-slate-600'}`}>
-        <Icon size={13} />
-        {ok ? 'Enabled' : 'Locked'}
-      </span>
-    </div>
-  );
-}
-
-function tokenStatus(token: ApiTokenSummary): 'active' | 'expired' | 'revoked' {
-  if (token.revokedAt) return 'revoked';
-  if (new Date(token.expiresAt).getTime() <= Date.now()) return 'expired';
-  return 'active';
-}
-
-function tokenStatusStyle(status: ReturnType<typeof tokenStatus>) {
-  if (status === 'active') return 'border-emerald-800/50 bg-emerald-950/20 text-emerald-300';
-  if (status === 'revoked') return 'border-rose-800/50 bg-rose-950/20 text-rose-300';
-  return 'border-amber-800/50 bg-amber-950/20 text-amber-300';
-}
-
-function fmtDateTime(value: string | null) {
-  if (!value) return 'Never';
-  return new Date(value).toLocaleString([], { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' });
-}
-
-const API_USE_CASES = [
-  { icon: Bot, title: 'Bots and overlays', text: 'Power Discord commands, widgets, companion tools or public utilities with normalized Starvis data.' },
-  { icon: Database, title: 'Data products', text: 'Query ships, loadouts, economy, items, missions, lore and changelog data without rebuilding an extractor.' },
-  { icon: Radar, title: 'Operations', text: 'Feed corporation dashboards, fleet tools, quality audits or monitoring with authenticated API access.' },
-  { icon: BrainCircuit, title: 'Multi-source & localization', text: 'Cross-reference P4K DataForge, RSI Matrix, UEX 2.0 and bilingual EN/FR translations from a single REST API.' },
-];
-
 export default function DeveloperPage() {
-  const { user, loading } = useAuth();
-  const [accessRequest, setAccessRequest] = useState<ApiAccessRequest | null>(null);
-  const [motivation, setMotivation] = useState('');
-  const [requestLoading, setRequestLoading] = useState(false);
-  const [requestSubmitting, setRequestSubmitting] = useState(false);
-  const [requestNotice, setRequestNotice] = useState<Notice>(null);
-  const [apiToken, setApiToken] = useState<string | null>(null);
-  const [apiTokenName, setApiTokenName] = useState('External project token');
-  const [apiTokenDescription, setApiTokenDescription] = useState('');
-  const [apiTokenMeta, setApiTokenMeta] = useState<{ name: string; expiresAt: string } | null>(null);
-  const [apiTokens, setApiTokens] = useState<ApiTokenSummary[]>([]);
-  const [apiTokensLoading, setApiTokensLoading] = useState(false);
-  const [revokingTokenId, setRevokingTokenId] = useState<number | null>(null);
-  const [generating, setGenerating] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [notice, setNotice] = useState<Notice>(null);
-  const [origin, setOrigin] = useState('https://starvis.ampynjord.bzh');
-
-  const hasAccess = hasDeveloperAccess(user?.role);
-  const isAdmin = user?.role === ADMIN_ROLE;
-  const roleLabel = user?.role ?? 'anonymous';
-  const apiBaseUrl = `${origin}/api/v1`;
-
-  useEffect(() => {
-    setOrigin(window.location.origin);
-  }, []);
-
-  useEffect(() => {
-    if (loading || !user || hasAccess) return;
-    let cancelled = false;
-    setRequestLoading(true);
-    fetch('/api/auth/developer-access-request')
-      .then(async (res) => {
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error ?? 'Failed to load request');
-        if (!cancelled) setAccessRequest(data.data ?? null);
-      })
-      .catch((error) => {
-        if (!cancelled) setRequestNotice({ type: 'error', text: error instanceof Error ? error.message : 'Failed to load request' });
-      })
-      .finally(() => {
-        if (!cancelled) setRequestLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [hasAccess, loading, user]);
-
-  const loadApiTokens = async () => {
-    if (!hasAccess) return;
-    setApiTokensLoading(true);
-    try {
-      const res = await fetch('/api/auth/api-tokens?includeRevoked=true&limit=100');
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error ?? 'Failed to load API tokens');
-      setApiTokens(Array.isArray(data.data) ? data.data : []);
-    } catch (err: any) {
-      setNotice({ type: 'error', text: err.message ?? 'Failed to load API tokens' });
-    } finally {
-      setApiTokensLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (!loading && hasAccess) void loadApiTokens();
-  }, [hasAccess, loading]);
-
-  const swaggerLabel = useMemo(() => {
-    if (isAdmin) return 'Full admin + public documentation';
-    return 'Public OpenAPI documentation';
-  }, [isAdmin]);
-
-  const generateToken = async () => {
-    setGenerating(true);
-    setApiToken(null);
-    setApiTokenMeta(null);
-    setNotice(null);
-    setCopied(false);
-    try {
-      const res = await fetch('/api/auth/api-token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: apiTokenName,
-          description: apiTokenDescription || undefined,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error ?? 'Token generation failed');
-      setApiToken(data.token);
-      setApiTokenMeta({ name: data.name ?? apiTokenName, expiresAt: data.expiresAt });
-      setNotice({ type: 'success', text: 'Token generated. Copy it now, it will not be shown again.' });
-      void loadApiTokens();
-    } catch (err: any) {
-      setNotice({ type: 'error', text: err.message ?? 'Token generation failed' });
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  const revokeToken = async (tokenId: number) => {
-    setRevokingTokenId(tokenId);
-    setNotice(null);
-    try {
-      const res = await fetch(`/api/auth/api-tokens/${tokenId}`, { method: 'DELETE' });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error ?? 'Token revocation failed');
-      setNotice({ type: 'success', text: 'API token revoked.' });
-      await loadApiTokens();
-    } catch (err: any) {
-      setNotice({ type: 'error', text: err.message ?? 'Token revocation failed' });
-    } finally {
-      setRevokingTokenId(null);
-    }
-  };
-
-  const copyToken = async () => {
-    if (!apiToken) return;
-    await navigator.clipboard.writeText(apiToken);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1800);
-  };
-
-  const submitAccessRequest = async () => {
-    setRequestSubmitting(true);
-    setRequestNotice(null);
-    try {
-      const res = await fetch('/api/auth/developer-access-request', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ motivation }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error ?? 'Failed to submit request');
-      setAccessRequest(data.data);
-      setMotivation('');
-      setRequestNotice({ type: 'success', text: 'Request sent. An admin can now review it from the admin panel.' });
-    } catch (err: any) {
-      setRequestNotice({ type: 'error', text: err.message ?? 'Failed to submit request' });
-    } finally {
-      setRequestSubmitting(false);
-    }
-  };
-
-  const requestStatusStyle =
-    accessRequest?.status === 'approved'
-      ? 'border-emerald-800/40 bg-emerald-950/20 text-emerald-400'
-      : accessRequest?.status === 'rejected'
-        ? 'border-red-800/40 bg-red-950/20 text-red-400'
-        : 'border-amber-800/40 bg-amber-950/20 text-amber-400';
-
-  if (loading) {
-    return (
-      <PageShell size="xl" className="p-4 md:p-6 min-w-0 max-w-full overflow-x-hidden">
-        <div className="p-8 text-center font-mono-sc text-sm text-slate-600">LOADING SESSION...</div>
-      </PageShell>
-    );
-  }
-
   return (
-    <PageShell size="xl" className="p-4 md:p-6 min-w-0 max-w-full overflow-x-hidden">
+    <PageShell size="xl" className="p-4 md:p-6">
       <PageHeader
-        eyebrow="Open Data & Developer Hub"
-        title="API & Datasets"
-        subtitle="Public REST API v1, interactive OpenAPI/Swagger documentation, versioned JSON data packs and optional high-throughput tokens."
+        eyebrow="Developer"
+        title="Public API"
+        subtitle="The data behind the wiki, as a REST API: readable without an account, with a project token when you need more."
         actions={
           <a
             href="/api-docs"
@@ -288,389 +63,73 @@ export default function DeveloperPage() {
       />
 
       <EarlyAccessNotice className="mb-4">
-        All read endpoints under `/api/v1/*` and `/api-docs` are publicly accessible without an API key. Optional Bearer tokens are available below for high-throughput community integrations.
+        External API schemas are stabilizing, but Starvis is still in early access. Use Swagger as the source of truth and expect some data fields to evolve with extraction improvements.
       </EarlyAccessNotice>
 
-      <section className="sci-panel p-5">
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.55fr)]">
-          <div>
-            <p className="mb-2 font-mono-sc text-[9px] uppercase tracking-widest text-cyan-600">Platform surface</p>
-            <h2 className="font-rajdhani text-lg font-bold uppercase tracking-wide text-cyan-300">Build on Starvis instead of rebuilding Starvis</h2>
-            <p className="mt-3 max-w-3xl font-rajdhani text-sm leading-relaxed text-slate-400">
-              Cross-referenced Star Citizen data from `Data.p4k` (DataForge), the official RSI website (Ship Matrix, Store, Starmap, Galactapedia, Comm-Links, Roadmap), UEX Corp 2.0 and bilingual EN/FR localization—available via REST or single-request JSON packs.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-start gap-2 lg:justify-end">
-            <a href="/api-docs" target="_blank" rel="noreferrer" className="sci-btn-primary px-3 py-2 text-xs">
-              Open Swagger
-            </a>
-            <a href="/api/v1/datasets" target="_blank" rel="noreferrer" className="sci-btn-ghost px-3 py-2 text-xs">
-              Bulk Datasets JSON <ExternalLink size={12} />
-            </a>
-          </div>
-        </div>
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {API_USE_CASES.map(({ icon: Icon, title, text }) => (
-            <div key={title} className="rounded-sm border border-slate-800 bg-slate-950/35 p-3">
-              <Icon size={15} className="mb-2 text-cyan-400" />
-              <p className="font-orbitron text-[10px] font-bold uppercase tracking-widest text-slate-300">{title}</p>
-              <p className="mt-2 font-rajdhani text-xs leading-relaxed text-slate-500">{text}</p>
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+        <div className="space-y-4 min-w-0">
+          <Section title="Access" icon={Key}>
+            <div className="space-y-3 font-rajdhani text-sm text-slate-400">
+              <p>
+                <span className="text-slate-200">Anonymous.</span> Every read endpoint under <code className="font-mono-sc text-xs text-cyan-400">/api/v1</code> answers
+                without credentials, under a per-IP rate limit.
+              </p>
+              <p>
+                <span className="text-slate-200">Project token.</span> For a bot, an overlay or a sync job that needs more than the anonymous limit, ask for a token
+                on the Starvis Discord server, with the name of your project. Tokens are issued by hand, last one year and can be revoked on request.
+              </p>
+              <p>
+                A token you send must be valid: a revoked or expired token gets a <code className="font-mono-sc text-xs text-cyan-400">401</code>, it never falls back to
+                anonymous access, so you notice it.
+              </p>
+              <Link
+                href="/discord"
+                className="inline-flex items-center gap-2 rounded border border-cyan-900/70 px-3 py-2 font-mono-sc text-xs text-cyan-300 hover:border-cyan-500 hover:text-cyan-100"
+              >
+                <UsersRound size={13} />
+                Ask for a token on Discord
+              </Link>
             </div>
-          ))}
-        </div>
-      </section>
+          </Section>
 
-      <div className="grid min-w-0 max-w-full gap-4 lg:grid-cols-2" id="datasets">
-        <Section title="Quickstart — Public REST API (No Key Required)" icon={Terminal}>
-          <div className="space-y-3">
-            <p className="font-rajdhani text-sm text-slate-400">
-              Query any `/api/v1/*` endpoint directly. Pass `?version=live|ptu|4.x.x` to query a specific patch or `?lang=fr` for French localization where supported.
-            </p>
-            <CodeBlock>{`# Public anonymous request (no API key needed)
-curl "${apiBaseUrl}/ships?limit=20&page=1"
-
-# Query a specific patch & bilingual translations
-curl "${apiBaseUrl}/ships?version=4.10.1&limit=5"
-curl "${apiBaseUrl}/translations?search=aurora&limit=10"
-
-# Download 3D ship model as standard glTF 2.0 (.glb), Wavefront (.obj) or OpenCTM (.ctm)
-curl -L "${apiBaseUrl}/ships/ANVL_Carrack/model/file?format=glb" -o carrack.glb`}</CodeBlock>
-          </div>
-        </Section>
-
-        <Section title="Base & Cross-Referenced Endpoints" icon={BookOpen}>
-          <CodeBlock>{`${apiBaseUrl}/ships
-${apiBaseUrl}/ships/:uuid/model/file?format=glb|obj|ctm
-${apiBaseUrl}/components
-${apiBaseUrl}/items
-${apiBaseUrl}/commodities
-${apiBaseUrl}/refineries
-${apiBaseUrl}/missions
-${apiBaseUrl}/missions/brokers
-${apiBaseUrl}/locations
-${apiBaseUrl}/starmap/positions
-${apiBaseUrl}/translations
-${apiBaseUrl}/datasets
-${apiBaseUrl}/rsi/roadmap
-${apiBaseUrl}/rsi/organizations/:symbol
-${apiBaseUrl}/rsi/status`}</CodeBlock>
-        </Section>
-      </div>
-
-      {!loading && user && !hasAccess && (
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
-          <Section title="Optional: High-Throughput API Token Access" icon={Lock}>
+          <Section title="Use cases" icon={Radar}>
             <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-sm border border-slate-800 bg-slate-950/40 px-3 py-3">
-                <p className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">Session</p>
-                <p className="mt-1 truncate font-orbitron text-sm text-slate-200">{user.username}</p>
-              </div>
-              <div className="rounded-sm border border-slate-800 bg-slate-950/40 px-3 py-3">
-                <p className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">Role</p>
-                <p className="mt-1 font-orbitron text-sm text-slate-500">{roleLabel}</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3 rounded-sm border border-amber-800/40 bg-amber-950/10 px-4 py-3">
-              <Lock size={14} className="mt-0.5 shrink-0 text-amber-500" />
-              <p className="font-rajdhani text-sm leading-relaxed text-slate-400">
-                Public `/api/v1/*` and Swagger `/api-docs` are already unlocked for everyone. If you need a dedicated Bearer token with higher rate limits for a production server or bot, request the <span className="font-semibold text-cyan-300">developer</span> role.
-              </p>
-            </div>
-          </Section>
-
-          <Section title="High-Throughput Token Request" icon={Send}>
-            {requestLoading ? (
-              <p className="font-mono-sc text-xs text-slate-600">Loading current request...</p>
-            ) : accessRequest ? (
-              <div className="space-y-3">
-                <div className={`rounded-sm border px-3 py-2 text-xs font-mono-sc ${requestStatusStyle}`}>
-                  Status: {accessRequest.status.toUpperCase()} · sent {new Date(accessRequest.createdAt).toLocaleDateString()}
-                </div>
-                <div className="rounded-sm border border-slate-800 bg-slate-950/40 p-3">
-                  <p className="mb-2 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">Motivation</p>
-                  <p className="whitespace-pre-wrap font-rajdhani text-sm leading-relaxed text-slate-400">{accessRequest.motivation}</p>
-                </div>
-                {accessRequest.adminNote && (
-                  <div className="rounded-sm border border-slate-800 bg-slate-950/40 p-3">
-                    <p className="mb-2 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">Admin note</p>
-                    <p className="font-rajdhani text-sm leading-relaxed text-slate-400">{accessRequest.adminNote}</p>
+              {API_USE_CASES.map(({ icon: Icon, title, text }) => (
+                <div key={title} className="border border-slate-800/70 bg-slate-950/40 p-3">
+                  <div className="mb-1.5 flex items-center gap-2">
+                    <Icon size={13} className="text-cyan-500 shrink-0" />
+                    <h3 className="font-rajdhani text-sm font-semibold text-slate-200">{title}</h3>
                   </div>
-                )}
-                {accessRequest.status === 'rejected' && (
-                  <p className="font-rajdhani text-sm text-slate-500">Contact an admin before submitting a new request.</p>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <label className="block">
-                  <span className="mb-1 block font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">Motivation</span>
-                  <textarea
-                    value={motivation}
-                    onChange={(event) => setMotivation(event.target.value)}
-                    minLength={40}
-                    maxLength={2000}
-                    rows={7}
-                    placeholder="Explain your project, expected API usage, tool name, data needs, and how you plan to respect Starvis rate limits and attribution."
-                    disabled={requestSubmitting}
-                    className="w-full resize-y rounded-sm border border-slate-800 bg-slate-950/70 px-3 py-2 font-rajdhani text-sm text-slate-200 outline-none transition-colors placeholder:text-slate-700 focus:border-cyan-700/70 disabled:opacity-50"
-                  />
-                </label>
-                <div className="flex items-center justify-between gap-3">
-                  <p className="font-mono-sc text-[10px] text-slate-600">{motivation.trim().length}/2000 · minimum 40 chars</p>
-                  <button
-                    type="button"
-                    onClick={submitAccessRequest}
-                    disabled={requestSubmitting || motivation.trim().length < 40}
-                    className="inline-flex items-center gap-2 rounded border border-cyan-700/50 bg-cyan-900/40 px-4 py-2 font-mono-sc text-sm text-cyan-300 transition-colors hover:border-cyan-500/70 hover:bg-cyan-900/60 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    <Send size={14} />
-                    {requestSubmitting ? 'Sending...' : 'Send request'}
-                  </button>
+                  <p className="font-rajdhani text-xs leading-relaxed text-slate-500">{text}</p>
                 </div>
-              </div>
-            )}
-            {requestNotice && (
-              <p
-                className={`rounded-sm border px-3 py-2 text-xs font-mono-sc ${
-                  requestNotice.type === 'success' ? 'border-emerald-800/40 bg-emerald-950/20 text-emerald-400' : 'border-red-800/40 bg-red-950/20 text-red-400'
-                }`}
-              >
-                {requestNotice.text}
-              </p>
-            )}
-          </Section>
-        </div>
-      )}
-
-      {!loading && user && !hasAccess ? null : (
-        <>
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
-        <div className="space-y-4">
-          <Section title="Access state" icon={ShieldCheck}>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-sm border border-slate-800 bg-slate-950/40 px-3 py-3">
-                <p className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">Session</p>
-                <p className="mt-1 truncate font-orbitron text-sm text-slate-200">{loading ? 'Checking...' : user ? user.username : 'Public / Anonymous'}</p>
-              </div>
-              <div className="rounded-sm border border-slate-800 bg-slate-950/40 px-3 py-3">
-                <p className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">Role</p>
-                <p className={`mt-1 font-orbitron text-sm ${hasAccess ? 'text-cyan-300' : 'text-slate-400'}`}>{roleLabel}</p>
-              </div>
-              <div className="rounded-sm border border-slate-800 bg-slate-950/40 px-3 py-3">
-                <p className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">Swagger & REST API</p>
-                <p className="mt-1 font-orbitron text-sm text-emerald-400">{swaggerLabel}</p>
-              </div>
+              ))}
             </div>
-
-            <div className="rounded-sm border border-slate-800/80 bg-slate-950/30 px-4">
-              <StatusRow ok={true} label="Public REST API (/api/v1/*)" />
-              <StatusRow ok={true} label="Swagger UI (/api-docs)" />
-              <StatusRow ok={hasAccess} label="Optional Bearer API token generation" />
-              <StatusRow ok={isAdmin} label="Admin routes in Swagger" />
-            </div>
-
-            {!user && !loading && (
-              <div className="flex flex-wrap items-center gap-3 rounded-sm border border-cyan-800/40 bg-cyan-950/10 px-4 py-3">
-                <UserRound size={14} className="text-cyan-500" />
-                <p className="flex-1 font-rajdhani text-sm text-slate-400">Public API access requires no login. Sign in only if you need to generate a dedicated Bearer token for higher rate limits.</p>
-                <Link href="/login?redirect=/developer" className="rounded border border-slate-700 px-3 py-2 font-mono-sc text-xs text-slate-300 hover:border-cyan-700/60">
-                  Login
-                </Link>
-              </div>
-            )}
-
-            {user && !hasAccess && (
-              <div className="flex items-start gap-3 rounded-sm border border-amber-800/40 bg-amber-950/10 px-4 py-3">
-                <Lock size={14} className="mt-0.5 shrink-0 text-amber-500" />
-                <p className="font-rajdhani text-sm leading-relaxed text-slate-400">
-                  Your account is currently <span className="font-semibold text-slate-300">{user.role}</span>. Ask an admin to assign the{' '}
-                  <span className="font-semibold text-cyan-300">{DEVELOPER_ROLE}</span> role for API documentation and external tokens.
-                </p>
-              </div>
-            )}
-          </Section>
-
-          <Section title="API token" icon={Key}>
-            <div className="space-y-3">
-              <p className="font-rajdhani text-sm leading-relaxed text-slate-400">
-                Generate a long-lived Bearer token for external scripts and integrations. Store it securely after copying it.
-              </p>
-
-              <div className="grid gap-3 sm:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
-                <label className="block">
-                  <span className="mb-1 block font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">Project name</span>
-                  <input
-                    value={apiTokenName}
-                    onChange={(event) => setApiTokenName(event.target.value)}
-                    maxLength={120}
-                    disabled={!hasAccess || generating}
-                    className="w-full rounded-sm border border-slate-800 bg-slate-950/70 px-3 py-2 font-rajdhani text-sm text-slate-200 outline-none transition-colors focus:border-cyan-700/70 disabled:opacity-50"
-                  />
-                </label>
-                <label className="block">
-                  <span className="mb-1 block font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">Description</span>
-                  <input
-                    value={apiTokenDescription}
-                    onChange={(event) => setApiTokenDescription(event.target.value)}
-                    maxLength={500}
-                    placeholder="Discord bot, public tool, data audit..."
-                    disabled={!hasAccess || generating}
-                    className="w-full rounded-sm border border-slate-800 bg-slate-950/70 px-3 py-2 font-rajdhani text-sm text-slate-200 outline-none transition-colors placeholder:text-slate-700 focus:border-cyan-700/70 disabled:opacity-50"
-                  />
-                </label>
-              </div>
-
-              {notice && (
-                <p
-                  className={`rounded-sm border px-3 py-2 text-xs font-mono-sc ${
-                    notice.type === 'success' ? 'border-emerald-800/40 bg-emerald-950/20 text-emerald-400' : 'border-red-800/40 bg-red-950/20 text-red-400'
-                  }`}
-                >
-                  {notice.text}
-                </p>
-              )}
-
-              {apiToken && (
-                <div className="space-y-2">
-                  {apiTokenMeta && (
-                    <p className="font-mono-sc text-[10px] text-slate-500">
-                      {apiTokenMeta.name} · expires {new Date(apiTokenMeta.expiresAt).toLocaleDateString()}
-                    </p>
-                  )}
-                  <div className="flex items-center gap-2">
-                    <code className="min-w-0 flex-1 truncate rounded border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-[10px] text-slate-300">
-                      {apiToken}
-                    </code>
-                    <button
-                      type="button"
-                      onClick={copyToken}
-                      className="shrink-0 rounded border border-slate-700 p-2 text-slate-400 transition-colors hover:border-cyan-700/50 hover:bg-white/5"
-                      title="Copy token"
-                    >
-                      {copied ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              <button
-                type="button"
-                onClick={generateToken}
-                disabled={!hasAccess || generating}
-                className="inline-flex items-center gap-2 rounded border border-cyan-700/50 bg-cyan-900/40 px-4 py-2 font-mono-sc text-sm text-cyan-300 transition-colors hover:border-cyan-500/70 hover:bg-cyan-900/60 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                <Key size={14} />
-                {generating ? 'Generating...' : 'Generate API token'}
-              </button>
-            </div>
-          </Section>
-
-          <Section title="Generated tokens" icon={Key}>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="font-rajdhani text-sm text-slate-400">Supervise and revoke the API tokens created by your account. Secrets are never shown again after generation.</p>
-              <button
-                type="button"
-                onClick={() => void loadApiTokens()}
-                disabled={apiTokensLoading}
-                className="inline-flex w-fit items-center gap-2 rounded border border-slate-800 px-3 py-2 font-mono-sc text-xs text-slate-400 transition-colors hover:border-cyan-800/70 hover:text-cyan-300 disabled:opacity-50"
-              >
-                <RefreshCw size={13} className={apiTokensLoading ? 'animate-spin' : ''} />
-                Refresh
-              </button>
-            </div>
-
-            {apiTokensLoading && apiTokens.length === 0 ? (
-              <p className="rounded-sm border border-slate-800 bg-slate-950/40 px-3 py-6 text-center font-mono-sc text-xs text-slate-600">
-                Loading API tokens...
-              </p>
-            ) : apiTokens.length === 0 ? (
-              <p className="rounded-sm border border-slate-800 bg-slate-950/40 px-3 py-6 text-center font-mono-sc text-xs text-slate-600">
-                No API token generated yet.
-              </p>
-            ) : (
-              <div className="overflow-x-auto rounded-sm border border-slate-800/80">
-                <table className="w-full min-w-[760px] text-left">
-                  <thead>
-                    <tr className="border-b border-slate-800/70 bg-slate-950/40 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
-                      <th className="px-3 py-2 font-normal">Project</th>
-                      <th className="px-3 py-2 font-normal">Status</th>
-                      <th className="px-3 py-2 font-normal">Created</th>
-                      <th className="px-3 py-2 font-normal">Expires</th>
-                      <th className="px-3 py-2 text-right font-normal">Usage</th>
-                      <th className="px-3 py-2 font-normal">Last used</th>
-                      <th className="px-3 py-2 font-normal">Client</th>
-                      <th className="px-3 py-2 text-right font-normal">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {apiTokens.map((token) => {
-                      const status = tokenStatus(token);
-                      return (
-                        <tr key={token.id} className="border-b border-slate-800/40 last:border-0 hover:bg-cyan-950/10">
-                          <td className="px-3 py-2">
-                            <p className="truncate font-mono-sc text-xs text-slate-300">{token.name}</p>
-                            {token.description && <p className="truncate font-rajdhani text-xs text-slate-600">{token.description}</p>}
-                          </td>
-                          <td className="px-3 py-2">
-                            <span className={`inline-flex rounded-sm border px-1.5 py-0.5 font-mono-sc text-[10px] font-bold uppercase ${tokenStatusStyle(status)}`}>
-                              {status}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2 font-mono-sc text-xs text-slate-500">{fmtDateTime(token.createdAt)}</td>
-                          <td className="px-3 py-2 font-mono-sc text-xs text-slate-500">{fmtDateTime(token.expiresAt)}</td>
-                          <td className="px-3 py-2 text-right font-mono-sc text-xs text-cyan-400">{token.usageCount.toLocaleString()}</td>
-                          <td className="px-3 py-2 font-mono-sc text-xs text-slate-500">{fmtDateTime(token.lastUsedAt)}</td>
-                          <td className="px-3 py-2">
-                            <p className="max-w-[18rem] truncate font-mono-sc text-xs text-slate-500" title={token.lastUserAgent ?? undefined}>
-                              {token.lastUsedIp ?? 'unknown'}{token.lastUserAgent ? ` · ${token.lastUserAgent}` : ''}
-                            </p>
-                          </td>
-                          <td className="px-3 py-2 text-right">
-                            <button
-                              type="button"
-                              onClick={() => void revokeToken(token.id)}
-                              disabled={status !== 'active' || revokingTokenId === token.id}
-                              className="inline-flex items-center gap-1.5 rounded-sm border border-rose-900/60 px-2 py-1 font-mono-sc text-[10px] text-rose-300 transition-colors hover:border-rose-600 hover:bg-rose-950/30 disabled:cursor-not-allowed disabled:opacity-35"
-                            >
-                              <Trash2 size={11} />
-                              {revokingTokenId === token.id ? 'Revoking' : 'Revoke'}
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
           </Section>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-4 min-w-0">
           <Section title="Request format" icon={Terminal}>
             <div className="space-y-3">
-              <p className="font-rajdhani text-sm text-slate-400">Use the token as a Bearer credential against the REST API. Public browser pages use an internal proxy; external projects must authenticate directly.</p>
+              <p className="font-rajdhani text-sm text-slate-400">Anonymous:</p>
+              <CodeBlock>{`curl "${API_BASE_URL}/ships?limit=20&page=1"`}</CodeBlock>
+              <p className="font-rajdhani text-sm text-slate-400">With a project token:</p>
               <CodeBlock>{`curl -H "Authorization: Bearer YOUR_API_TOKEN" \\
-  "${apiBaseUrl}/ships?limit=20&page=1"`}</CodeBlock>
+  "${API_BASE_URL}/ships?limit=20&page=1"`}</CodeBlock>
             </div>
           </Section>
 
           <Section title="Base endpoints" icon={BookOpen}>
-            <CodeBlock>{`${apiBaseUrl}/ships
-${apiBaseUrl}/components
-${apiBaseUrl}/items
-${apiBaseUrl}/commodities
-${apiBaseUrl}/missions
-${apiBaseUrl}/missions/brokers
-${apiBaseUrl}/locations
-${apiBaseUrl}/starmap/positions
-${apiBaseUrl}/translations
-${apiBaseUrl}/search?search=aurora`}</CodeBlock>
+            <CodeBlock>{`${API_BASE_URL}/ships
+${API_BASE_URL}/components
+${API_BASE_URL}/items
+${API_BASE_URL}/commodities
+${API_BASE_URL}/missions
+${API_BASE_URL}/locations
+${API_BASE_URL}/starmap/positions
+${API_BASE_URL}/search?search=aurora`}</CodeBlock>
           </Section>
         </div>
       </div>
-        </>
-      )}
     </PageShell>
   );
 }

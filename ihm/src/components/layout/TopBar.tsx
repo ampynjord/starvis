@@ -1,27 +1,18 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search,
-  LogIn,
-  User,
-  LogOut,
-  Settings,
   Menu,
   Orbit,
   Code2,
   Scroll,
-  Shield,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
-import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { ADMIN_ROLE } from '@/lib/app-constants';
 
 export function TopBar({
   onMenuToggle,
@@ -32,31 +23,12 @@ export function TopBar({
 }) {
   const pathname = usePathname();
   const { env, setEnv } = useEnv();
-  const { user, logout } = useAuth();
   const { language, setLanguage, t } = useLanguage();
-  const [mounted, setMounted] = useState(false);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const userMenuRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
   const { data: version } = useQuery({
     queryKey: ['version', env],
     queryFn: () => api.stats.version(env),
     staleTime: 10 * 60_000,
   });
-
-  useEffect(() => {
-    if (!userMenuOpen) return;
-    const handler = (event: MouseEvent) => {
-      if (userMenuRef.current?.contains(event.target as Node)) return;
-      setUserMenuOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [userMenuOpen]);
 
   const navLinks = [
     { href: '/', label: t('nav_nexus'), icon: Orbit },
@@ -196,76 +168,6 @@ export function TopBar({
             <span>SC {version.game_version}</span>
           </div>
         )}
-
-        {/* User Account / Sign in */}
-        <div className="relative" ref={userMenuRef}>
-          {mounted && user ? (
-            <>
-              <button
-                onClick={() => setUserMenuOpen((v) => !v)}
-                className="flex items-center gap-2 p-1 sm:px-2.5 sm:py-1.5 rounded-xl border border-slate-800 hover:border-cyan-500/40 bg-slate-900/40 hover:bg-slate-900/80 transition-colors"
-              >
-                <div className="w-7 h-7 rounded-lg bg-cyan-950 border border-cyan-700/50 flex items-center justify-center overflow-hidden shrink-0">
-                  {user.avatarUrl ? (
-                    <img src={user.avatarUrl} alt={user.username} className="w-full h-full object-cover" />
-                  ) : (
-                    <User size={14} className="text-cyan-400" />
-                  )}
-                </div>
-                <span className="text-xs font-mono-sc text-slate-200 hidden md:block">{user.username}</span>
-              </button>
-
-              <AnimatePresence>
-                {userMenuOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -4 }}
-                    transition={{ duration: 0.12 }}
-                    className="absolute right-0 top-full mt-2 w-48 bg-slate-950 border border-cyan-500/30 rounded-xl shadow-xl z-50 overflow-hidden backdrop-blur-xl"
-                  >
-                    {user.role === ADMIN_ROLE && (
-                      <Link
-                        href="/admin"
-                        onMouseDown={() => setUserMenuOpen(false)}
-                        className="flex items-center gap-2.5 px-3.5 py-2.5 text-xs font-mono-sc text-cyan-400 hover:bg-cyan-950/50 hover:text-cyan-300 transition-colors border-b border-slate-800/80"
-                      >
-                        <Shield size={14} />
-                        {t('menu_admin')}
-                      </Link>
-                    )}
-                    <Link
-                      href="/profile"
-                      onMouseDown={() => setUserMenuOpen(false)}
-                      className="flex items-center gap-2.5 px-3.5 py-2.5 text-xs font-mono-sc text-slate-300 hover:bg-cyan-950/50 hover:text-cyan-300 transition-colors"
-                    >
-                      <Settings size={14} />
-                      {t('my_profile')}
-                    </Link>
-                    <button
-                      onMouseDown={async () => {
-                        setUserMenuOpen(false);
-                        await logout();
-                      }}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-xs font-mono-sc text-rose-400 hover:bg-rose-950/30 transition-colors border-t border-slate-800"
-                    >
-                      <LogOut size={14} />
-                      {t('sign_out')}
-                    </button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </>
-          ) : (
-            <Link
-              href="/login"
-              className="flex items-center gap-1.5 px-3 py-1.5 border border-cyan-500/40 hover:border-cyan-400 bg-cyan-950/30 hover:bg-cyan-950/60 text-cyan-300 font-mono-sc text-xs rounded-xl transition-all shadow-sm shadow-cyan-950/50"
-            >
-              <LogIn size={13} />
-              <span className="hidden sm:inline">{t('sign_in')}</span>
-            </Link>
-          )}
-        </div>
       </div>
     </header>
   );
