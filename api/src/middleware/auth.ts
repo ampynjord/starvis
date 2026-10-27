@@ -39,10 +39,41 @@ function requestUserAgent(req: Request): string | null {
   return userAgent.length > 160 ? `${userAgent.slice(0, 157)}...` : userAgent;
 }
 
+/** Longueur minimale de `ADMIN_API_KEY` en production. */
+export const ADMIN_API_KEY_MIN_LENGTH = 32;
+
+/**
+ * `ADMIN_API_KEY` utilisable. En production, une clé de moins de
+ * `ADMIN_API_KEY_MIN_LENGTH` caractères est traitée comme absente : `/admin`
+ * reste fermé plutôt que protégé par une clé faible.
+ */
+export function configuredAdminApiKey(env: NodeJS.ProcessEnv = process.env): string | undefined {
+  const key = env.ADMIN_API_KEY;
+  if (!key) return undefined;
+  if (env.NODE_ENV === 'production' && key.length < ADMIN_API_KEY_MIN_LENGTH) return undefined;
+  return key;
+}
+
+/** Message d'alerte au démarrage si `ADMIN_API_KEY` est présente mais refusée, sinon `null`. */
+export function adminApiKeyProblem(env: NodeJS.ProcessEnv = process.env): string | null {
+  if (!env.ADMIN_API_KEY || configuredAdminApiKey(env)) return null;
+  return `ADMIN_API_KEY is shorter than ${ADMIN_API_KEY_MIN_LENGTH} characters: /admin and the admin-key callers are disabled until it is replaced`;
+}
+
 function applyInternalClientMarker(req: Request): void {
-  if (!process.env.SERVER_API_KEY || req.headers['x-api-key'] !== process.env.SERVER_API_KEY) return;
+  if (!process.env.SERVER_API_KEY || !matchesSecret(apiKeyHeader(req), process.env.SERVER_API_KEY)) return;
   const internalClient = String(req.headers['x-starvis-internal-client'] || '').trim();
   if (/^[a-z0-9_-]{1,40}$/i.test(internalClient)) req.internalClient = internalClient;
+}
+
+/**
+ * Pose le marqueur « appelant interne » avant les limiteurs de débit, pour que
+ * `resolveClientIp` lise l'adresse du visiteur transmise par le proxy de l'IHM
+ * (sinon tout le trafic du site partage l'adresse de l'IHM).
+ */
+export function markInternalClient(req: Request, _res: Response, next: NextFunction): void {
+  applyInternalClientMarker(req);
+  next();
 }
 
 /** Valide un jeton API et l'attache à la requête ; lève une erreur s'il est refusé. */
@@ -94,7 +125,7 @@ export async function resolveExternalApiAccess(req: Request, res: Response, next
 export function requireInternalOrAdmin(req: Request, res: Response, next: NextFunction) {
   const apiKey = apiKeyHeader(req);
   if (!apiKey) return res.status(401).json({ success: false, error: 'Authentication required' });
-  if (matchesSecret(apiKey, process.env.SERVER_API_KEY) || matchesSecret(apiKey, process.env.ADMIN_API_KEY)) {
+  if (matchesSecret(apiKey, process.env.SERVER_API_KEY) || matchesSecret(apiKey, configuredAdminApiKey())) {
     applyInternalClientMarker(req);
     req.authMethod = 'admin_key';
     return next();
@@ -106,7 +137,7 @@ export function requireInternalOrAdmin(req: Request, res: Response, next: NextFu
 export function requireAdminKey(req: Request, res: Response, next: NextFunction) {
   const apiKey = apiKeyHeader(req);
   if (!apiKey) return res.status(401).json({ success: false, error: 'Authentication required' });
-  if (!matchesSecret(apiKey, process.env.ADMIN_API_KEY)) {
+  if (!matchesSecret(apiKey, configuredAdminApiKey())) {
     return res.status(401).json({ success: false, error: 'Invalid admin API key' });
   }
   req.authMethod = 'admin_key';

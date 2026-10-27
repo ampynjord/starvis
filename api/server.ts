@@ -22,7 +22,7 @@ import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import slowDown from 'express-slow-down';
 import helmet from 'helmet';
 import swaggerUi from 'swagger-ui-express';
-import { resolveExternalApiAccess } from './src/middleware/auth.js';
+import { adminApiKeyProblem, markInternalClient, resolveExternalApiAccess } from './src/middleware/auth.js';
 import { prometheusMiddleware } from './src/middleware/prometheus.js';
 import { responseShapeMiddleware } from './src/middleware/response-shape.js';
 import { healthRouter } from './src/routes/health.js';
@@ -76,12 +76,14 @@ const speedLimiter = slowDown({
   delayAfter: RATE_LIMITS.slowAfter,
   delayMs: (hits) => (hits - RATE_LIMITS.slowAfter) * 500,
   maxDelayMs: 20_000,
+  keyGenerator: clientIpRateLimitKey('slow'),
   skip: () => isTest,
 });
 
 const apiLimiter = rateLimit({
   windowMs: RATE_LIMITS.windowMs,
   max: RATE_LIMITS.max,
+  keyGenerator: clientIpRateLimitKey('api'),
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, error: 'Too many requests, please try again later' },
@@ -109,6 +111,7 @@ const adminLimiter = rateLimit({
 const burstLimiter = rateLimit({
   windowMs: RATE_LIMITS.burstWindowMs,
   max: RATE_LIMITS.burst,
+  keyGenerator: clientIpRateLimitKey('burst'),
   standardHeaders: false,
   legacyHeaders: false,
   message: { success: false, error: 'Too many requests per minute, slow down' },
@@ -129,6 +132,9 @@ const anonymousApiLimiter = rateLimit({
   skip: (req) => isTest || req.authMethod !== 'anonymous',
 });
 
+// Le marqueur « appelant interne » doit précéder les limiteurs : il permet de les
+// indexer sur l'adresse du visiteur transmise par l'IHM, pas sur celle de l'IHM.
+app.use(markInternalClient);
 app.use('/api', burstLimiter, speedLimiter, apiLimiter);
 app.use('/admin', adminLimiter);
 
@@ -262,6 +268,9 @@ app.get('/', (_, res) =>
 
 // ===== STARTUP =====
 async function start() {
+  const adminKeyProblem = adminApiKeyProblem();
+  if (adminKeyProblem) logger.error(adminKeyProblem, { module: 'Auth' });
+
   // 0. Ensure CTM cache directory exists
   const { mkdirSync } = await import('node:fs');
   const ctmCacheDir = process.env.CTM_CACHE_DIR || '/tmp/ctm-cache';
