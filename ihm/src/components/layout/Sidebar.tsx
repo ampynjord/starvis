@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { motion } from 'framer-motion';
 import {
@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEnv } from '@/contexts/EnvContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { ISSUES_URL } from '@/lib/app-constants';
 import type { TranslationKey } from '@/lib/i18n';
 
 type DrawerLink = {
@@ -136,6 +137,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
       </nav>
 
       <div className="px-4 py-3 border-t border-slate-800/80 space-y-2.5 bg-slate-900/30">
+        <a href={ISSUES_URL} target="_blank" rel="noopener noreferrer" className="block text-xs font-mono-sc text-slate-400 hover:text-white transition-colors">Report bug</a>
         <p className="text-[9px] text-slate-600 leading-tight">{t('disclaimer')}</p>
       </div>
     </aside>

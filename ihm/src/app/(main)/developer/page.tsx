@@ -46,7 +46,7 @@ export default function DeveloperPage() {
     <PageShell size="xl" className="p-4 md:p-6">
       <PageHeader
         eyebrow="Developer"
-        title="Public API"
+        title="Public API & Datasets"
         subtitle="The data behind the wiki, as a REST API: readable without an account, with a project token when you need more."
         actions={
           <a

@@ -1,4 +1,4 @@
-import type { NextConfig } from 'next';
+﻿import type { NextConfig } from 'next';
 
 const SECURITY_HEADERS = [
   { key: 'X-Content-Type-Options', value: 'nosniff' },
@@ -36,6 +36,15 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     return [
+      // Les comptes ont ete retires (docs/renaissance.md, D1) : leurs pages
+      // renvoient vers l'accueil plutot que vers une 404.
+      ...['/login', '/register', '/forgot-password', '/reset-password', '/verify-email', '/profile', '/my-reports'].map((source) => ({
+        source,
+        destination: '/',
+        permanent: true,
+      })),
+      ...['/admin', '/admin/bug-reports', '/admin/monitoring'].map((source) => ({ source, destination: '/', permanent: true })),
+      { source: '/report-bug', destination: 'https://github.com/ampynjord/starvis/issues', permanent: true },
       { source: '/equipment', destination: '/components', permanent: true },
       { source: '/ships-components', destination: '/components', permanent: true },
       { source: '/vehicles', destination: '/ships', permanent: true },
