@@ -2,6 +2,11 @@ import type { TaxonomyCategory, UniverseEntityNexus, UniverseOmniResult } from '
 
 type NexusLang = 'fr' | 'en';
 
+// Alias `/api/v2` et non le chemin canonique `/api/universe` : en production,
+// Traefik n'envoie à l'API que `/api/v1`, `/api/v2`, `/api-docs` et `/health`.
+// `/api/universe` tomberait sur la réécriture de Next.js, qui répond 500.
+const UNIVERSE_PATH = '/api/v2/universe';
+
 function getBaseUrl(): string {
   if (typeof window !== 'undefined') return '';
   return (process.env.API_URL ?? 'http://127.0.0.1:3000').replace(/\/$/, '');
@@ -9,7 +14,7 @@ function getBaseUrl(): string {
 
 export async function fetchUniverseTaxonomy(env = 'live'): Promise<TaxonomyCategory[]> {
   const base = getBaseUrl();
-  const res = await fetch(`${base}/api/universe/taxonomy?env=${encodeURIComponent(env)}`);
+  const res = await fetch(`${base}${UNIVERSE_PATH}/taxonomy?env=${encodeURIComponent(env)}`);
   if (!res.ok) return [];
   const json = await res.json();
   return json.data || [];
@@ -19,7 +24,7 @@ export async function fetchOmniSearch(query: string, env = 'live', limit = 20, l
   if (!query || query.trim().length === 0) return [];
   const base = getBaseUrl();
   const res = await fetch(
-    `${base}/api/universe/omni-search?q=${encodeURIComponent(query)}&env=${encodeURIComponent(env)}&lang=${lang}&limit=${limit}`,
+    `${base}${UNIVERSE_PATH}/omni-search?q=${encodeURIComponent(query)}&env=${encodeURIComponent(env)}&lang=${lang}&limit=${limit}`,
   );
   if (!res.ok) return [];
   const json = await res.json();
@@ -53,7 +58,7 @@ export async function fetchUniverseExplore(params: {
   if (params.lang) query.set('lang', params.lang);
 
   const base = getBaseUrl();
-  const res = await fetch(`${base}/api/universe/explore?${query.toString()}`);
+  const res = await fetch(`${base}${UNIVERSE_PATH}/explore?${query.toString()}`);
   if (!res.ok) throw new Error('Failed to fetch universe exploration data');
   return res.json();
 }
@@ -66,7 +71,7 @@ export async function fetchEntityNexus(
 ): Promise<UniverseEntityNexus | null> {
   const base = getBaseUrl();
   const res = await fetch(
-    `${base}/api/universe/entities/${encodeURIComponent(category)}/${encodeURIComponent(id)}?env=${encodeURIComponent(env)}&lang=${lang}`,
+    `${base}${UNIVERSE_PATH}/entities/${encodeURIComponent(category)}/${encodeURIComponent(id)}?env=${encodeURIComponent(env)}&lang=${lang}`,
   );
   if (!res.ok) return null;
   const json = await res.json();
