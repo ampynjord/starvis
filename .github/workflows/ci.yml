@@ -97,7 +97,7 @@ jobs:
             file: ihm/Dockerfile
     steps:
       - uses: actions/checkout@v7
-      - uses: hadolint/hadolint-action@v3.1.0
+      - uses: hadolint/hadolint-action@v3.5.0
         with:
           dockerfile: ${{ matrix.file }}
           failure-threshold: error
